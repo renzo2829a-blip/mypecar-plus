@@ -81,60 +81,60 @@
       @font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('fonts/manrope-latin-wght-normal.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
       .mps-overlay { position:fixed; inset:0; z-index:99999; overflow-y:auto;
         background:linear-gradient(135deg,#04231f 0%,#0b5d52 55%,#0f8f7f 100%);
-        display:flex; align-items:center; justify-content:center; padding:20px 16px; box-sizing:border-box;
+        display:flex; align-items:center; justify-content:center; padding:14px 16px; box-sizing:border-box;
         font-family: 'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
-      .mps-card { background:#fff; border-radius:26px; width:100%; max-width:460px; margin:auto;
-        box-shadow:0 30px 80px rgba(2,8,23,.45); padding:32px 30px 28px; box-sizing:border-box; }
-      .mps-marca { display:flex; align-items:center; gap:14px; margin-bottom:22px; }
-      .mps-logo { flex:none; width:52px; height:52px; border-radius:15px; background:#fff;
+      .mps-card { background:#fff; border-radius:20px; width:100%; max-width:390px; margin:auto;
+        box-shadow:0 30px 80px rgba(2,8,23,.45); padding:22px 24px 20px; box-sizing:border-box; }
+      .mps-marca { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+      .mps-logo { flex:none; width:42px; height:42px; border-radius:12px; background:#fff;
         box-shadow:0 4px 14px rgba(15,23,42,.14), inset 0 0 0 1px #e2e8f0; display:grid; place-items:center; }
-      .mps-logo svg { width:28px; height:28px; }
-      .mps-marca-n { font-size:20px; font-weight:800; color:#0f172a; line-height:1.1; letter-spacing:.2px; }
-      .mps-marca-s { font-size:13.5px; color:#64748b; margin-top:3px; }
-      .mps-titulo { font-size:26px; font-weight:800; color:#0f172a; margin:0 0 6px; line-height:1.15; }
-      .mps-subtitulo { font-size:15px; color:#64748b; margin:0 0 20px; line-height:1.45; }
-      .mps-tabs { display:flex; gap:6px; margin-bottom:18px; background:#f1f5f9; border-radius:14px; padding:5px; }
-      .mps-tab { flex:1; text-align:center; padding:11px 6px; border-radius:10px; font-size:14.5px;
+      .mps-logo svg { width:23px; height:23px; }
+      .mps-marca-n { font-size:17px; font-weight:800; color:#0f172a; line-height:1.1; letter-spacing:.2px; }
+      .mps-marca-s { font-size:12px; color:#64748b; margin-top:2px; }
+      .mps-titulo { font-size:21px; font-weight:800; color:#0f172a; margin:0 0 4px; line-height:1.15; }
+      .mps-subtitulo { font-size:13px; color:#64748b; margin:0 0 14px; line-height:1.4; }
+      .mps-tabs { display:flex; gap:6px; margin-bottom:14px; background:#f1f5f9; border-radius:12px; padding:4px; }
+      .mps-tab { flex:1; text-align:center; padding:9px 6px; border-radius:9px; font-size:13px;
         font-weight:700; color:#64748b; cursor:pointer; user-select:none; }
       .mps-tab.activa { background:#fff; color:#0f172a; box-shadow:0 1px 4px rgba(15,23,42,.14); }
-      .mps-label { font-size:14px; font-weight:700; color:#1e293b; margin:14px 0 6px; display:block; }
-      .mps-input { width:100%; box-sizing:border-box; padding:14px 16px; border:1px solid #dbe3ee; background:#f8fafc;
-        border-radius:14px; font-size:16px; min-height:52px; margin-bottom:2px; color:#0f172a; }
+      .mps-label { font-size:12.5px; font-weight:700; color:#1e293b; margin:10px 0 4px; display:block; }
+      .mps-input { width:100%; box-sizing:border-box; padding:10px 14px; border:1px solid #dbe3ee; background:#f8fafc;
+        border-radius:12px; font-size:14px; min-height:44px; margin-bottom:2px; color:#0f172a; }
       .mps-input::placeholder { color:#94a3b8; }
       .mps-input:focus { outline:none; border-color:#0f766e; background:#fff; box-shadow:0 0 0 4px rgba(15,118,110,.14); }
-      .mps-btn { width:100%; padding:15px 16px; min-height:54px; border:none; border-radius:14px; font-size:16px;
-        font-weight:800; cursor:pointer; margin-top:16px; transition:filter .15s, transform .1s; }
+      .mps-btn { width:100%; padding:11px 14px; min-height:44px; border:none; border-radius:12px; font-size:14px;
+        font-weight:800; cursor:pointer; margin-top:12px; transition:filter .15s, transform .1s; }
       .mps-btn:active { transform:scale(.99); }
       .mps-btn-primario { background:#0f766e; color:#fff; box-shadow:0 8px 20px rgba(15,118,110,.28); }
       .mps-btn-primario:hover { filter:brightness(1.07); }
       .mps-btn-primario:disabled { opacity:.6; cursor:default; box-shadow:none; }
       .mps-btn-secundario { background:#fff; color:#0f172a; border:1px solid #dbe3ee; }
-      .mps-link { color:#0f766e; font-size:14px; font-weight:600; cursor:pointer; text-decoration:underline; }
-      .mps-error { background:#fef2f2; color:#b91c1c; font-size:14px; border-radius:12px;
-        padding:11px 13px; margin-top:14px; line-height:1.4; }
-      .mps-ok { background:#f0fdf4; color:#15803d; font-size:14px; border-radius:12px;
-        padding:11px 13px; margin-top:14px; line-height:1.4; }
+      .mps-link { color:#0f766e; font-size:12.5px; font-weight:600; cursor:pointer; text-decoration:underline; }
+      .mps-error { background:#fef2f2; color:#b91c1c; font-size:12.5px; border-radius:10px;
+        padding:9px 11px; margin-top:10px; line-height:1.4; }
+      .mps-ok { background:#f0fdf4; color:#15803d; font-size:12.5px; border-radius:10px;
+        padding:9px 11px; margin-top:10px; line-height:1.4; }
       .mps-empresa-item { display:flex; align-items:center; justify-content:space-between; gap:12px;
-        border:1px solid #dbe3ee; border-radius:16px; padding:15px 16px; margin-bottom:10px; background:#fff;
+        border:1px solid #dbe3ee; border-radius:13px; padding:11px 14px; margin-bottom:8px; background:#fff;
         cursor:pointer; transition:.15s; }
       .mps-empresa-item:hover { border-color:#0f766e; background:#f0fdfa; box-shadow:0 6px 16px rgba(15,118,110,.10); }
-      .mps-empresa-nombre { font-weight:800; font-size:16px; color:#0f172a; }
-      .mps-empresa-ruc { font-size:13.5px; color:#64748b; margin-top:2px; }
-      .mps-ir { flex:none; color:#0f766e; font-weight:800; font-size:14px; white-space:nowrap; }
+      .mps-empresa-nombre { font-weight:800; font-size:14px; color:#0f172a; }
+      .mps-empresa-ruc { font-size:12px; color:#64748b; margin-top:2px; }
+      .mps-ir { flex:none; color:#0f766e; font-weight:800; font-size:12.5px; white-space:nowrap; }
       .mps-btn-google { background:#fff; color:#0f172a; border:1px solid #dbe3ee; display:flex; align-items:center;
         justify-content:center; gap:10px; margin-top:0; }
       .mps-btn-google:hover { background:#f8fafc; }
       .mps-btn-google:disabled { opacity:.6; cursor:default; }
-      .mps-separador { display:flex; align-items:center; gap:12px; color:#94a3b8; font-size:13.5px; margin:18px 0 2px; }
+      .mps-separador { display:flex; align-items:center; gap:12px; color:#94a3b8; font-size:12px; margin:12px 0 2px; }
       .mps-separador::before, .mps-separador::after { content:""; flex:1; height:1px; background:#e2e8f0; }
-      .mps-terminos { display:flex; align-items:flex-start; gap:10px; margin-top:16px; font-size:14px; color:#334155; line-height:1.4; cursor:pointer; }
-      .mps-terminos input { flex:none; width:20px; height:20px; margin-top:1px; accent-color:#0f766e; cursor:pointer; }
+      .mps-terminos { display:flex; align-items:flex-start; gap:9px; margin-top:12px; font-size:12.5px; color:#334155; line-height:1.4; cursor:pointer; }
+      .mps-terminos input { flex:none; width:18px; height:18px; margin-top:1px; accent-color:#0f766e; cursor:pointer; }
       .mps-terminos a { color:#0f766e; font-weight:700; }
-      .mps-ayuda { font-size:13.5px; color:#64748b; margin:12px 0 0; line-height:1.45; }
-      .mps-centro { text-align:center; margin:14px 0 0; }
-      .mps-contacto { display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:18px; }
+      .mps-ayuda { font-size:12px; color:#64748b; margin:9px 0 0; line-height:1.4; }
+      .mps-centro { text-align:center; margin:10px 0 0; }
+      .mps-contacto { display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:14px; }
       .mps-contacto-btn { display:block; width:100%; box-sizing:border-box; text-align:center; text-decoration:none;
-        background:#16a34a; color:#fff; font-weight:800; font-size:15.5px; padding:14px 16px; border-radius:14px; }
+        background:#16a34a; color:#fff; font-weight:800; font-size:14px; padding:11px 14px; border-radius:12px; }
       .mps-aviso-lic { position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:99997; width:calc(100vw - 24px); max-width:560px; box-sizing:border-box;
         display:flex; align-items:flex-start; gap:10px; border-radius:14px; padding:10px 12px 10px 14px; font-size:13.5px; line-height:1.4;
         box-shadow:0 8px 24px rgba(15,23,42,.18); font-family:'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
@@ -142,12 +142,13 @@
       .mps-aviso-lic.roj { background:#fef2f2; border:1px solid #fca5a5; color:#991b1b; }
       .mps-aviso-lic a { color:inherit; font-weight:800; }
       .mps-aviso-lic .x { flex:none; cursor:pointer; font-weight:800; opacity:.7; padding:0 2px; }
-      .mps-contador { font-size:13.5px; color:#64748b; margin:14px 0 10px; }
+      .mps-contador { font-size:12px; color:#64748b; margin:10px 0 8px; }
       @media (max-width:480px) {
-        .mps-card { padding:24px 18px 22px; border-radius:22px; }
-        .mps-titulo { font-size:23px; }
+        .mps-card { padding:20px 16px 18px; border-radius:18px; }
+        .mps-titulo { font-size:20px; }
+        .mps-input { font-size:16px; }
       }
-      .mps-pie { text-align:center; margin-top:18px; font-size:13px; color:#94a3b8; line-height:1.4; }
+      .mps-pie { text-align:center; margin-top:12px; font-size:12px; color:#94a3b8; line-height:1.4; }
       .mps-badge { position:fixed; bottom:10px; right:10px; z-index:99998; background:#fff;
         border:1px solid #e2e8f0; border-radius:999px; padding:6px 12px; font-size:12.5px;
         font-weight:600; color:#0f172a; box-shadow:0 2px 8px rgba(0,0,0,.08); cursor:pointer;
