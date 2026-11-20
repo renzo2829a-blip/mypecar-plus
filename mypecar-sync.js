@@ -1494,6 +1494,24 @@ var LZString = {
     // nube, quita a todo el que no sea quien acaba de reiniciar — para que
     // el negocio nuevo no herede co-dueños ni asistentes del negocio
     // anterior — y cancela las invitaciones pendientes que hubiera.
+    // (2026-11-20) Pago por Yape: el dueño declara su plan y su nombre en Yape; si el pago ya
+    // llegó (o llega después), la nube activa la empresa sola. Ver funciones reportar_pago /
+    // yape_registrar_pago en Supabase.
+    async reportarPago(empresaId, plan, nombreYape) {
+      requiereSupabase();
+      const { data, error } = await supabaseClient.rpc('reportar_pago', {
+        p_empresa_id: empresaId, p_plan: plan, p_nombre_yape: nombreYape
+      });
+      if (error) throw error;
+      return data;
+    },
+    // Aviso al WhatsApp del administrador (registro de empresa / pago declarado). Nunca lanza error.
+    async avisar(empresaId, tipo) {
+      try {
+        if (!supabaseClient || !supabaseClient.functions) return;
+        await supabaseClient.functions.invoke('avisar', { body: { tipo, empresa_id: empresaId } });
+      } catch (e) { /* el aviso es opcional */ }
+    },
     async reiniciarComoNueva(empresaId, { ruc, razonSocial, nombreComercial }) {
       requiereSupabase();
       const { data, error } = await supabaseClient.rpc('reiniciar_empresa_como_nueva', {
