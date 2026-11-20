@@ -2660,6 +2660,7 @@ var LZString = {
   global.MypecarSync = {
     init, getEstado, onEstadoCambio, appActual,
     auth, empresas,
+    obtenerClienteSupabase: function () { return supabaseClient; },
     pullAll, storageGet, storageSet, push, flushOutbox, getConflictos,
     removeClave, flushOutboxBorrados,
     instalarInterceptorLocalStorage,
