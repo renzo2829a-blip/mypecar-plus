@@ -36,6 +36,33 @@
 (function (global) {
   'use strict';
 
+  // ---------------------------------------------------------------------
+  // Anti-parpadeo (2026-11-20): en las 9 apps, la pantalla de la aplicación
+  // se pintaba unos instantes antes de que apareciera el login. Se oculta la
+  // página desde que carga este archivo (va en el <head>) y se muestra de
+  // nuevo cuando asegurarAcceso() termina o cuando aparece una pantalla de
+  // login/bloqueo (que cubre todo). Seguro: pase lo que pase, a los 6 segundos
+  // la página se muestra sola, para que nunca quede en blanco.
+  // Solo se aplica en los módulos ("108 0X ... Mypecar Plus.html"), no en
+  // index.html ni legal.html.
+  // ---------------------------------------------------------------------
+  function liberarPagina() {
+    try { document.documentElement.classList.remove('mps-esperando'); } catch (e) {}
+  }
+  (function ocultarHastaVerificar() {
+    try {
+      let ruta = location.pathname;
+      try { ruta = decodeURIComponent(ruta); } catch (e) {}
+      if (!/108\s*0\d/.test(ruta)) return;
+      const st = document.createElement('style');
+      st.id = 'mps-anti-parpadeo';
+      st.textContent = 'html.mps-esperando body{visibility:hidden!important}';
+      (document.head || document.documentElement).appendChild(st);
+      document.documentElement.classList.add('mps-esperando');
+      setTimeout(liberarPagina, 6000);
+    } catch (e) { liberarPagina(); }
+  })();
+
   const EMPRESA_NOMBRE_KEY = 'mypecar_empresa_activa_nombre';
   let estilosInyectados = false;
   let overlayEl = null;
@@ -201,7 +228,8 @@
     opciones = opciones || {};
     injectStyles();
 
-    return new Promise(async (resolve) => {
+    return new Promise(async (resolveOriginal) => {
+      const resolve = (v) => { liberarPagina(); resolveOriginal(v); };
       const estado = global.MypecarSync ? global.MypecarSync.getEstado() : { conectadoASupabase: false };
 
       if (!estado.conectadoASupabase) {
@@ -295,6 +323,7 @@
     limpiarOverlay();
     overlayEl = document.createElement('div');
     overlayEl.className = 'mps-overlay';
+    liberarPagina();
     document.body.appendChild(overlayEl);
 
     overlayEl.innerHTML = `
@@ -321,6 +350,7 @@
     limpiarOverlay();
     overlayEl = document.createElement('div');
     overlayEl.className = 'mps-overlay';
+    liberarPagina();
     document.body.appendChild(overlayEl);
 
     let titulo, mensaje, msgWa;
@@ -364,6 +394,7 @@
     limpiarOverlay();
     overlayEl = document.createElement('div');
     overlayEl.className = 'mps-overlay';
+    liberarPagina();
     document.body.appendChild(overlayEl);
 
     (async () => {
@@ -752,6 +783,7 @@
     limpiarOverlay();
     overlayEl = document.createElement('div');
     overlayEl.className = 'mps-overlay';
+    liberarPagina();
     document.body.appendChild(overlayEl);
     overlayEl.innerHTML = `
       <div class="mps-card" style="max-width:480px;">
