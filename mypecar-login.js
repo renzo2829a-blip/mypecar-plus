@@ -535,7 +535,7 @@
           <label><input type="radio" name="mps-plan" value="anual" /> Anual <b>S/ ${YAPE.anual}</b></label>
         </div>
         <p class="mps-pago-paso">1. Yapea al <b>${num}</b> el monto exacto.</p>
-        <p class="mps-pago-paso">2. Escribe tu nombre como aparece en Yape y pulsa el botón.</p>
+        <p class="mps-pago-paso">2. Escribe tu nombre como aparece en Yape y pulsa el botón: <b>entras de inmediato</b>.</p>
         <input class="mps-input" id="mps-pago-nombre" placeholder="Tu nombre en Yape (ej. Juan Pérez)" autocomplete="name" />
         <button class="mps-btn mps-btn-primario" id="mps-pago-btn" style="margin-top:8px;">Ya hice mi Yape</button>
         <div id="mps-pago-msg"></div>
@@ -567,7 +567,13 @@
       try {
         const r = await global.MypecarSync.empresas.reportarPago(empresaId, plan, nombre);
         global.MypecarSync.empresas.avisar(empresaId, 'pago_reportado');
-        if (r && r.activada && estadoEmpresa === 'autorizada') { window.location.reload(); return; }
+        if (r && r.activada && r.provisional) {
+          // Acceso provisional de 48 horas: entra ya; el pago se confirma solo cuando llegue el Yape.
+          msg('Listo: tu empresa quedó activa por 48 horas mientras confirmamos tu Yape. Entrando…', 'ok');
+          setTimeout(() => window.location.reload(), 1500);
+          return;
+        }
+        if (r && r.activada) { window.location.reload(); return; }
         msg('Listo. Apenas lleguemos a ver tu Yape, tu empresa se activa sola. No cierres esta pantalla.', 'ok');
         btn.textContent = 'Esperando tu pago…';
         vigilar(empresaId);
@@ -597,7 +603,7 @@
       msgWa = 'Hola, mi empresa figura suspendida en MYPECAR PLUS y quiero renovar mi licencia.';
     } else {
       titulo = '⏳ Empresa pendiente de aprobación';
-      mensaje = 'Tu empresa fue registrada correctamente. Para activarla, paga con Yape aquí abajo y entrarás en segundos. Si prefieres otra forma de pago, escríbenos.';
+      mensaje = 'Tu empresa fue registrada correctamente. Para activarla, paga con Yape aquí abajo: al avisar tu pago, entras de inmediato con acceso por 48 horas mientras confirmamos. Si prefieres otra forma de pago, escríbenos.';
       msgWa = 'Hola, registré mi empresa en MYPECAR PLUS y quiero activarla.';
     }
 
