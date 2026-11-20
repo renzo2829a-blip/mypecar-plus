@@ -125,6 +125,59 @@
   })();
 
   // ---------------------------------------------------------------------
+  // Periodo activo = mes actual (2026-11-20). Antes cada módulo se abría en el último mes que se
+  // había usado en él (uno en mayo, otro en junio...). Ahora, al abrir un módulo con periodos
+  // (01 a 06), se pasa solo al mes de HOY: si ese mes ya existe se activa, y si no existe se crea
+  // vacío con la misma función de cada módulo ("Nuevo periodo"). No borra ni cambia datos de
+  // otros meses; el usuario puede volver a cualquier mes con el selector de periodo.
+  // ---------------------------------------------------------------------
+  (function irAlMesActual() {
+    try {
+      let ruta = location.pathname;
+      try { ruta = decodeURIComponent(ruta); } catch (e) {}
+      const m = /108\s*0([1-6])/.exec(ruta);
+      if (!m) return;
+      const modulo = parseInt(m[1], 10);
+      let hecho = false, intentos = 0;
+      function hoyKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+      async function intentar() {
+        if (hecho) return;
+        intentos++;
+        if (intentos > 40) { clearInterval(reloj); return; }           // se rinde a los ~20 s
+        if (document.querySelector('.mps-overlay')) return;           // todavía hay pantalla de login
+        if (typeof config === 'undefined' || !config || typeof switchPeriod !== 'function') return;
+        const key = hoyKey();
+        // Módulos 01 a 05: periodsData con los meses guardados. 06 (Activos Fijos) no lo usa.
+        const tiene = (typeof periodsData !== 'undefined') && periodsData;
+        if (modulo !== 6 && (!tiene || Object.keys(periodsData).length === 0)) return; // aún cargando los datos
+        if (config.periodoActivo === key) { hecho = true; clearInterval(reloj); return; }
+        hecho = true; clearInterval(reloj);
+        if (modulo === 6) { await switchPeriod(key); const sel = document.getElementById('periodo-selector'); if (sel) sel.value = key; return; }
+        if (periodsData[key]) { await switchPeriod(key); return; }
+        if (modulo <= 4 && typeof createPeriod === 'function') {
+          const mes = document.getElementById('new-periodo-mes-sel');
+          const anio = document.getElementById('new-periodo-anio-sel');
+          if (mes && anio) {
+            mes.value = key.slice(5);
+            if (!Array.from(anio.options).some(o => o.value === key.slice(0, 4))) {
+              const o = document.createElement('option'); o.value = key.slice(0, 4); o.textContent = key.slice(0, 4); anio.appendChild(o);
+            }
+            anio.value = key.slice(0, 4);
+            await createPeriod();
+          }
+          return;
+        }
+        if (modulo === 5 && typeof claveDePeriodo === 'function') {   // Personal
+          periodsData[key] = { planilla: [], planillaRxH: [] };
+          try { localStorage.setItem(claveDePeriodo(key), JSON.stringify(periodsData[key])); } catch (e) {}
+          await switchPeriod(key);
+        }
+      }
+      const reloj = setInterval(() => { intentar().catch(e => { console.warn('Periodo actual:', e); }); }, 500);
+    } catch (e) { /* nunca debe impedir abrir el módulo */ }
+  })();
+
+  // ---------------------------------------------------------------------
   // Pestañas agrupadas en menús desplegables (2026-11-20). Reportes (29 pestañas) y Libro
   // Diario (21) llenaban el encabezado con 3-4 filas de botones. Aquí se AGRUPAN en menús
   // (Libros, Estados financieros, Gestión, ...). Son los MISMOS botones, con los mismos ids y
