@@ -1,0 +1,2725 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario — MYPECAR PLUS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script>window.MYPECAR_APP_VERSION = '2026-10-16';</script>
+    <script src="mypecar-sync.js"></script>
+    <script src="mypecar-login.js"></script>
+<script src="mypecar-mobile.js"></script>
+<script>
+    // Blindaje (2026-09-24): si mypecar-sync.js o mypecar-login.js no lograron
+    // cargar (archivo con otro nombre, con ".txt", o en otra carpeta), esto lo
+    // avisa de inmediato en vez de dejar la pantalla en blanco sin ninguna pista.
+    (function () {
+        function avisarSiFaltaAlgo() {
+            var faltan = [];
+            if (typeof MypecarSync === 'undefined') faltan.push('mypecar-sync.js');
+            if (typeof MypecarLogin === 'undefined') faltan.push('mypecar-login.js');
+            if (faltan.length === 0) return;
+            var div = document.createElement('div');
+            div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#b91c1c;color:#fff;padding:14px 18px;font:bold 14px/1.5 sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+            div.innerHTML = '\u26A0\uFE0F No se pudo cargar: <u>' + faltan.join(', ') + '</u>. La aplicacion no puede iniciar.<br>'
+                + 'Verifica que ese archivo este en la MISMA CARPETA que este HTML, con ese nombre EXACTO '
+                + '(sin ".txt" al final, sin numeros ni palabras adelante). Corrige el nombre/ubicacion y vuelve a abrir este archivo.';
+            document.body.insertBefore(div, document.body.firstChild);
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', avisarSiFaltaAlgo);
+        else avisarSiFaltaAlgo();
+    })();
+    </script>
+
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-area { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; background-color: white !important; }
+            table { font-size: 9px !important; border-collapse: collapse !important; }
+            th, td { border: 1px solid #000 !important; padding: 3px !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-gradient-to-r from-amber-600 via-orange-600 to-red-700 text-white shadow-lg no-print">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div id="header-logo-circulo" class="bg-white p-2 rounded-full shadow-md border-2 border-yellow-400 flex items-center justify-center w-14 h-14 overflow-hidden">
+                    <i id="header-logo-generico" class="fa-solid fa-warehouse text-3xl text-orange-600"></i>
+                    <img id="header-logo-cliente" class="hidden w-full h-full object-contain" alt="Logo del negocio">
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black tracking-tight flex items-center gap-2">
+                        CONTROL DE INVENTARIO
+                        <span class="text-xs bg-yellow-400 text-red-950 font-bold px-2 py-0.5 rounded-full">09 INVENTARIO</span>
+                    </h1>
+                    <p class="text-xs text-orange-100 flex items-center gap-1 font-medium">
+                        <i class="fa-solid fa-boxes-stacked text-[10px]"></i> Stock, Kardex y Valorización — <span id="nav-empresa-name-sub">Sin datos de empresa</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 no-print">
+                <div class="bg-orange-950 bg-opacity-40 px-3 py-1.5 rounded-lg border border-orange-500 text-right">
+                    <p class="text-[9px] text-orange-200 font-bold uppercase">Sede Contable</p>
+                    <p class="text-xs font-bold truncate max-w-[200px]" id="nav-empresa-name">Sin configurar</p>
+                </div>
+                <div class="bg-orange-950 bg-opacity-40 px-3 py-1.5 rounded-lg border border-orange-500 text-right">
+                    <p class="text-[9px] text-orange-200 font-bold uppercase">RUC SUNAT</p>
+                    <p class="text-xs font-mono font-bold text-yellow-300" id="nav-empresa-ruc">-</p>
+                </div>
+                <div class="bg-orange-950 bg-opacity-40 px-3 py-1.5 rounded-lg border border-orange-500 text-right">
+                    <p class="text-[9px] text-orange-200 font-bold uppercase">Método Valorización</p>
+                    <p class="text-xs font-mono font-bold text-yellow-300" id="nav-metodo-valorizacion">PROMEDIO</p>
+                </div>
+                <div class="bg-orange-950 bg-opacity-40 px-3 py-1.5 rounded-lg border border-orange-500 text-right" id="sync-status-cont" title="Estado de guardado en la nube">
+                    <p class="text-[9px] text-orange-200 font-bold uppercase">Guardado en la nube</p>
+                    <p class="text-xs font-bold" id="sync-status-badge">—</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-orange-950 bg-opacity-30 border-t border-orange-500 border-opacity-30">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap gap-1 py-2">
+                <button id="btn-tab-dashboard" onclick="switchTab('dashboard')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 bg-orange-50 text-orange-700 border border-orange-100 transition-all">
+                    <i class="fa-solid fa-gauge-high"></i> Panel General
+                </button>
+                <button id="btn-tab-kardex" onclick="switchTab('kardex')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
+                    <i class="fa-solid fa-clipboard-list"></i> Kardex
+                </button>
+                <button id="btn-tab-importar" onclick="switchTab('importar')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
+                    <i class="fa-solid fa-file-import"></i> Importar
+                </button>
+                <button id="btn-tab-ajuste" onclick="switchTab('ajuste')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
+                    <i class="fa-solid fa-sliders"></i> Ajuste Manual
+                </button>
+                <button id="btn-tab-cierre" onclick="switchTab('cierre')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> Cierre Contable
+                </button>
+                <button id="btn-tab-reportes" onclick="switchTab('reportes')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
+                    <i class="fa-solid fa-chart-column"></i> Reportes
+                </button>
+                <button id="btn-tab-alertas" onclick="switchTab('alertas')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
+                    <i class="fa-solid fa-bell"></i> Alertas
+                    <span id="tab-alertas-badge" class="hidden bg-rose-600 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center animate-pulse">0</span>
+                </button>
+                <button id="btn-tab-seguridad" onclick="switchTab('seguridad')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
+                    <i class="fa-solid fa-user-shield"></i> Seguridad
+                </button>
+                <button id="btn-tab-settings" onclick="switchTab('settings')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
+                    <i class="fa-solid fa-gears"></i> Ajustes
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ================= PESTAÑA: DASHBOARD ================= -->
+        <section id="tab-dashboard" class="tab-content space-y-6">
+
+            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3">
+                <i class="fa-solid fa-circle-info text-indigo-500 mt-0.5"></i>
+                <p class="text-xs text-indigo-800">
+                    <b>Cómo funciona:</b> este panel se alimenta de los archivos <b>Movimientos de Inventario</b> exportados desde <b>01 Ventas</b> (salidas) y <b>02 Compras</b> (entradas). Impórtalos en la pestaña <b>Importar</b>. El stock y la valorización se calculan aquí mismo con el método elegido en <b>Ajustes</b>.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-2 no-print">
+                <button onclick="window.print()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-print"></i> Imprimir</button>
+                <button onclick="compartirDashboardWhatsApp()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                <button onclick="compartirDashboardCorreo()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-envelope"></i> Correo</button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Productos Catalogados</p>
+                    <p class="text-2xl font-black text-slate-800 mt-1" id="kpi-total-productos">0</p>
+                    <p class="text-[10px] text-slate-400 mt-1">En catálogo de Ajustes</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Valor Total de Inventario</p>
+                    <p class="text-2xl font-black text-emerald-600 mt-1" id="kpi-valor-inventario">S/ 0.00</p>
+                    <p class="text-[10px] text-slate-400 mt-1" id="kpi-metodo-usado">Método: Promedio Ponderado</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Movimientos Registrados</p>
+                    <p class="text-2xl font-black text-slate-800 mt-1" id="kpi-total-movimientos">0</p>
+                    <p class="text-[10px] text-slate-400 mt-1" id="kpi-ultima-importacion">Sin importaciones aún</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-rose-200" id="kpi-alertas-card">
+                    <p class="text-xs text-rose-500 font-semibold uppercase"><i class="fa-solid fa-triangle-exclamation"></i> Alertas de Stock Mínimo</p>
+                    <p class="text-2xl font-black text-rose-600 mt-1" id="kpi-alertas-stock">0</p>
+                    <p class="text-[10px] text-slate-400 mt-1">Productos por debajo del mínimo</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 lg:col-span-1">
+                    <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-chart-pie text-orange-500"></i> Valor por Punto de Venta</h4>
+                    <div class="h-64"><canvas id="chartValorPV"></canvas></div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 lg:col-span-2">
+                    <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-ranking-star text-orange-500"></i> Productos con Mayor Valor en Stock</h4>
+                    <div id="top-productos-valor" class="space-y-2 text-sm"></div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between gap-2 sm:items-center">
+                    <div>
+                        <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-boxes-stacked text-orange-500"></i> Stock Actual por Producto x Punto de Venta</h4>
+                        <p class="text-[11px] text-slate-500 mt-0.5" id="stock-actual-fecha">Datos en tiempo real — al --</p>
+                    </div>
+                    <input type="text" id="filtro-stock-texto" oninput="renderStockActual()" placeholder="Buscar producto o punto de venta..." class="border border-slate-300 rounded-lg px-3 py-1.5 text-xs w-full sm:w-72">
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="text-left px-3 py-2">Producto</th>
+                                <th class="text-left px-3 py-2">Punto de Venta</th>
+                                <th class="text-right px-3 py-2">Stock Actual</th>
+                                <th class="text-left px-3 py-2">Unidad</th>
+                                <th class="text-right px-3 py-2">Costo Prom.</th>
+                                <th class="text-right px-3 py-2">Valor en Stock</th>
+                                <th class="text-center px-3 py-2">Stock Mínimo</th>
+                                <th class="text-center px-3 py-2">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-stock-actual"></tbody>
+                    </table>
+                    <p id="msg-stock-vacio" class="text-center text-slate-400 text-sm py-8 hidden">Aún no hay movimientos importados. Ve a la pestaña <b>Importar</b> para comenzar.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA: KARDEX ================= -->
+        <section id="tab-kardex" class="tab-content hidden space-y-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-clipboard-list text-orange-500"></i> Kardex Valorizado</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Producto</label>
+                        <select id="kardex-producto" onchange="renderKardex()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Punto de Venta</label>
+                        <select id="kardex-punto-venta" onchange="renderKardex()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="">Todos (consolidado)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Método de Valorización</label>
+                        <select id="kardex-metodo" onchange="renderKardex()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="PROMEDIO">Promedio Ponderado</option>
+                            <option value="PEPS">PEPS (FIFO)</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">El método elegido aquí es solo para esta vista. Para cambiar el método oficial usado en el Panel General, ve a Ajustes.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-4 pt-3 flex items-center justify-between flex-wrap gap-1">
+                    <p class="text-xs font-semibold text-slate-600" id="kardex-fecha-consulta">Saldo actualizado al --</p>
+                    <p class="text-[10px] text-slate-400">Este saldo es en tiempo real: no depende de la Fecha de Corte de la pestaña Cierre Contable.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="text-left px-3 py-2">Fecha</th>
+                                <th class="text-left px-3 py-2">Origen</th>
+                                <th class="text-left px-3 py-2">Comprobante</th>
+                                <th class="text-left px-3 py-2">Punto de Venta</th>
+                                <th class="text-right px-3 py-2">Entrada Cant.</th>
+                                <th class="text-right px-3 py-2">Entrada Costo Unit.</th>
+                                <th class="text-right px-3 py-2">Salida Cant.</th>
+                                <th class="text-right px-3 py-2">Salida Costo Unit.</th>
+                                <th class="text-right px-3 py-2">Saldo Cant.</th>
+                                <th class="text-right px-3 py-2">Saldo Costo Prom.</th>
+                                <th class="text-right px-3 py-2">Saldo Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-kardex"></tbody>
+                    </table>
+                    <p id="msg-kardex-vacio" class="text-center text-slate-400 text-sm py-8 hidden">No hay movimientos para este producto / punto de venta.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA: IMPORTAR ================= -->
+        <section id="tab-importar" class="tab-content hidden space-y-6">
+            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3">
+                <i class="fa-solid fa-circle-info text-indigo-500 mt-0.5"></i>
+                <p class="text-xs text-indigo-800">
+                    Cada importación <b>reemplaza por completo</b> los movimientos de ese origen (Ventas o Compras) por los del archivo importado — no se suman ni duplican. Vuelve a exportar desde Ventas/Compras y a importar aquí cada vez que registres nuevas operaciones. Los ajustes manuales no se ven afectados por las importaciones.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fa-solid fa-cart-shopping text-emerald-500"></i> Movimientos de Ventas (Salidas)</h4>
+                    <p class="text-xs text-slate-500 mb-3">Archivo generado en <b>01 Ventas → Ajustes → Exportar Movimientos de Inventario</b>.</p>
+                    <input type="file" id="input-importar-ventas" accept=".json" class="hidden" onchange="handleImportFile(event, 'venta')">
+                    <button onclick="document.getElementById('input-importar-ventas').click()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-lg text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-arrow-up"></i> Importar JSON de Ventas
+                    </button>
+                    <p class="text-[11px] text-slate-500 mt-3" id="resumen-import-venta">Sin importaciones de Ventas todavía.</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fa-solid fa-truck-ramp-box text-blue-500"></i> Movimientos de Compras (Entradas)</h4>
+                    <p class="text-xs text-slate-500 mb-3">Archivo generado en <b>02 Compras → Ajustes → Exportar Movimientos de Inventario</b>.</p>
+                    <input type="file" id="input-importar-compras" accept=".json" class="hidden" onchange="handleImportFile(event, 'compra')">
+                    <button onclick="document.getElementById('input-importar-compras').click()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-arrow-up"></i> Importar JSON de Compras
+                    </button>
+                    <p class="text-[11px] text-slate-500 mt-3" id="resumen-import-compra">Sin importaciones de Compras todavía.</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-orange-500"></i> Historial de Importaciones</h4>
+                <div id="historial-importaciones" class="text-xs space-y-1"></div>
+                <p id="msg-historial-vacio" class="text-center text-slate-400 text-sm py-4 hidden">Aún no se ha importado ningún archivo.</p>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA: AJUSTE MANUAL ================= -->
+        <section id="tab-ajuste" class="tab-content hidden space-y-6">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-sliders text-orange-500"></i> Registrar Ajuste Manual de Inventario</h4>
+                <p class="text-xs text-slate-500 mb-4">Usa esto para correcciones que no vienen de Ventas ni Compras: mermas, roturas, donaciones, conteos físicos, inventario inicial, etc.</p>
+                <form id="form-ajuste" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Ajuste</label>
+                        <select id="ajuste-tipo" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="entrada">Entrada (aumenta stock)</option>
+                            <option value="salida">Salida (reduce stock)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha</label>
+                        <input type="date" id="ajuste-fecha" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Punto de Venta / Almacén</label>
+                        <select id="ajuste-punto-venta" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Producto</label>
+                        <input type="text" id="ajuste-producto" list="producto-datalist" required placeholder="Escribe para buscar en el catálogo..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="onProductoAjusteInput(this.value)">
+                        <input type="hidden" id="ajuste-producto-codigo">
+                        <datalist id="producto-datalist"></datalist>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Unidad</label>
+                        <input type="text" id="ajuste-unidad" readonly class="w-full border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Cantidad</label>
+                        <input type="number" id="ajuste-cantidad" min="0.01" step="0.01" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div id="bloque-ajuste-costo">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Costo Unitario (S/)</label>
+                        <input type="number" id="ajuste-costo" min="0" step="0.01" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                        <p class="text-[10px] text-slate-400 mt-1">Si lo dejas vacío, se usará el costo promedio actual del producto.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Categoría del Ajuste</label>
+                        <select id="ajuste-categoria" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="merma">Merma (deterioro, vencimiento, robo hormiga)</option>
+                            <option value="rotura">Rotura / Daño</option>
+                            <option value="donacion">Donación / Consumo interno</option>
+                            <option value="conteo">Diferencia de Conteo Físico</option>
+                            <option value="inicial">Inventario Inicial</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                        <p class="text-[10px] text-slate-400 mt-1">Los ajustes de "Merma" alimentan el Reporte de Mermas (pestaña Reportes).</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Motivo (detalle)</label>
+                        <input type="text" id="ajuste-motivo" required placeholder="Ej: Merma por vencimiento, conteo físico, inventario inicial..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div class="md:col-span-3">
+                        <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-5 py-2 rounded-lg text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i> Registrar Ajuste
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-list text-orange-500"></i> Ajustes Manuales Registrados</h4>
+                    <button onclick="switchAjusteVista('papelera')" id="btn-ver-papelera-ajustes" class="text-xs text-slate-500 hover:text-rose-600 font-semibold"><i class="fa-solid fa-trash"></i> Ver Papelera</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="text-left px-3 py-2">Fecha</th>
+                                <th class="text-left px-3 py-2">Tipo</th>
+                                <th class="text-left px-3 py-2">Producto</th>
+                                <th class="text-left px-3 py-2">Punto de Venta</th>
+                                <th class="text-right px-3 py-2">Cantidad</th>
+                                <th class="text-left px-3 py-2">Categoría</th>
+                                <th class="text-left px-3 py-2">Motivo</th>
+                                <th class="text-center px-3 py-2 no-print">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-ajustes"></tbody>
+                    </table>
+                    <p id="msg-ajustes-vacio" class="text-center text-slate-400 text-sm py-8 hidden">No hay ajustes manuales registrados.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA: CIERRE CONTABLE ================= -->
+        <section id="tab-cierre" class="tab-content hidden space-y-6">
+            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3">
+                <i class="fa-solid fa-circle-info text-indigo-500 mt-0.5"></i>
+                <p class="text-xs text-indigo-800">
+                    Esta pestaña conecta el Kardex con la Contabilidad. Elige una <b>fecha de corte</b> (normalmente el último día del mes que vas a cerrar) y el sistema calcula el valor del inventario a esa fecha, con el mismo método (PEPS o Promedio) configurado en Ajustes. Exporta ese resultado y súbelo en <b>04 Libro Diario → pestaña Almacén</b> para que el Costo de Ventas del mes se calcule con el Kardex real, en vez de una estimación manual. También puedes importarlo en <b>07 Reportes</b> para comparar la cifra contable contra el Kardex.
+                </p>
+                <p class="text-xs text-indigo-800 mt-2">
+                    <b>Nota:</b> esta fecha de corte solo se usa aquí, para el asiento de cierre. El <b>Panel General</b>, el <b>Kardex</b> y los <b>Reportes</b> siempre muestran el saldo en tiempo real, a la fecha de hoy — no cambian según lo que elijas en esta pestaña.
+                </p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-col sm:flex-row items-end gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha de Corte</label>
+                        <input type="date" id="cierre-fecha-corte" onchange="renderCierre()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <p class="text-[11px] text-slate-500 mb-2">Se incluyen todos los movimientos (ventas, compras y ajustes) registrados hasta e incluyendo esta fecha.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Valor de Inventario a la Fecha de Corte</p>
+                    <p class="text-2xl font-black text-emerald-600 mt-1" id="cierre-kpi-valor">S/ 0.00</p>
+                    <p class="text-[10px] font-semibold text-slate-600 mt-1" id="cierre-kpi-fecha">Al --</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5" id="cierre-kpi-metodo">Método: Promedio Ponderado</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Productos con Stock</p>
+                    <p class="text-2xl font-black text-slate-800 mt-1" id="cierre-kpi-productos">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Movimientos Considerados</p>
+                    <p class="text-2xl font-black text-slate-800 mt-1" id="cierre-kpi-movimientos">0</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-file-invoice-dollar text-orange-500"></i> Valorización a la Fecha de Corte (para el asiento de cierre)</h4>
+                    <div class="flex flex-wrap gap-2 no-print">
+                        <button onclick="exportarValorizacionContable()" class="bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-file-export"></i> Exportar para Contabilidad (.json)</button>
+                        <button onclick="window.print()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-print"></i> Imprimir</button>
+                        <button onclick="compartirCierreWhatsApp()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                        <button onclick="compartirCierreCorreo()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-envelope"></i> Correo</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="text-left px-3 py-2">Producto</th>
+                                <th class="text-left px-3 py-2">Grupo</th>
+                                <th class="text-left px-3 py-2">Punto de Venta</th>
+                                <th class="text-right px-3 py-2">Cantidad</th>
+                                <th class="text-left px-3 py-2">Unidad</th>
+                                <th class="text-right px-3 py-2">Costo Unit.</th>
+                                <th class="text-right px-3 py-2">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-cierre-valorizacion"></tbody>
+                    </table>
+                    <p id="msg-cierre-vacio" class="text-center text-slate-400 text-sm py-8 hidden">No hay stock valorizado a esta fecha.</p>
+                    <div id="cierre-resumen-grupos" class="px-3 py-3 border-t border-slate-100"></div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-clipboard-check text-orange-500"></i> Listado para Toma de Inventario Físico</h4>
+                    <div class="flex flex-wrap gap-2 no-print">
+                        <button onclick="imprimirListadoFisico()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-print"></i> Imprimir</button>
+                        <button onclick="compartirListadoFisicoWhatsApp()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                        <button onclick="compartirListadoFisicoCorreo()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-envelope"></i> Correo</button>
+                        <button onclick="exportarListadoFisicoExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Exportar Excel</button>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 mb-3">Usa este listado en papel o en Excel al hacer un conteo físico: anota lo contado en la columna "Conteo Físico" y compáralo contra el stock del sistema para encontrar diferencias (mermas, roturas, errores de registro no detectados).</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="text-left px-3 py-2">Producto</th>
+                                <th class="text-left px-3 py-2">Punto de Venta</th>
+                                <th class="text-left px-3 py-2">Unidad</th>
+                                <th class="text-right px-3 py-2">Stock Según Sistema</th>
+                                <th class="text-right px-3 py-2">Costo Unit.</th>
+                                <th class="text-right px-3 py-2">Valor Según Sistema</th>
+                                <th class="text-center px-3 py-2 print-blank">Conteo Físico</th>
+                                <th class="text-center px-3 py-2 print-blank">Diferencia</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-listado-fisico"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA: REPORTES ================= -->
+        <section id="tab-reportes" class="tab-content hidden space-y-6">
+            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3">
+                <i class="fa-solid fa-circle-info text-indigo-500 mt-0.5"></i>
+                <p class="text-xs text-indigo-800">
+                    Estos 3 reportes también se incluyen en el archivo que exportas en <b>Cierre Contable → Exportar para Contabilidad (.json)</b>, para que <b>07 Reportes</b> y <b>08 Auditoría</b> puedan mostrarlos e incluirlos en su análisis.
+                </p>
+            </div>
+
+            <!-- Reporte 1: Saldos de Inventario -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" id="reporte-bloque-saldos">
+                <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between gap-2 sm:items-center">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-boxes-stacked text-orange-500"></i> Reporte de Saldos de Inventario</h4>
+                    <div class="flex flex-wrap gap-2 no-print">
+                        <button onclick="imprimirBloqueReporte('reporte-bloque-saldos')" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-print"></i> Imprimir</button>
+                        <button onclick="compartirReporteWhatsApp('saldos')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                        <button onclick="compartirReporteCorreo('saldos')" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-envelope"></i> Correo</button>
+                        <button onclick="exportarReporteExcel('saldos')" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 px-4 pt-3">Stock valorizado al <span class="font-semibold text-slate-700" id="reporte-saldos-fecha">--</span>, por producto y punto de venta, con el método de valorización oficial (Ajustes).</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="text-left px-3 py-2">Producto</th>
+                                <th class="text-left px-3 py-2">Punto de Venta</th>
+                                <th class="text-right px-3 py-2">Cantidad</th>
+                                <th class="text-left px-3 py-2">Unidad</th>
+                                <th class="text-right px-3 py-2">Costo Prom.</th>
+                                <th class="text-right px-3 py-2">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-reporte-saldos"></tbody>
+                        <tfoot>
+                            <tr class="bg-slate-50 font-bold border-t-2 border-slate-200">
+                                <td class="px-3 py-2" colspan="5">Total General</td>
+                                <td class="px-3 py-2 text-right" id="reporte-saldos-total">S/ 0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <p id="msg-reporte-saldos-vacio" class="text-center text-slate-400 text-sm py-8 hidden">No hay stock registrado todavía.</p>
+                </div>
+            </div>
+
+            <!-- Reporte 2: Stock Menor al Mínimo -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" id="reporte-bloque-stockminimo">
+                <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between gap-2 sm:items-center">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-rose-500"></i> Reporte de Stock Menor al Mínimo</h4>
+                    <div class="flex flex-wrap gap-2 no-print">
+                        <button onclick="imprimirBloqueReporte('reporte-bloque-stockminimo')" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-print"></i> Imprimir</button>
+                        <button onclick="compartirReporteWhatsApp('stockminimo')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                        <button onclick="compartirReporteCorreo('stockminimo')" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-envelope"></i> Correo</button>
+                        <button onclick="exportarReporteExcel('stockminimo')" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 px-4 pt-3">Productos cuyo stock actual está por debajo del "Stock Mínimo" configurado en Ajustes → Catálogo de Productos. Úsalo para decidir qué reponer con el proveedor. Consultado al <span class="font-semibold text-slate-700" id="reporte-stockminimo-fecha">--</span>.</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="text-left px-3 py-2">Producto</th>
+                                <th class="text-left px-3 py-2">Punto de Venta</th>
+                                <th class="text-left px-3 py-2">Unidad</th>
+                                <th class="text-right px-3 py-2">Stock Actual</th>
+                                <th class="text-right px-3 py-2">Stock Mínimo</th>
+                                <th class="text-right px-3 py-2">Falta Reponer</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-reporte-stockminimo"></tbody>
+                    </table>
+                    <p id="msg-reporte-stockminimo-vacio" class="text-center text-slate-400 text-sm py-8 hidden">Sin alertas — ningún producto está por debajo de su stock mínimo.</p>
+                </div>
+            </div>
+
+            <!-- Reporte 3: Mermas -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" id="reporte-bloque-mermas">
+                <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between gap-2 sm:items-center">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-dumpster-fire text-amber-600"></i> Reporte de Mermas</h4>
+                    <div class="flex flex-wrap gap-2 no-print">
+                        <button onclick="imprimirBloqueReporte('reporte-bloque-mermas')" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-print"></i> Imprimir</button>
+                        <button onclick="compartirReporteWhatsApp('mermas')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                        <button onclick="compartirReporteCorreo('mermas')" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-envelope"></i> Correo</button>
+                        <button onclick="exportarReporteExcel('mermas')" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-end gap-3 px-4 pt-3 no-print">
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-600 mb-1">Desde</label>
+                        <input type="date" id="mermas-fecha-desde" onchange="renderReporteMermas()" class="border border-slate-300 rounded-lg px-3 py-1.5 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-600 mb-1">Hasta</label>
+                        <input type="date" id="mermas-fecha-hasta" onchange="renderReporteMermas()" class="border border-slate-300 rounded-lg px-3 py-1.5 text-xs">
+                    </div>
+                    <p class="text-[10px] text-slate-400 mb-1.5">Ajustes registrados con categoría "Merma" en ese rango de fechas. Valorizados al costo promedio vigente del producto.</p>
+                </div>
+                <p class="text-xs font-semibold text-slate-600 px-4 pt-2" id="reporte-mermas-periodo">Periodo: --</p>
+                <div class="overflow-x-auto mt-2">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="text-left px-3 py-2">Fecha</th>
+                                <th class="text-left px-3 py-2">Producto</th>
+                                <th class="text-left px-3 py-2">Punto de Venta</th>
+                                <th class="text-right px-3 py-2">Cantidad</th>
+                                <th class="text-left px-3 py-2">Unidad</th>
+                                <th class="text-right px-3 py-2">Costo Unit.</th>
+                                <th class="text-right px-3 py-2">Valor</th>
+                                <th class="text-left px-3 py-2">Motivo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-reporte-mermas"></tbody>
+                        <tfoot>
+                            <tr class="bg-amber-50 font-bold border-t-2 border-amber-200">
+                                <td class="px-3 py-2" colspan="6">Total Mermas del Periodo</td>
+                                <td class="px-3 py-2 text-right" id="reporte-mermas-total">S/ 0.00</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <p id="msg-reporte-mermas-vacio" class="text-center text-slate-400 text-sm py-8 hidden">No hay mermas registradas en ese rango de fechas.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA: ALERTAS ================= -->
+        <section id="tab-alertas" class="tab-content hidden space-y-6">
+            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3">
+                <i class="fa-solid fa-circle-info text-indigo-500 mt-0.5"></i>
+                <p class="text-xs text-indigo-800">
+                    Este panel muestra en un solo lugar las alertas activas del sistema: por ahora, un producto cuyo stock actual está por debajo del stock mínimo configurado en Ajustes → Catálogo de Productos. Las alertas se calculan en tiempo real a partir de tus datos ya guardados — no se guardan como registros aparte. Puedes marcarlas como <b>Atendida</b> (ya la resolviste) o <b>No aplicable</b> (no corresponde actuar, con motivo obligatorio), y siempre podrás reabrirlas si cambias de opinión.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-rose-200">
+                    <p class="text-xs text-rose-500 font-semibold uppercase"><i class="fa-solid fa-triangle-exclamation"></i> Alertas Pendientes</p>
+                    <p class="text-2xl font-black text-rose-600 mt-1" id="alertas-kpi-pendientes">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Atendidas</p>
+                    <p class="text-2xl font-black text-emerald-600 mt-1" id="alertas-kpi-atendidas">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">No Aplicables</p>
+                    <p class="text-2xl font-black text-slate-500 mt-1" id="alertas-kpi-no-aplicables">0</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b border-slate-100">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-bell text-rose-500"></i> Alertas Pendientes</h4>
+                </div>
+                <div id="lista-alertas-pendientes" class="divide-y divide-slate-100"></div>
+                <p id="msg-alertas-pendientes-vacio" class="text-center text-slate-400 text-sm py-8 hidden">No hay alertas pendientes en este momento.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <button onclick="toggleHistorialAlertas()" class="w-full p-4 flex justify-between items-center text-left">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-orange-500"></i> Historial de Alertas Resueltas</h4>
+                    <i id="icono-historial-alertas" class="fa-solid fa-chevron-down text-slate-400"></i>
+                </button>
+                <div id="bloque-historial-alertas" class="hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                                <tr>
+                                    <th class="text-left px-3 py-2">Alerta</th>
+                                    <th class="text-left px-3 py-2">Estado</th>
+                                    <th class="text-left px-3 py-2">Motivo</th>
+                                    <th class="text-left px-3 py-2">Usuario</th>
+                                    <th class="text-left px-3 py-2">Fecha</th>
+                                    <th class="text-center px-3 py-2 no-print">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-historial-alertas"></tbody>
+                        </table>
+                        <p id="msg-historial-alertas-vacio" class="text-center text-slate-400 text-sm py-8 hidden">Sin alertas resueltas todavía.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA: SEGURIDAD ================= -->
+        <section id="tab-seguridad" class="tab-content hidden space-y-6">
+
+            <div class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 mb-1"><i class="fa-solid fa-user-shield text-indigo-700"></i> Usuario Activo</h3>
+                <p class="text-xs text-slate-500 mb-4">Cada movimiento o ajuste que se registre quedará asociado a este nombre. Útil si varias personas usan el mismo archivo.</p>
+                <div class="flex flex-wrap items-end gap-3">
+                    <div class="flex-1 min-w-[220px]">
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tu Nombre</label>
+                        <input type="text" id="seg-usuario-activo" placeholder="Ej. María Torres" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm">
+                    </div>
+                    <button onclick="guardarUsuarioActivo()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-all">
+                        <i class="fa-solid fa-check mr-1"></i> Guardar
+                    </button>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">Esto es un campo de identificación simple (sin contraseña) — no bloquea el acceso de nadie, solo deja constancia de quién registró cada dato.</p>
+            </div>
+
+            <div class="max-w-4xl mx-auto bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-book text-orange-500"></i> Bitácora de Cambios</h4>
+                <div id="lista-bitacora" class="text-xs space-y-1 max-h-64 overflow-y-auto"></div>
+                <p id="msg-bitacora-vacio" class="text-center text-slate-400 text-sm py-4 hidden">Sin actividad registrada todavía.</p>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA: AJUSTES ================= -->
+        <section id="tab-settings" class="tab-content hidden space-y-6">
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-building text-orange-500"></i> Datos de la Empresa</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Razón Social</label>
+                        <input type="text" id="set-razon-social" onchange="guardarDatosEmpresa()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre Comercial</label>
+                        <input type="text" id="set-nombre-comercial" onchange="guardarDatosEmpresa()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">RUC</label>
+                        <input type="text" id="set-ruc" maxlength="11" onchange="guardarDatosEmpresa()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Logo del Negocio (opcional)</label>
+                        <div class="flex items-center gap-3">
+                            <div id="set-logo-preview-wrap" class="hidden w-12 h-12 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                <img id="set-logo-preview" class="w-full h-full object-contain" alt="Logo del negocio">
+                            </div>
+                            <input type="file" id="set-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="subirLogoCliente(event)" class="flex-1 text-[11px] text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100">
+                            <button type="button" id="btn-quitar-logo" onclick="quitarLogoCliente()" class="hidden text-rose-500 hover:text-rose-700 text-xs font-bold px-2"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-1">Reemplaza el ícono genérico del encabezado por tu propio logo. Máximo 300 KB — formatos PNG, JPG, WEBP o SVG.</p>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5"><i class="fa-solid fa-stamp text-amber-500"></i> Licenciado a (marca de agua)</label>
+                        <input type="text" id="set-licenciado-a" placeholder="Ej. Estudio Contable Torres & Asociados" onchange="guardarDatosEmpresa()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">Estos datos se completan automáticamente con la primera importación, pero puedes editarlos si es necesario.</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-scale-balanced text-orange-500"></i> Método de Valorización Oficial</h4>
+                <div class="flex items-center gap-4">
+                    <select id="set-metodo-valorizacion" onchange="guardarMetodoValorizacion()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="PROMEDIO">Promedio Ponderado</option>
+                        <option value="PEPS">PEPS (FIFO - Primeras Entradas, Primeras Salidas)</option>
+                    </select>
+                    <p class="text-xs text-slate-500 max-w-md">Se usa en el Panel General y en las alertas. Puedes comparar ambos métodos libremente en la pestaña Kardex sin afectar esta configuración.</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-store text-orange-500"></i> Puntos de Venta / Almacenes</h4>
+                <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                    <input type="text" id="nuevo-pv-nombre" placeholder="Nombre del punto de venta o almacén" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    <button onclick="agregarPuntoVenta()" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-4 py-2 rounded-lg text-sm"><i class="fa-solid fa-plus"></i> Agregar</button>
+                </div>
+                <div id="lista-puntos-venta" class="space-y-1"></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-tags text-orange-500"></i> Catálogo de Productos</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-3">
+                    <input type="text" id="nuevo-prod-nombre" placeholder="Nombre del producto" class="border border-slate-300 rounded-lg px-3 py-2 text-sm sm:col-span-2">
+                    <input type="text" id="nuevo-prod-unidad" placeholder="Unidad (ej. UND, KG)" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    <button onclick="agregarProducto()" class="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-4 py-2 rounded-lg text-sm"><i class="fa-solid fa-plus"></i> Agregar</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                                <th class="text-left px-3 py-2">Código</th>
+                                <th class="text-left px-3 py-2">Nombre</th>
+                                <th class="text-left px-3 py-2">Unidad</th>
+                                <th class="text-right px-3 py-2">Stock Mínimo</th>
+                                <th class="text-left px-3 py-2" title="Grupo de la cuenta 60: define la cuenta de existencias en el Cierre de Existencias de 04 Libro Diario">Grupo contable (Cta. 60)</th>
+                                <th class="text-center px-3 py-2 no-print">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-catalogo-productos"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-800 mb-3 flex items-center gap-2"><i class="fa-solid fa-database text-orange-500"></i> Respaldo y Reinicio</h4>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="exportarBackupCompleto()" class="bg-slate-700 hover:bg-slate-800 text-white font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-download"></i> Exportar Respaldo Completo (.json)</button>
+                    <input type="file" id="input-restaurar-backup" accept=".json" class="hidden" onchange="handleRestaurarBackup(event)">
+                    <button onclick="document.getElementById('input-restaurar-backup').click()" class="bg-slate-500 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-upload"></i> Restaurar Respaldo</button>
+                </div>
+                <div class="flex flex-wrap gap-3 mt-3 pt-3 border-t border-slate-100">
+                    <p class="text-[11px] text-amber-900 font-semibold mb-3">También borra en la nube los datos de la empresa activa (para todos sus usuarios). Si tiene datos, se descarga un respaldo y se pide escribir el RUC.</p>
+                <button onclick="vaciarDatosPrueba()" class="bg-rose-600 hover:bg-rose-700 text-white font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-broom"></i> Vaciar Datos de Prueba</button>
+                    <p class="text-xs text-rose-900 font-bold mb-4 bg-rose-100 border border-rose-300 rounded-lg p-3">⚠ Este botón también borra en la NUBE los datos de la empresa activa, para todos sus usuarios, y cambia su RUC y razón social. NO lo uses para atender a un cliente nuevo: para eso, en el globito de empresa elige «Cambiar de empresa» → «+ Registrar otra empresa». Si la empresa tiene datos, el sistema descargará un respaldo y te pedirá escribir su RUC.</p>
+                <button onclick="reiniciarNuevaEmpresa()" class="bg-rose-800 hover:bg-rose-900 text-white font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2"><i class="fa-solid fa-building-circle-exclamation"></i> Reiniciar Todo (Nueva Empresa)</button>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">"Vaciar Datos de Prueba" mantiene el RUC y el nombre de la empresa actual, igual que en las otras 6 apps. "Reiniciar Todo" te pide el RUC de una empresa distinta y un código de autorización — úsalo solo si vas a reutilizar este archivo para un negocio distinto.</p>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="hidden"></div>
+
+    <script>
+        // ==================================================================
+        // ALMACENAMIENTO
+        // ==================================================================
+        async function storageGet(key, fallback) {
+            const valor = await MypecarSync.storageGet(key, fallback);
+            // Doble blindaje (ademas del que ya tiene mypecar-sync.js): si por algun
+            // motivo el valor guardado llega como null y quien llama esperaba otra cosa
+            // (un arreglo, un objeto), no se deja pasar -- evita que Periodos o el
+            // Catalogo de Cuentas queden en blanco por un dato corrupto en la nube.
+            if (valor === null) return fallback;
+            // Blindaje adicional (2026-09-12): "null" no es la única forma en que un
+            // dato de la nube puede venir corrupto -- también puede llegar con el TIPO
+            // equivocado (ej. un objeto {} donde se esperaba un arreglo []).
+            if (Array.isArray(fallback) && !Array.isArray(valor)) return fallback;
+            if (fallback !== null && typeof fallback === 'object' && !Array.isArray(fallback) && (typeof valor !== 'object' || Array.isArray(valor))) return fallback;
+            return valor;
+        }
+        async function storageSet(key, value) { return MypecarSync.storageSet(key, value); }
+
+        // ==================================================================
+        // ESTADO GLOBAL
+        // ==================================================================
+        let config = {
+            razonSocial: '',
+            nombreComercial: '',
+            ruc: '',
+            metodoValorizacion: 'PROMEDIO', // 'PROMEDIO' o 'PEPS' — método oficial usado en el Panel General
+            puntosVenta: [
+                { codigo: 'PV1', nombre: 'Principal' }
+            ],
+            productos: [], // { codigo, nombre, unidad, stockMinimo, controlaStock }
+            usuarioActivo: '', // igual que en las demás 8 apps: identifica quién registra cada movimiento (sin contraseña)
+            licenciadoA: ''    // nombre del cliente/estudio licenciado (marca de agua) — igual que en las demás 8 apps
+        };
+
+        // stockMovimientos: unión de lo importado desde Ventas (salidas), Compras (entradas)
+        // y los ajustes manuales registrados aquí mismo.
+        // { id, fecha, tipo:'entrada'|'salida', origen:'venta'|'compra'|'ajuste', origenId,
+        //   comprobante, puntoVenta, productoCodigo, productoNombre, unidad, cantidad,
+        //   costoUnitario, monto, motivo, registradoPor, fechaRegistro }
+        let stockMovimientos = [];
+        let papeleraAjustes = []; // ajustes manuales eliminados, recuperables
+        let bitacora = [];
+        let historialImportaciones = []; // { origen, fecha, cantidadMovimientos, empresa }
+
+        function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+
+        // Categorías de ajuste manual — "merma" es la que alimenta el Reporte de Mermas.
+        // Los ajustes registrados antes de este cambio no tienen "categoria" guardada; se
+        // tratan como 'otro' en todos lados (ver categoriaDeAjuste()) para no perder datos.
+        const CATEGORIAS_AJUSTE = {
+            merma: 'Merma', rotura: 'Rotura / Daño', donacion: 'Donación / Consumo interno',
+            conteo: 'Diferencia de Conteo Físico', inicial: 'Inventario Inicial', otro: 'Otro'
+        };
+        function categoriaDeAjuste(m) { return m.categoria || 'otro'; }
+
+        // ==================================================================
+        // INICIALIZACIÓN
+        // ==================================================================
+        function actualizarBadgeSincronizacion(estado) {
+            const el = document.getElementById('sync-status-badge');
+            const cont = document.getElementById('sync-status-cont');
+            if (!el || !estado) return;
+            if (!estado.online) {
+                el.innerHTML = '<i class="fa-solid fa-wifi text-amber-300"></i> Guardado en este equipo';
+                if (cont) cont.title = 'No hay conexión a internet en este momento. Todo lo que registres se sigue guardando con normalidad en este equipo, y se respaldará solo en la nube en cuanto vuelva la señal.';
+            } else if (!estado.conectadoASupabase) {
+                el.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-300"></i> Sin conexión con el servidor';
+                if (cont) cont.title = 'No se pudo conectar con el servidor de la nube. Tus datos siguen guardados en este equipo con normalidad. Si el problema continúa, avisa a soporte.';
+            } else if (estado.atascado) {
+                el.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-rose-300"></i> Cambios sin respaldar en la nube';
+                if (cont) cont.title = `Llevamos varios minutos intentando respaldar ${estado.pendientesEnCola} cambio(s) en la nube y no se ha podido. Tranquilo: tus datos NO se han perdido, siguen guardados en este equipo. Revisa tu conexión a internet; si el problema sigue, avísale a soporte.` + (estado.ultimoError ? ` (Detalle técnico: ${estado.ultimoError})` : '');
+            } else if (estado.pendientesEnCola > 0) {
+                el.innerHTML = '<i class="fa-solid fa-arrows-rotate text-yellow-300"></i> Guardando en la nube…';
+                if (cont) cont.title = 'Se están respaldando tus últimos cambios en la nube. Esto suele tardar solo unos segundos.';
+            } else {
+                el.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-300"></i> Todo guardado';
+                if (cont) cont.title = 'Toda tu información está guardada y respaldada en la nube.';
+            }
+        }
+
+        async function inicializarApp() {
+            MypecarSync.init({
+                url: 'https://byucdwgerwpoqicklycf.supabase.co',
+                anonKey: 'sb_publishable_hmEycJi0F0OoEn9cE6S_aA_XS60thr8',
+                app: 'inventario'
+            });
+            MypecarSync.onEstadoCambio(actualizarBadgeSincronizacion); // 2026-10-17: indicador de guardado en la nube (igual que 01 a 05)
+            actualizarBadgeSincronizacion(MypecarSync.getEstado());
+            await MypecarLogin.asegurarAcceso({ tituloApp: 'Inventario' });
+            // Blindaje: un fallo de red al sincronizar con la nube nunca debe
+            // impedir que el resto de la app se termine de pintar con lo que ya
+            // había guardado en este dispositivo (ver mypecar-sync.js).
+            try { await MypecarSync.pullAll(); } catch (e) { console.error('No se pudo sincronizar con la nube al iniciar (se sigue con los datos locales):', e); }
+
+            config = await storageGet('inventario_config', config);
+            if (!config.puntosVenta || config.puntosVenta.length === 0) config.puntosVenta = [{ codigo: 'PV1', nombre: 'Principal' }];
+            if (!config.productos) config.productos = [];
+            if (!config.metodoValorizacion) config.metodoValorizacion = 'PROMEDIO';
+            if (config.licenciadoA == null) config.licenciadoA = '';
+
+            // NUEVO en 09 (2026-09-24b, 6ta ronda; igual que en 01-06) -- los datos legales de la empresa
+            // (RUC, razón social, nombre comercial) salen SIEMPRE de Supabase, que es
+            // la fuente oficial de la empresa activa. Antes solo se completaban si el
+            // config estaba en blanco: si el config traía datos de OTRA empresa (así
+            // pasó con DEMO DOS mostrando la Pollería, y la Pollería mostrando PRUEBA),
+            // nunca se corregían. Ahora, si el RUC guardado no coincide con el de la
+            // empresa activa, se reemplazan los 3 datos y se limpian también el
+            // "Licenciado a" y el logo, porque eran de la otra empresa.
+            try {
+                const empresaIdActual = MypecarSync.empresas.activaId();
+                if (empresaIdActual) {
+                    const datosEmpresa = await MypecarSync.empresas.obtenerDatos(empresaIdActual);
+                    if (datosEmpresa) {
+                        const rucLocal = String(config.ruc || '').trim();
+                        const rucNube = String(datosEmpresa.ruc || '').trim();
+                        const configEnBlanco = !config.ruc && !config.razonSocial;
+                        const configDeOtraEmpresa = !!rucLocal && !!rucNube && rucLocal !== rucNube;
+                        if (configEnBlanco || configDeOtraEmpresa) {
+                            if (configDeOtraEmpresa) {
+                                console.warn('[MYPECAR] La configuración guardada era de otra empresa (RUC ' + rucLocal + '); se corrige con los datos oficiales de la empresa activa (RUC ' + rucNube + ').');
+                                config.licenciadoA = '';
+                                config.logoBase64 = '';
+                            }
+                            config.ruc = datosEmpresa.ruc || '';
+                            config.razonSocial = datosEmpresa.razonSocial || '';
+                            config.nombreComercial = datosEmpresa.nombreComercial || '';
+                            await storageSet('inventario_config', config);
+                        }
+                    }
+                }
+            } catch (e) { console.error('No se pudo verificar los datos de la empresa con la nube (se reintentará en la próxima carga):', e); }
+
+            // Igual que en las demás 8 apps: el Usuario Activo nunca debe sobrevivir una
+            // carga fresca — se limpia acá siempre, venga de donde venga (nube o local),
+            // porque el borrado que hace beforeunload no llega a la nube.
+            config.usuarioActivo = '';
+            try { pedirUsuarioSiNoExiste(); } catch (e) { console.error('Error al pedir usuario activo:', e); }
+            try { aplicarMarcaDeAgua(); } catch (e) { console.error('Error al aplicar marca de agua:', e); }
+            try { aplicarSelloMypecar(); } catch (e) { console.error('Error al aplicar el sello MYPECAR:', e); }
+            try { aplicarLogoCliente(); } catch (e) { console.error('Error al aplicar el logo del cliente:', e); }
+
+            stockMovimientos = await storageGet('inventario_movimientos', []);
+            papeleraAjustes = await storageGet('inventario_papelera_ajustes', []);
+            bitacora = await storageGet('inventario_bitacora', []);
+            historialImportaciones = await storageGet('inventario_historial_importaciones', []);
+            alertasResueltas = await cargarAlertasResueltas();
+
+            document.getElementById('ajuste-fecha').value = new Date().toISOString().split('T')[0];
+
+            syncConfigUI();
+            switchTab('dashboard');
+            actualizarBadgeAlertas();
+        }
+
+        window.addEventListener('beforeunload', function () {
+            config.usuarioActivo = '';
+            try { localStorage.setItem('inventario_config', JSON.stringify(config)); } catch (e) { /* almacenamiento no disponible */ }
+        });
+
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                config.usuarioActivo = '';
+                pedirUsuarioSiNoExiste();
+            }
+        });
+
+        async function persistAll() {
+            await storageSet('inventario_config', config);
+            await storageSet('inventario_movimientos', stockMovimientos);
+            await storageSet('inventario_papelera_ajustes', papeleraAjustes);
+            await storageSet('inventario_bitacora', bitacora);
+            await storageSet('inventario_historial_importaciones', historialImportaciones);
+        }
+
+        function registrarBitacora(accion, detalle) {
+            bitacora.unshift({ accion, detalle, usuario: config.usuarioActivo || 'Sin identificar', fecha: new Date().toISOString() });
+            if (bitacora.length > 300) bitacora = bitacora.slice(0, 300);
+        }
+
+        // ==================================================================
+        // PANEL DE ALERTAS — piloto replicado desde 03 Caja y Bancos / 04 Libro
+        // Diario. Las alertas se CALCULAN en vivo a partir de datos ya guardados
+        // (nunca se guardan como registros fijos). Por ahora, la única regla es
+        // "stock por debajo del mínimo configurado", reutilizando exactamente el
+        // mismo cálculo que ya usa calcularAlertasStockMinimo() en Reportes.
+        // ==================================================================
+        const PREFIJO_ALERTA_RESUELTA = 'inventario_alerta_resuelta__';
+        function claveAlertaResuelta(alertaId) { return PREFIJO_ALERTA_RESUELTA + alertaId; }
+        let alertasResueltas = {};
+
+        async function cargarAlertasResueltas() {
+            const resultado = {};
+            try {
+                const claves = (MypecarSync.listarClavesLocales ? MypecarSync.listarClavesLocales() : Object.keys(localStorage))
+                    .filter(k => k.startsWith(PREFIJO_ALERTA_RESUELTA));
+                for (const clave of claves) {
+                    const alertaId = clave.slice(PREFIJO_ALERTA_RESUELTA.length);
+                    const valor = await storageGet(clave, null);
+                    if (valor) resultado[alertaId] = valor;
+                }
+            } catch (e) { console.error('Error al cargar alertas resueltas:', e); }
+            return resultado;
+        }
+
+        const REGLAS_ALERTAS = [
+            {
+                key: 'stock_minimo',
+                evaluar: function () {
+                    return calcularAlertasStockMinimo().map(a => {
+                        const alertaId = `stock_minimo__${a.productoCodigo}__${a.puntoVenta}`;
+                        return {
+                            id: alertaId,
+                            regla: 'stock_minimo',
+                            recordId: a.productoCodigo,
+                            puntoVenta: a.puntoVenta,
+                            titulo: 'Stock por debajo del mínimo',
+                            detalle: `${a.productoNombre} en ${nombrePVGlobal(a.puntoVenta)}: stock actual ${a.cantidad} ${a.unidad || ''}, mínimo configurado ${a.stockMinimo} — faltan ${a.faltante}.`,
+                            severidad: 'media'
+                        };
+                    });
+                }
+            }
+        ];
+
+        function calcularTodasLasAlertas() {
+            const todas = [];
+            REGLAS_ALERTAS.forEach(regla => { try { todas.push(...regla.evaluar()); } catch (e) { console.error('Error evaluando regla de alerta ' + regla.key + ':', e); } });
+            return todas;
+        }
+
+        function alertasPendientes() {
+            return calcularTodasLasAlertas().filter(a => !alertasResueltas[a.id]);
+        }
+
+        function actualizarBadgeAlertas() {
+            const badge = document.getElementById('tab-alertas-badge');
+            if (!badge) return;
+            const n = alertasPendientes().length;
+            if (n > 0) { badge.textContent = n > 99 ? '99+' : String(n); badge.classList.remove('hidden'); }
+            else { badge.classList.add('hidden'); }
+        }
+
+        function irAlProductoDeAlerta(productoCodigo, puntoVenta) {
+            switchTab('dashboard');
+            setTimeout(() => {
+                const filtroInput = document.getElementById('filtro-stock-texto');
+                if (filtroInput) { filtroInput.value = ''; renderStockActual(); }
+                const filaId = 'stock-row-' + sanitizarIdFila(productoCodigo) + '__' + sanitizarIdFila(puntoVenta);
+                const fila = document.getElementById(filaId);
+                if (fila) {
+                    fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    fila.classList.add('ring-2', 'ring-rose-500');
+                    setTimeout(() => fila.classList.remove('ring-2', 'ring-rose-500'), 2500);
+                }
+            }, 150);
+        }
+
+        function sanitizarIdFila(texto) {
+            return String(texto || '').replace(/[^A-Za-z0-9_-]/g, '_');
+        }
+
+        function buscarAlertaPorId(alertaId) {
+            return calcularTodasLasAlertas().find(a => a.id === alertaId);
+        }
+
+        async function marcarAlertaAtendida(alertaId) {
+            const alerta = buscarAlertaPorId(alertaId);
+            if (!alerta) return;
+            const registro = { estado: 'atendida', motivo: '', usuario: config.usuarioActivo || 'Sin identificar', fecha: new Date().toISOString(), titulo: alerta.titulo, detalle: alerta.detalle };
+            alertasResueltas[alertaId] = registro;
+            await storageSet(claveAlertaResuelta(alertaId), registro);
+            registrarBitacora('alerta', `Alerta marcada como Atendida: ${alerta.titulo} — ${alerta.detalle}`);
+            await persistAll();
+            renderAlertas();
+            actualizarBadgeAlertas();
+            showToast('Alerta marcada como atendida.');
+        }
+
+        async function marcarAlertaNoAplicable(alertaId) {
+            const alerta = buscarAlertaPorId(alertaId);
+            if (!alerta) return;
+            const motivo = prompt('¿Por qué no aplica esta alerta? (obligatorio)');
+            if (!motivo || !motivo.trim()) { showToast('Debes indicar un motivo para marcar la alerta como No aplicable.', 'error'); return; }
+            const registro = { estado: 'no_aplicable', motivo: motivo.trim(), usuario: config.usuarioActivo || 'Sin identificar', fecha: new Date().toISOString(), titulo: alerta.titulo, detalle: alerta.detalle };
+            alertasResueltas[alertaId] = registro;
+            await storageSet(claveAlertaResuelta(alertaId), registro);
+            registrarBitacora('alerta', `Alerta marcada como No aplicable: ${alerta.titulo} — Motivo: ${motivo.trim()}`);
+            await persistAll();
+            renderAlertas();
+            actualizarBadgeAlertas();
+            showToast('Alerta marcada como no aplicable.');
+        }
+
+        async function reabrirAlerta(alertaId) {
+            const registro = alertasResueltas[alertaId];
+            delete alertasResueltas[alertaId];
+            await MypecarSync.removeClave(claveAlertaResuelta(alertaId));
+            registrarBitacora('alerta', `Alerta reabierta: ${registro ? registro.titulo : alertaId}`);
+            renderAlertas();
+            actualizarBadgeAlertas();
+            showToast('Alerta reabierta.');
+        }
+
+        function toggleHistorialAlertas() {
+            const bloque = document.getElementById('bloque-historial-alertas');
+            const icono = document.getElementById('icono-historial-alertas');
+            if (!bloque) return;
+            const oculto = bloque.classList.toggle('hidden');
+            if (icono) icono.className = oculto ? 'fa-solid fa-chevron-down text-slate-400' : 'fa-solid fa-chevron-up text-slate-400';
+        }
+
+        function renderAlertas() {
+            const todas = calcularTodasLasAlertas();
+            const pendientes = todas.filter(a => !alertasResueltas[a.id]);
+            const resueltasIds = Object.keys(alertasResueltas);
+            const atendidas = resueltasIds.filter(id => alertasResueltas[id].estado === 'atendida');
+            const noAplicables = resueltasIds.filter(id => alertasResueltas[id].estado === 'no_aplicable');
+
+            document.getElementById('alertas-kpi-pendientes').innerText = pendientes.length;
+            document.getElementById('alertas-kpi-atendidas').innerText = atendidas.length;
+            document.getElementById('alertas-kpi-no-aplicables').innerText = noAplicables.length;
+
+            const cont = document.getElementById('lista-alertas-pendientes');
+            const vacio = document.getElementById('msg-alertas-pendientes-vacio');
+            cont.innerHTML = '';
+            if (pendientes.length === 0) { vacio.classList.remove('hidden'); } else {
+                vacio.classList.add('hidden');
+                pendientes.forEach(a => {
+                    const div = document.createElement('div');
+                    div.className = 'p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+                    div.innerHTML = `
+                        <div class="cursor-pointer flex-1" onclick="irAlProductoDeAlerta('${a.recordId}', '${a.puntoVenta}')">
+                            <p class="font-semibold text-slate-800 text-sm flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation text-rose-500"></i> ${a.titulo}</p>
+                            <p class="text-xs text-slate-500 mt-0.5">${a.detalle}</p>
+                        </div>
+                        <div class="flex gap-2 flex-shrink-0">
+                            <button onclick="marcarAlertaAtendida('${a.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg"><i class="fa-solid fa-check"></i> Atendida</button>
+                            <button onclick="marcarAlertaNoAplicable('${a.id}')" class="bg-slate-500 hover:bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg"><i class="fa-solid fa-ban"></i> No aplicable</button>
+                        </div>
+                    `;
+                    cont.appendChild(div);
+                });
+            }
+
+            const tbody = document.getElementById('tabla-historial-alertas');
+            const msgHistVacio = document.getElementById('msg-historial-alertas-vacio');
+            tbody.innerHTML = '';
+            if (resueltasIds.length === 0) { msgHistVacio.classList.remove('hidden'); } else {
+                msgHistVacio.classList.add('hidden');
+                resueltasIds.sort((a, b) => (alertasResueltas[b].fecha || '').localeCompare(alertasResueltas[a].fecha || '')).forEach(id => {
+                    const r = alertasResueltas[id];
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-slate-100';
+                    tr.innerHTML = `
+                        <td class="px-3 py-2">${r.titulo}</td>
+                        <td class="px-3 py-2">${r.estado === 'atendida' ? '<span class="text-emerald-600 font-semibold">Atendida</span>' : '<span class="text-slate-500 font-semibold">No aplicable</span>'}</td>
+                        <td class="px-3 py-2">${r.motivo || '-'}</td>
+                        <td class="px-3 py-2">${r.usuario || 'Sin identificar'}</td>
+                        <td class="px-3 py-2">${new Date(r.fecha).toLocaleString('es-PE')}</td>
+                        <td class="px-3 py-2 text-center no-print"><button onclick="reabrirAlerta('${id}')" class="text-orange-600 hover:text-orange-800"><i class="fa-solid fa-rotate-left"></i> Reabrir</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        // ==================================================================
+        // SEGURIDAD — Usuario Activo y marca de agua (igual que las demás 8 apps)
+        // ==================================================================
+        function pedirUsuarioSiNoExiste() {
+            if (config.usuarioActivo) return;
+            const nombre = prompt('¿Cuál es tu nombre? Quedará asociado a lo que registres en este archivo.');
+            if (nombre && nombre.trim()) {
+                config.usuarioActivo = nombre.trim();
+                // No persistimos aquí: config aún no tiene los datos cargados desde la nube.
+                // El persistAll() al final de inicializarApp() guardará esto junto con todo lo demás.
+                showToast(`Bienvenido/a, ${config.usuarioActivo}.`);
+            }
+        }
+
+        async function guardarUsuarioActivo() {
+            const valor = document.getElementById('seg-usuario-activo').value.trim();
+            config.usuarioActivo = valor;
+            await persistAll();
+            showToast(valor ? `Usuario activo: ${valor}` : 'Usuario activo borrado.');
+        }
+
+        function aplicarMarcaDeAgua() {
+            let barra = document.getElementById('marca-agua-licencia');
+            if (!config.licenciadoA) {
+                if (barra) barra.remove();
+            } else {
+                if (!barra) {
+                    barra = document.createElement('div');
+                    barra.id = 'marca-agua-licencia';
+                    barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0F172A;color:#94A3B8;font-size:10px;text-align:center;padding:3px 8px;font-family:Arial,sans-serif;';
+                    document.body.appendChild(barra);
+                    document.body.style.paddingBottom = '20px';
+                }
+                barra.innerText = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros`;
+            }
+        }
+
+        const MYPECAR_ICONO_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAFsAAAA3CAYAAABjADa4AAApSElEQVR4nLWceZweVZX+v+feW/VuvaaTTnf2EEIgIRAWQwyyCYZFEcQFVFRcUMQFF9QZHcdxRh1xVGZUBEUEBUHEBQU3kEUFZCcEAiEL2bdO0nv3u1Tde35/VHUnOgxmdH63P91va6nznHOe8zznlqgq//9GAISAEBQsnr406LpdDYILWEK+nQFVwJCdj9DsIg7oKEhEQABEUATBAx40guwTEA9o9rkmJFrEUsUMb1GtD6NAKg5nYkxxEpQmSBAwCuSXrwYCHsEg+X6zv2P2kb/JAqqKSPZd9zftYT9HwGAURBSDgMK63cN8/bdP0Si3kFoH+cUFVYKHEAI2NFja6bng5CO11VoxgFWPYhFVvBhEwOT3SvMbEVAcDm+gtvYB3Xr7l2g1I2AMEpTBUKF02CuZ/LLzVeJ2MXgwiuJQQNTm+8tvhAD4/Gr231R/6cBj////auy9PqGoCKJQlSI90kpCOzZpgAiCwRiDWEGcoKTUCzWwhgCYfGcqAAaDQZTMo9UiwRAk/1xBJKG+ZSWT6j1EtkZqitgQKDHI8PbHiOvLSKN2wAIeZczLcwuPH5T8RWB/x4tFCvM/fvJ/MIQAKIHMaGjmxYpk8xabe5Ogqoz9GDFEpkQhqEQoNtsNKhDEZFHDD0GyUwn9ioINZGFJGxTqmzTZ9iSx1AkSMGEUGxpAgt+9EXavxaUjBAHUYjSAViHdo/ghkGT8GhSD/hWfVNXx3xcb++XZL7oT+Z+j2b7vj+3BkOJCipCCUfJwhmpANXOuIIqkMdZnYSjbWXbrEDA6QnXHct21cTmtE6bTOuVwpdSCH+2j3ruLas/jyOBGXOzwmmKCR4wF5ygwyPBTv4FqorZzPqVKG0jCUO8GhreupdLarS0zDoO4U8DsDSnoC1zRX9pF/ttrlYCoALJ/xh4L8OOH2cf4L5Y2RLPpDeBQvBGChDxZCjo+sSQ3dLZfj9LQBC9jB9A8QYJhkNEdK3Tg99egWx5loNyFzllK1DGR4b6tpJtXEY3upEkVwRCLEGwJMMTiiaRBuvGPjG54BOk8BD9tAWoCveuewO5Yz2hbF/qS19I67zQNxRYJCEaj7Dz2zZUy9kZA1KL7GD57FVCElCxfiP9r82N/hr6IuRWM/Pn9D/lvFhqzOA46FlwAxarPvT+/sDwgFUJCffPD2v/wjyntepymeJBGDdKnf0swKYY6RQJFVwMK1G0ZpIhTxYgQJEMwElLiMEBj+wMMbXuIiCKVhqdgUpLBYYYfuQXjA82HLdPgOiVIPn2zk+XPXc1iVcadQQW8wtBwVXt27eK5DTvZtv55pndP+vuNrS8SRvY9pX2396J5yhFEMyNnv7nRRVFjSQ3qJQd9IZDuWqM9f7oRt2sFRRogBYJRNFQxmlL2NVKJSKyjbgrUpBlbLBNZR2qE0KhRTqpEYRSLJdIG1icYVZxY0JQQPIX+tQw8eAuhUKJlwRmIbwKbAiG/3nxW5uilYRLqDc/W7Xv0udWbefSJZ3luzUYGh6r09vfRv2sTH/vA2/8+Y4vsO7de2Mx/hlJlb6QLYQzTamZwk80CIxYrCtbiTb53BaOBan8P1V1r6Q6j4LMEayyIDaQiJI2YalpioDSV8gGLmTjzcKRpItZEJOLRxghh5xpGNzxC2LWOcjJIrCn1kBKMIFi8CLH3NAZ3M7pnO62hqmgsqMvnnkERRmuBXbt7dcVTz3DfY8+x4qmnGR6tUk08e/oHGRypEjBE4kgGB1l4+KL/vbHHsq5IhiBEXyhRjG0sBJvBNBHNEsU+mdvIPuEPCJr5jCLYkOBCwJhAEEcaLM3dc9jZdQjJ1uWUZJQkkswrQ4MUy+5iJ9Gc45m6+HSk7QAi0yTOGEhSLUgsSVTCT3kp5QWn6PDaP9H/6K9oG95IFIbxwZPgsaGBDSVG2qYzc8HxQEGCSagmMRs3b9flK57liadX8+TK59i0eTuYiJFGkVq9TiBk+E4cxE1AIKSKGGHugbP/98YeS5Zj/waRF/XtQOaxISiqWdgzImAEu6/f59AvzV254YUQPGryMGMM2jRZph//et32kw3EDSVQBWNJXDt9pWlMXPwGmueeTKPQJjEG/KBW19/PjifupnnW4Xrx4FOIihMlLR8o7Qtn0N65QDfe+32adz1KMfQTRLBGqEqJriWvQCceKD5UgDpbdmzVy77yX/z6jvtx5Yk0TIwXg5oEMBgrqBrEZBhVshIM51IWHLmQ5kosf3MYGanW2LazR/uSQDB74bqOwySw3lOMhQOmTpVK5BABZwyRtagIhL3FQhiL2prdlJqWSIgIpFjNKlAVi22eTFQREi9UPDQc9Fem0LrkzVTmnC6YIpECGvC1GvU167FMPUUxOI9jyEqjR/+27ISVOSlNCwFVEQVi3Pu4Etf/gY/uvtBtNSMOAdIkOAgOBRfR7NRhoY2c9jhi1DjKZIQvIByAqEBwHYSDlk0j//4/JVEIxvpu++7lHZ/gyRUUBGCU0RTNK1RCzWKYYjjjjuGuqvhUxeCEBRLoiTicBmeI4pRUUKz0FnfojM3IJEQBHRvSTAMV+r0J06hbYqXtLQfytH/9UNVAn2NGpVaIzQxpnLuwYuCcJp08qOL+P7Fp5MODbP9wZ/T2LqSuLmFdrPGiOsnbe6ktPtRCn1PIcUOJIYQEg1AbLDaJIQKrRRIYirNCQzWA0GRugsIYWzsQ4OklaK7WWfqhBb1XeuJ1NPWMYbOtjKq5jhqzjjKzTFUmxOIXA9NEwtBGmpaEqNaAknnNBoaWLR8Bce+/gyk1kzz6WcJgHf9K9pnLdOhVDzuOG2W/j85z/G+MMdlm86kBEK1FSMKYYRSTGiKI7WYAEXW/wDQMLYqrEaJlyKYD1oiuERrEmxOsFqjuBBIojgSGgYQwtCTVAr96N+DVUFPzBUw5jhVOM7Q08Q8LnrH+GKcyfxk9tv4rbb7uaZLW3aXfFOFQqJPzhIsPhw7ryzhLMOK2G0jUgy0jTGxDGZTgiJRUgIBqBs2xnu2c7q7VtRRp0IHnEY0N3fj1u5jNEDzsCLA2wcU8ubDA10sPvFdayvv0AmXaQvUCbpo92YQKaKXfx+2Q4uOKvE/Q+8xmnnv5nRnbtwR+voJEZCTHfvIItPPY6DZs4RcS3fDoNUUlvV2NpKQ0uNlv4cX7v6erwFR2FzB5c56AEklzE81Amvdim2VOGb1YioTFbYPUAaZ+w8oj+eEHQY6XxOEnf5aZLD0uEBoP1oZFPJvKA9QpsX+kJUGHXjmM2XPlNi4LzXvSKZjrEhitc/9jpZuXQ2VgKPPHkPVfhZR3f5+kdKe6/dg1IcYUf/vFF6iOfKUf3sZjlp+3AysG4h8//Q08NCZfoFsW1owsvpb32e2GhZTf7yWX70tCcJFSPY82O91xygQmVFLM2fbGVUw/pQNvVS0y8+Etu+sO3ROOSDFqTFDXlY3g0nCLl4o+HmvsUscd28+p+TeQzn3srN9zVzQtvrmL5xvDPQqQDRAZjjJZVsQlnvfp0uUoVI1kFTS6+CqOYJnU7hVI3PzhoNn4WQmpUJWCVIVCS1AsUIHAdKAMd4kMjBHQ0GVzE1D2LFdPMEE0iM24BiPl46QJUf1CmnzKNz9YnE1YT+ZbNQxpTmDBjBlNaGogrRl+9RtBIkoFhoiCiuVDgFcecJHVimtorPPfMFtq6NrOm7RmKtRK5tUeSFcuIcTiGGA6bkAxTFrup7XkAZWvIkKS9Xacz1UbdoAOtHNKuBGnzUUpV0EK2gAiCTBhKygpZs4KOVDVIAoTQdE7RCX2Cs2s6uenRR9m9M02kOsK4KX0EJONYUymyeFwLbVIhBhrIcgQNTUW6ZM7pjK5cQ2xVN+bxx3TXFtIeeIAoOo6yUsGxYym0TmDGuAY6BseSbW/CFN9NuwtmM7YuTFJKIe1oGLdU+SIrq5UOOX0BX/nO14lVBrn3ge8QCVfx7bO3sX1nHVe6TExpROQE3RY6JgeTiSJ6yyaEz1yI4YQdlfQbNXPnUMFmc/YNXsO3O1YPOJHRw+PJDbYCyGIYTx02mLmkuvpO46Sikc9+/BLuueEyfnvfXVQyEqNQpiibNHb6ktkQIdEr2mB3gYo3/xkNU7oaUKcOZaRAptPQwtb4LqURwcpN25gVqOfIY45mvQmzcbeqogWi1AokGuoyxJqQ0KBRq7cItfN0aH0mHl/PVecfx6/n/5hVGx9lRnQjBw6cQTQ6BClC5FbFmU6Xd9OZ76XkChJVo2NimQmYaCE8vlZ8WKxUOG5vFIiI3aG44BiE7GISwlsG3fmxznC9BbwK3nq0jNoY7DAYPo1qmcAbA1I3rttG5PYRIcphaK0hIAOxa5w6bXCHhdc4KMLPsyF97m4pcMBIRlnH0jvpNu+cQ2yn3P9Bh/hI/eOo9XT0lWTP2vfF6DohBlWfppy1LGnyc/eeYD4Vn4tHFOSVy/tYqPGYiu9jZgHt7B44zdBUIYVBw6zUcpEQCmDVFyQZDkKpjO87gjdSjT47V8SFTVWSyG9UjEjTgV4KQQ98+8CmVLzwJXi1AoGyghDN0fzq/j4uOGgel/WuJIrmY7SkYIYIVoLIiiiRIZQKw9jAqTQzo6qLbfeu5FWn3ojKrmDzUAdRSDBTFxNVU/rr08l0RC/cGaN9uVi8QSXbP4CFCOI1Cs8NGBIVI0IhqNvEmzcNsGRxAJDo/rDhAqE5jsQOsbdSpqOcp2NkiHKnQdWjTBltRDkVOhqE+eDrQBjZTdc8m5uv+wELM7VAr2LU2hMlBIcuC5cq6MpKDGuydVA6vJlvcHIQRSKVQoUQ3Ss6WNI7iiwqjKgSXbteYFtVsnBKHYPmbrmgJvfNPKppSCcjZFsHW1J4mjLLI5+PXFbEeS20URuhSqxIspiSnzGYzpASEBmk1AF0y4iUmxrTeNAY9lo1FrgvCn6yn/Yui2eeMoOO4z/GaSf9AqccdCidbUUyfkY/YFTQBxr02c1v9BC1yg5DOhpECFOkJVMxbTQTSuAJEeoO5MgqEdVNVKPYm+fdxV0RYzOOQTNGeCEnW01gT7XKZi2wl2uajFmvo3sO/nRRiFxHShiiIIoTcgYqIOhSF8h0T9EY2Y7QOtRZJHKcgcEs2/mo4LIu2SG9UWuKB2eGOKFa/eWa3+CQ1B7B0OhWiVVR30wVaAJHYCJnAKMwuNggUS4XKA7LiApJlgy1Ea3q6WlZ5Ejjy7ycfw0KEs7yUXQjs1x4gLzY+2N7dwtq+CqM4ipR6VNiQmDR+bK0G1sPmC4ULHgVBKJTvBdRxctc7rTmnnzP+9krMuHM+qLR5f/YXhF/eO0Bs8kUQyivRB3RQGtInWLcAWmoit24rzcGX8+arDsFXFVdc9wLbekMkojaYaOClkLj57bO4pbfF8XN/wtevXsHo6BgWJv0MDFtEEEE10QQ6JnB5ODLNoFCEHnCIQKMQVFwbEENZ0Cyu5eR5kkP2gz/8vsz2waWsMLXH+bmaOAYnprxvJgvnr2LR8ecx/tXHc1DTGKKBhLGbtxNqXsuw1JhSlgFtaFqNb1yqO8YoNu1EN9dRl8p3zHi3/9AhPvvuWZTLOb++dwPX3v406LEc6BuKuoLpAqHkwHMsvV5EmzMBrXd4ZTQVy1QScjJUwWuIY01AZC1CG5xUohhLnRAt0xNiziyC1RvKKGyPvzPOB0jHkVU1U5CKVI9U6NsdY6mmzNXHc9yvzHSMoWJDoaMhVUq7QRhP4uHTr8Ff1EQuFUYSWiHOKTAJCtq6DCsGBBEeahOjHt2CyDU39EY1NpMs+FMJf/6yn6/ceibmt+ZJ7iaVMkPYilm2rV6HVSk0lppMRA1KHZm6PSMS4WImJRGmyQE6RImnQiSfDPFm9INgUwT8xxs32byrgQ8ZoQ1cdMxNJ4TXBcvUv30I8/DGBrbLnjXcqZI7hsQvV+xzXpTHQGqcXtLFm1mLJKMDpAgMzppHzHXfceyw+ffFhUD3RTydKTLxSKgigrGF0nqUJI0jrjPHXCsHf+wSs4Wv6l+VLBSDLQ5W5o5DsimIWZBHF2ZnYCbc0N9DVX+eGSpwiOn9UZDBWKuGuqjF5xNiOJWKrfoSN02WoaMBFXCV6JEFoQVCE1CIzKcTqhoBKqxT4qLR4nJvOJDBl6h3po1nnbwjbeu2yEEBmjMuGiSTNZ1JBRT2KKQhKPtVCQAQ3xdgIVsr55Or/Nt6IQpNJi9naqfHZ+ExfMbcOOqTFsQ+YkPqe1eFBNKekcguzz71wqNCVjLLl9OcffuICtFhCyVpQaWCtnUEqZzUwWVUpvE6FZAlKlHtcwXHHtYt79/nnU4hDpBXK4xjsvOoRPnCUR3aOM6BQ/lZTShDgQaAyxAaEFPRRZm4Rc0d/M2sBjIB9nY6PGjfSTa8VtqzM1qtJTuGiy4hOfeh3/8vnDeeSpjXzt6nvJZzWjxYAnMhotcbSVoAJEIcVaS3XI0DlFcvLxbSyeXaR/aIzB0Ry/K8LODEIzikV7Cq4a6iIvC2iEz0uNPRR6JKZ4dR2yGpm/QNSYS31SEDwSQmZQOUj7cbTaQvQnEB2/kd+u/wKlKVDZLdCzhLOOOh8yjT8h5rQTPk/JG0O4Vfrbe4hbW0hklHFTx7Nk8UsMFB7lTZee9x/9c85m6ftmcvsjq/j9c8+wNe+iK5H0aiO0xJcTdARsKq9lQBQZDS3aRJimYPHJAjTMPYmoS5F1lJDpTfhWMi0Y53UzZ3P4kdN507ldNC44l8pgN2ldk4fbSbY7yPkNqJZW6q1lYIeg2G5xN0YoZFj4hqM48/xTaJizAJUYNvzuVrY+9RwjK9aRZAnDVLGtBpElOJmm3Q4TmpROP2FZ0seOxlZK7XM4tGkR3cveT2VYIDoP/tPFWq6QjS4UnQIiv4NisMS//i2Xy6+cx0jByxE+A2i/nCn/0nSC7ijCJKDaJXe/EmxNYD6NKmhpUiimadg1zbdvfg4bxnzhxlXse/0iOofX8v6Fr2fajGYK0YAoxggR/2RA/0Sg/xdCzXsdQdi7YQAAAABJRU5ErkJggg==';
+
+        function aplicarSelloMypecar() {
+            if (document.getElementById('sello-mypecar')) return;
+            const sello = document.createElement('div');
+            sello.id = 'sello-mypecar';
+            sello.style.cssText = 'position:fixed;bottom:' + (config.licenciadoA ? '26px' : '8px') + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
+            sello.innerHTML = '<img src="data:image/png;base64,' + MYPECAR_ICONO_B64 + '" style="height:14px;width:auto;display:block;" alt="MYPECAR CONTABLE">';
+            document.body.appendChild(sello);
+        }
+
+        // ==================================================================
+        // LOGO DEL NEGOCIO — reemplaza el ícono genérico del encabezado por el
+        // logo propio del cliente. Se guarda como base64 dentro de config,
+        // igual que en las demás 8 apps.
+        // ==================================================================
+        function subirLogoCliente(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const tiposValidos = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+            if (!tiposValidos.includes(file.type)) {
+                showToast('El archivo debe ser una imagen (PNG, JPG, WEBP o SVG) — no un documento Word, PDF, ni otro tipo de archivo. Si tu logo está dentro de un Word, ábrelo y guárdalo primero como imagen.', 'error');
+                event.target.value = '';
+                return;
+            }
+            if (file.size > 300 * 1024) {
+                showToast('El logo es muy grande (máximo 300 KB). Comprime la imagen e inténtalo de nuevo.', 'error');
+                event.target.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                config.logoBase64 = e.target.result;
+                persistAll();
+                aplicarLogoCliente();
+                showToast('Logo actualizado.');
+            };
+            reader.onerror = function () {
+                showToast('No se pudo leer el archivo. Intenta con otra imagen.', 'error');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function quitarLogoCliente() {
+            if (!confirm('¿Quitar el logo actual y volver al ícono genérico?')) return;
+            config.logoBase64 = '';
+            persistAll();
+            aplicarLogoCliente();
+            const inputEl = document.getElementById('set-logo-input');
+            if (inputEl) inputEl.value = '';
+            showToast('Logo eliminado.');
+        }
+
+        function aplicarLogoCliente() {
+            const generico = document.getElementById('header-logo-generico');
+            const clienteImg = document.getElementById('header-logo-cliente');
+            const previewWrap = document.getElementById('set-logo-preview-wrap');
+            const preview = document.getElementById('set-logo-preview');
+            const btnQuitar = document.getElementById('btn-quitar-logo');
+            if (config.logoBase64) {
+                if (generico) generico.classList.add('hidden');
+                if (clienteImg) { clienteImg.src = config.logoBase64; clienteImg.classList.remove('hidden'); }
+                if (preview) preview.src = config.logoBase64;
+                if (previewWrap) previewWrap.classList.remove('hidden');
+                if (btnQuitar) btnQuitar.classList.remove('hidden');
+            } else {
+                if (generico) generico.classList.remove('hidden');
+                if (clienteImg) clienteImg.classList.add('hidden');
+                if (previewWrap) previewWrap.classList.add('hidden');
+                if (btnQuitar) btnQuitar.classList.add('hidden');
+            }
+        }
+
+        function renderSeguridad() {
+            const inputUsuario = document.getElementById('seg-usuario-activo');
+            if (inputUsuario) inputUsuario.value = config.usuarioActivo || '';
+            renderBitacora();
+        }
+
+        function showToast(message, type = 'success') {
+            let toast = document.getElementById('toast');
+            const color = type === 'success' ? 'border-emerald-500' : 'border-rose-500';
+            const icon = type === 'success' ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-rose-400';
+            toast.className = `fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border ${color} transform transition-all duration-300`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => { toast.className = "hidden"; }, 3500);
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all";
+            });
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            const btn = document.getElementById('btn-tab-' + tabId);
+            if (btn) btn.className = "tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 bg-orange-50 text-orange-700 border border-orange-100 transition-all";
+
+            if (tabId === 'dashboard') renderDashboard();
+            else if (tabId === 'kardex') renderKardexTab();
+            else if (tabId === 'importar') renderImportar();
+            else if (tabId === 'ajuste') renderAjusteManualTab();
+            else if (tabId === 'cierre') renderCierre();
+            else if (tabId === 'reportes') renderReportesTab();
+            else if (tabId === 'alertas') renderAlertas();
+            else if (tabId === 'seguridad') renderSeguridad();
+            else if (tabId === 'settings') renderSettings();
+        }
+
+        function syncConfigUI() {
+            document.getElementById('nav-empresa-name').innerText = config.nombreComercial || 'Sin configurar';
+            document.getElementById('nav-empresa-name-sub').innerText = config.nombreComercial || 'Sin datos de empresa';
+            // El <title> de la pestaña también debe reflejar la empresa activa, igual que
+            // en el resto de las apps de Mypecar Plus.
+            try { document.title = `Inventario — ${(config.nombreComercial || config.razonSocial || 'MYPECAR PLUS').trim()}`; } catch (e) { console.error('Error al actualizar el título de la pestaña:', e); }
+            document.getElementById('nav-empresa-ruc').innerText = config.ruc || '-';
+            document.getElementById('nav-metodo-valorizacion').innerText = config.metodoValorizacion === 'PEPS' ? 'PEPS (FIFO)' : 'PROMEDIO';
+            document.getElementById('set-razon-social').value = config.razonSocial || '';
+            document.getElementById('set-nombre-comercial').value = config.nombreComercial || '';
+            document.getElementById('set-ruc').value = config.ruc || '';
+            document.getElementById('set-metodo-valorizacion').value = config.metodoValorizacion;
+            const licInput = document.getElementById('set-licenciado-a');
+            if (licInput) licInput.value = config.licenciadoA || '';
+            aplicarLogoCliente();
+            populateProductoDatalist();
+            poblarSelectoresPuntoVenta();
+        }
+
+        // ==================================================================
+        // RUC (validación, para el campo editable de empresa)
+        // ==================================================================
+        function validarDigitoVerificadorRuc(ruc) {
+            if (!/^\d{11}$/.test(ruc)) return false;
+            const prefijosValidos = ['10', '15', '16', '17', '20'];
+            if (!prefijosValidos.includes(ruc.substring(0, 2))) return false;
+            const factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+            const digitos = ruc.split('').map(Number);
+            let suma = 0;
+            for (let i = 0; i < 10; i++) suma += digitos[i] * factores[i];
+            // ARREGLO (2026-10-06): las 2 excepciones del algoritmo oficial de SUNAT
+            // estaban INVERTIDAS (se usaba 11→0 y 10→1). Lo correcto es 10→0 y 11→1.
+            // Por eso RUC reales y vigentes (cerca de 1 de cada 5) se rechazaban como
+            // "no válidos". Mismo arreglo aplicado en 02 Registro de Compras.
+            let resultado = 11 - (suma % 11);
+            if (resultado === 10) resultado = 0;
+            else if (resultado === 11) resultado = 1;
+            return resultado === digitos[10];
+        }
+
+        async function guardarDatosEmpresa() {
+            const ruc = document.getElementById('set-ruc').value.trim();
+            if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { const chk = await MypecarSync.seguridad.validarRucEmpresaActiva(ruc); if (!chk.ok) { alert(chk.mensaje); document.getElementById('set-ruc').value = config.ruc || ''; return; } } // 2026-10-16
+            if (ruc && !validarDigitoVerificadorRuc(ruc)) {
+                showToast('El RUC ingresado no tiene un dígito verificador válido.', 'error');
+            }
+            config.razonSocial = document.getElementById('set-razon-social').value.trim();
+            config.nombreComercial = document.getElementById('set-nombre-comercial').value.trim();
+            config.ruc = ruc;
+            const licInput = document.getElementById('set-licenciado-a');
+            if (licInput) config.licenciadoA = licInput.value.trim();
+            await persistAll();
+            syncConfigUI();
+            aplicarMarcaDeAgua();
+            showToast('Datos de la empresa actualizados.');
+        }
+
+        async function guardarMetodoValorizacion() {
+            config.metodoValorizacion = document.getElementById('set-metodo-valorizacion').value;
+            registrarBitacora('config', `Método de valorización cambiado a ${config.metodoValorizacion}`);
+            await persistAll();
+            syncConfigUI();
+            renderDashboard();
+            showToast('Método de valorización actualizado.');
+        }
+
+        // ==================================================================
+        // CATÁLOGO: PRODUCTOS
+        // ==================================================================
+        function generarCodigoProducto(nombre) {
+            const base = (nombre || '').toUpperCase().trim().replace(/[^A-Z0-9\s]/g, '').replace(/\s+/g, '_').slice(0, 40) || 'PRODUCTO';
+            let codigo = base, n = 1;
+            while (config.productos.some(p => p.codigo === codigo)) { n++; codigo = `${base}_${n}`; }
+            return codigo;
+        }
+
+        function generarCodigoPuntoVenta(nombre) {
+            const base = 'PV' + (nombre || '').toUpperCase().trim().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+            let codigo = base || 'PV1', n = 1;
+            while (config.puntosVenta.some(pv => pv.codigo === codigo)) { n++; codigo = `${base}_${n}`; }
+            return codigo;
+        }
+
+        function getProducto(codigo) { return config.productos.find(p => p.codigo === codigo); }
+
+        // ==================================================================
+        // GRUPO CONTABLE DE EXISTENCIAS (2026-10-11) — PCGE
+        // ==================================================================
+        // Cada producto pertenece al grupo de la cuenta 60 con que se compra, y eso define
+        // su cuenta de existencias en el Cierre de Existencias de 04 Libro Diario:
+        //   601 Mercaderías → 201 · 602 Materias primas → 241 · 603 Suministros → 252 · 604 Envases → 261
+        // Se deduce SOLO de las compras importadas de 02 (cada entrada trae su cuenta 60).
+        // Si se corrige a mano en Ajustes, ya no se vuelve a deducir para ese producto.
+        const GRUPOS_CONTABLES_EXISTENCIA = {
+            '601': { nombre: 'Mercaderías', existencia: '201' },
+            '602': { nombre: 'Materias primas', existencia: '241' },
+            '603': { nombre: 'Suministros', existencia: '252' },
+            '604': { nombre: 'Envases y embalajes', existencia: '261' }
+        };
+        function grupoDeCuentaCompra(cuenta) {
+            const c = String(cuenta || '');
+            if (/^609[1-4]/.test(c)) return '60' + c.charAt(3); // costos vinculados siguen a su grupo
+            const p = c.substring(0, 3);
+            return GRUPOS_CONTABLES_EXISTENCIA[p] ? p : null;
+        }
+        function grupoContableDe(codigo) {
+            const p = getProducto(codigo);
+            return (p && GRUPOS_CONTABLES_EXISTENCIA[p.grupoContable]) ? p.grupoContable : '';
+        }
+        // Devuelve cuántos productos quedaron con grupo nuevo o cambiado.
+        function inferirGruposContables() {
+            const acumulado = {};
+            stockMovimientos.forEach(m => {
+                if (m.origen !== 'compra' || !m.cuenta) return;
+                const g = grupoDeCuentaCompra(m.cuenta);
+                if (!g) return;
+                if (!acumulado[m.productoCodigo]) acumulado[m.productoCodigo] = {};
+                acumulado[m.productoCodigo][g] = (acumulado[m.productoCodigo][g] || 0) + (Math.abs(parseFloat(m.monto)) || 1);
+            });
+            let cambios = 0;
+            config.productos.forEach(p => {
+                if (p.grupoOrigen === 'manual' && GRUPOS_CONTABLES_EXISTENCIA[p.grupoContable]) return;
+                const a = acumulado[p.codigo];
+                if (!a) return;
+                const g = Object.keys(a).sort((x, y) => a[y] - a[x])[0];
+                if (p.grupoContable !== g) { p.grupoContable = g; p.grupoOrigen = 'auto'; cambios++; }
+            });
+            return cambios;
+        }
+        async function actualizarGrupoContable(codigo, valor) {
+            const producto = getProducto(codigo);
+            if (!producto) return;
+            if (valor) { producto.grupoContable = valor; producto.grupoOrigen = 'manual'; }
+            else { delete producto.grupoContable; delete producto.grupoOrigen; inferirGruposContables(); }
+            registrarBitacora('catalogo', `Grupo contable de ${producto.nombre}: ${producto.grupoContable ? producto.grupoContable + ' ' + GRUPOS_CONTABLES_EXISTENCIA[producto.grupoContable].nombre : 'automático (sin dato aún)'}`);
+            await persistAll();
+            renderSettings();
+            showToast('Grupo contable actualizado.');
+        }
+        function valorizacionPorGrupo(stock) {
+            const r = { '601': 0, '602': 0, '603': 0, '604': 0, 'sin_grupo': 0 };
+            stock.forEach(g => { const k = grupoContableDe(g.productoCodigo) || 'sin_grupo'; r[k] = round2(r[k] + (g.valor || 0)); });
+            return r;
+        }
+
+        function populateProductoDatalist() {
+            const datalist = document.getElementById('producto-datalist');
+            if (!datalist) return;
+            datalist.innerHTML = '';
+            config.productos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = `${p.codigo} - ${p.nombre}`;
+                datalist.appendChild(opt);
+            });
+        }
+
+        async function agregarProducto() {
+            const nombre = document.getElementById('nuevo-prod-nombre').value.trim();
+            const unidad = document.getElementById('nuevo-prod-unidad').value.trim() || 'UND';
+            if (!nombre) { showToast('Escribe un nombre de producto.', 'error'); return; }
+            const codigo = generarCodigoProducto(nombre);
+            config.productos.push({ codigo, nombre, unidad, stockMinimo: 0, controlaStock: true });
+            registrarBitacora('catalogo', `Producto agregado: ${nombre} (${codigo})`);
+            document.getElementById('nuevo-prod-nombre').value = '';
+            document.getElementById('nuevo-prod-unidad').value = '';
+            await persistAll();
+            populateProductoDatalist();
+            renderSettings();
+            renderDashboard();
+            actualizarBadgeAlertas();
+            showToast('Producto agregado al catálogo.');
+        }
+
+        async function eliminarProducto(codigo) {
+            const usado = stockMovimientos.some(m => m.productoCodigo === codigo);
+            if (usado && !confirm('Este producto ya tiene movimientos de inventario registrados. ¿Eliminarlo del catálogo de todas formas? Los movimientos históricos se conservarán.')) return;
+            config.productos = config.productos.filter(p => p.codigo !== codigo);
+            registrarBitacora('catalogo', `Producto eliminado del catálogo: ${codigo}`);
+            await persistAll();
+            populateProductoDatalist();
+            renderSettings();
+            actualizarBadgeAlertas();
+            showToast('Producto eliminado del catálogo.');
+        }
+
+        async function actualizarStockMinimo(codigo, valor) {
+            const producto = getProducto(codigo);
+            if (!producto) return;
+            producto.stockMinimo = parseFloat(valor) || 0;
+            await persistAll();
+            renderDashboard();
+            actualizarBadgeAlertas();
+        }
+
+        // ==================================================================
+        // CATÁLOGO: PUNTOS DE VENTA
+        // ==================================================================
+        function poblarSelectoresPuntoVenta() {
+            ['ajuste-punto-venta', 'kardex-punto-venta'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                const valorActual = sel.value;
+                const esKardex = id === 'kardex-punto-venta';
+                sel.innerHTML = esKardex ? '<option value="">Todos (consolidado)</option>' : '';
+                config.puntosVenta.forEach(pv => {
+                    const opt = document.createElement('option');
+                    opt.value = pv.codigo;
+                    opt.textContent = pv.nombre;
+                    sel.appendChild(opt);
+                });
+                if ([...sel.options].some(o => o.value === valorActual)) sel.value = valorActual;
+            });
+        }
+
+        async function agregarPuntoVenta() {
+            const nombre = document.getElementById('nuevo-pv-nombre').value.trim();
+            if (!nombre) { showToast('Escribe un nombre de punto de venta.', 'error'); return; }
+            const codigo = generarCodigoPuntoVenta(nombre);
+            config.puntosVenta.push({ codigo, nombre });
+            registrarBitacora('catalogo', `Punto de venta agregado: ${nombre} (${codigo})`);
+            document.getElementById('nuevo-pv-nombre').value = '';
+            await persistAll();
+            poblarSelectoresPuntoVenta();
+            renderSettings();
+            showToast('Punto de venta agregado.');
+        }
+
+        async function eliminarPuntoVenta(codigo) {
+            if (config.puntosVenta.length <= 1) { showToast('Debe existir al menos un punto de venta.', 'error'); return; }
+            const usado = stockMovimientos.some(m => m.puntoVenta === codigo);
+            if (usado && !confirm('Este punto de venta ya tiene movimientos registrados. ¿Eliminarlo del catálogo de todas formas?')) return;
+            config.puntosVenta = config.puntosVenta.filter(pv => pv.codigo !== codigo);
+            registrarBitacora('catalogo', `Punto de venta eliminado: ${codigo}`);
+            await persistAll();
+            poblarSelectoresPuntoVenta();
+            renderSettings();
+            showToast('Punto de venta eliminado.');
+        }
+
+        // ==================================================================
+        // IMPORTACIÓN DE MOVIMIENTOS (desde 01 Ventas y 02 Compras)
+        // ==================================================================
+        function mergeCatalogos(payload) {
+            (payload.puntosVenta || []).forEach(pv => {
+                if (!config.puntosVenta.some(x => x.codigo === pv.codigo)) config.puntosVenta.push({ codigo: pv.codigo, nombre: pv.nombre });
+            });
+            (payload.productos || []).forEach(p => {
+                if (!config.productos.some(x => x.codigo === p.codigo)) {
+                    config.productos.push({ codigo: p.codigo, nombre: p.nombre, unidad: p.unidad || 'UND', stockMinimo: p.stockMinimo || 0, controlaStock: p.controlaStock !== false });
+                }
+            });
+            if (!config.ruc && payload.empresa) {
+                config.razonSocial = payload.empresa.razonSocial || '';
+                config.nombreComercial = payload.empresa.nombreComercial || '';
+                config.ruc = payload.empresa.ruc || '';
+            }
+        }
+
+        async function handleImportFile(event, origenEsperado) {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const payload = JSON.parse(text);
+                if (payload.tipo !== 'movimientos_inventario') { showToast('El archivo no tiene el formato esperado (movimientos_inventario).', 'error'); return; }
+                const origenArchivo = payload.origen === 'ventas' ? 'venta' : (payload.origen === 'compras' ? 'compra' : payload.origen);
+                if (origenArchivo !== origenEsperado) {
+                    showToast(`Este archivo es de ${payload.origen}, pero lo subiste en el casillero equivocado.`, 'error');
+                    return;
+                }
+
+                mergeCatalogos(payload);
+
+                // Reemplazo total de los movimientos de este origen (no se suman/duplican)
+                stockMovimientos = stockMovimientos.filter(m => m.origen !== origenEsperado);
+                let nextId = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1;
+                (payload.movimientos || []).forEach(m => {
+                    stockMovimientos.push({
+                        id: nextId++,
+                        fecha: m.fecha,
+                        tipo: m.tipo,
+                        origen: origenEsperado,
+                        origenId: m.ventaId ?? m.compraId ?? null,
+                        comprobante: m.comprobante || '',
+                        puntoVenta: m.puntoVenta || 'PV1',
+                        productoCodigo: m.productoCodigo,
+                        productoNombre: m.productoNombre,
+                        unidad: m.unidad,
+                        cantidad: parseFloat(m.cantidad) || 0,
+                        costoUnitario: (m.costoUnitario !== undefined && m.costoUnitario !== null) ? parseFloat(m.costoUnitario) : null,
+                        monto: (m.monto !== undefined && m.monto !== null) ? parseFloat(m.monto) : null,
+                        motivo: '',
+                        cuenta: m.cuenta || '',
+                        registradoPor: m.registradoPor || 'Sin identificar',
+                        fechaRegistro: m.fechaRegistro || new Date().toISOString()
+                    });
+                });
+
+                historialImportaciones = historialImportaciones.filter(h => h.origen !== origenEsperado);
+                historialImportaciones.unshift({
+                    origen: origenEsperado,
+                    fecha: new Date().toISOString(),
+                    cantidadMovimientos: (payload.movimientos || []).length,
+                    empresa: payload.empresa ? payload.empresa.nombreComercial : ''
+                });
+
+                registrarBitacora('importacion', `Importados ${(payload.movimientos || []).length} movimientos de ${origenEsperado === 'venta' ? 'Ventas' : 'Compras'}`);
+                const gruposAsignados = inferirGruposContables();
+                if (gruposAsignados > 0) registrarBitacora('catalogo', `Grupo contable deducido de las compras para ${gruposAsignados} producto(s)`);
+                await persistAll();
+                syncConfigUI();
+                renderImportar();
+                renderDashboard();
+                actualizarBadgeAlertas();
+                showToast(`Se importaron ${(payload.movimientos || []).length} movimientos de ${origenEsperado === 'venta' ? 'Ventas' : 'Compras'}.`);
+            } catch (e) {
+                showToast('No se pudo leer el archivo. Verifica que sea un JSON válido exportado desde Ventas o Compras.', 'error');
+            } finally {
+                event.target.value = '';
+            }
+        }
+
+        function renderImportar() {
+            const ventaHist = historialImportaciones.find(h => h.origen === 'venta');
+            const compraHist = historialImportaciones.find(h => h.origen === 'compra');
+            document.getElementById('resumen-import-venta').innerText = ventaHist
+                ? `Última importación: ${new Date(ventaHist.fecha).toLocaleString('es-PE')} — ${ventaHist.cantidadMovimientos} movimiento(s).`
+                : 'Sin importaciones de Ventas todavía.';
+            document.getElementById('resumen-import-compra').innerText = compraHist
+                ? `Última importación: ${new Date(compraHist.fecha).toLocaleString('es-PE')} — ${compraHist.cantidadMovimientos} movimiento(s).`
+                : 'Sin importaciones de Compras todavía.';
+
+            const cont = document.getElementById('historial-importaciones');
+            const vacio = document.getElementById('msg-historial-vacio');
+            cont.innerHTML = '';
+            if (historialImportaciones.length === 0) { vacio.classList.remove('hidden'); return; }
+            vacio.classList.add('hidden');
+            historialImportaciones.slice().sort((a, b) => b.fecha.localeCompare(a.fecha)).forEach(h => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center border-b border-slate-100 py-1.5';
+                div.innerHTML = `<span><i class="fa-solid ${h.origen === 'venta' ? 'fa-cart-shopping text-emerald-500' : 'fa-truck-ramp-box text-blue-500'}"></i> ${h.origen === 'venta' ? 'Ventas' : 'Compras'} — ${h.cantidadMovimientos} movimiento(s)</span><span class="text-slate-400">${new Date(h.fecha).toLocaleString('es-PE')}</span>`;
+                cont.appendChild(div);
+            });
+        }
+
+        // ==================================================================
+        // CÁLCULO DE STOCK Y VALORIZACIÓN (PEPS / PROMEDIO PONDERADO)
+        // ==================================================================
+        function movimientosOrdenados() {
+            // Orden cronológico: primero por fecha del movimiento; si coinciden, por el
+            // momento exacto en que quedó registrado en su app de origen (fechaRegistro) —
+            // así una compra registrada en la mañana antepone su entrada a una venta de esa
+            // misma tarde, aunque ambas se hayan importado aquí en cualquier orden. El id
+            // local es el último desempate, para un orden estable y determinista.
+            return [...stockMovimientos].sort((a, b) =>
+                (a.fecha || '').localeCompare(b.fecha || '') ||
+                (a.fechaRegistro || '').localeCompare(b.fechaRegistro || '') ||
+                a.id - b.id
+            );
+        }
+
+        // Pasada única: devuelve el stock y valor por producto x punto de venta.
+        // Si se indica fechaCorte (YYYY-MM-DD), solo considera movimientos con
+        // fecha <= fechaCorte — así se puede reconstruir el saldo valorizado que
+        // existía al cierre de un mes ya pasado, no solo el saldo de hoy.
+        function calcularStockActual(metodo, fechaCorte) {
+            const grupos = {};
+            movimientosOrdenados().forEach(m => {
+                if (fechaCorte && (m.fecha || '') > fechaCorte) return;
+                const key = m.productoCodigo + '|' + m.puntoVenta;
+                if (!grupos[key]) grupos[key] = { productoCodigo: m.productoCodigo, productoNombre: m.productoNombre, puntoVenta: m.puntoVenta, unidad: m.unidad, cantidad: 0, valor: 0, capasPEPS: [] };
+                const g = grupos[key];
+                g.productoNombre = m.productoNombre || g.productoNombre;
+                g.unidad = m.unidad || g.unidad;
+                if (m.tipo === 'entrada') {
+                    const costo = (m.costoUnitario !== null && m.costoUnitario !== undefined) ? m.costoUnitario : (g.cantidad > 0.0000001 ? g.valor / g.cantidad : 0);
+                    g.cantidad += m.cantidad;
+                    g.valor += costo * m.cantidad;
+                    if (metodo === 'PEPS') g.capasPEPS.push({ cantidad: m.cantidad, costoUnitario: costo });
+                } else {
+                    if (metodo === 'PROMEDIO') {
+                        const costoProm = g.cantidad > 0.0000001 ? g.valor / g.cantidad : 0;
+                        g.valor -= costoProm * m.cantidad;
+                        g.cantidad -= m.cantidad;
+                    } else {
+                        let restante = m.cantidad;
+                        while (restante > 0.0000001 && g.capasPEPS.length > 0) {
+                            const capa = g.capasPEPS[0];
+                            const usar = Math.min(capa.cantidad, restante);
+                            g.valor -= usar * capa.costoUnitario;
+                            capa.cantidad -= usar;
+                            restante -= usar;
+                            if (capa.cantidad <= 0.0000001) g.capasPEPS.shift();
+                        }
+                        g.cantidad -= m.cantidad;
+                    }
+                }
+            });
+            return Object.values(grupos).map(g => {
+                const cantidad = round2(g.cantidad);
+                const valor = round2(g.valor);
+                return { productoCodigo: g.productoCodigo, productoNombre: g.productoNombre, puntoVenta: g.puntoVenta, unidad: g.unidad, cantidad, valor, costoProm: Math.abs(cantidad) > 0.0000001 ? round2(valor / cantidad) : 0 };
+            });
+        }
+
+        // Detalle completo (para la pestaña Kardex): filas fecha a fecha con saldo corrido.
+        function construirKardex(productoCodigo, puntoVenta, metodo) {
+            const movs = movimientosOrdenados().filter(m => m.productoCodigo === productoCodigo && (!puntoVenta || m.puntoVenta === puntoVenta));
+            let saldoCantidad = 0, saldoValor = 0;
+            let capasPEPS = [];
+            const filas = [];
+            movs.forEach(m => {
+                let fila = { ...m, entradaCant: 0, entradaCosto: 0, entradaValor: 0, salidaCant: 0, salidaCosto: 0, salidaValor: 0 };
+                if (m.tipo === 'entrada') {
+                    const costo = (m.costoUnitario !== null && m.costoUnitario !== undefined) ? m.costoUnitario : (saldoCantidad > 0.0000001 ? saldoValor / saldoCantidad : 0);
+                    fila.entradaCant = m.cantidad;
+                    fila.entradaCosto = round2(costo);
+                    fila.entradaValor = round2(costo * m.cantidad);
+                    saldoCantidad += m.cantidad;
+                    saldoValor += fila.entradaValor;
+                    if (metodo === 'PEPS') capasPEPS.push({ cantidad: m.cantidad, costoUnitario: costo });
+                } else {
+                    if (metodo === 'PROMEDIO') {
+                        const costoProm = saldoCantidad > 0.0000001 ? saldoValor / saldoCantidad : 0;
+                        fila.salidaCant = m.cantidad;
+                        fila.salidaCosto = round2(costoProm);
+                        fila.salidaValor = round2(costoProm * m.cantidad);
+                    } else {
+                        let restante = m.cantidad, valorConsumido = 0;
+                        while (restante > 0.0000001 && capasPEPS.length > 0) {
+                            const capa = capasPEPS[0];
+                            const usar = Math.min(capa.cantidad, restante);
+                            valorConsumido += usar * capa.costoUnitario;
+                            capa.cantidad -= usar;
+                            restante -= usar;
+                            if (capa.cantidad <= 0.0000001) capasPEPS.shift();
+                        }
+                        fila.salidaCant = m.cantidad;
+                        fila.salidaValor = round2(valorConsumido);
+                        fila.salidaCosto = m.cantidad > 0.0000001 ? round2(valorConsumido / m.cantidad) : 0;
+                    }
+                    saldoCantidad -= m.cantidad;
+                    saldoValor -= fila.salidaValor;
+                }
+                saldoValor = round2(saldoValor);
+                if (Math.abs(saldoValor) < 0.005) saldoValor = 0;
+                saldoCantidad = round2(saldoCantidad);
+                fila.saldoCantidad = saldoCantidad;
+                fila.saldoValor = saldoValor;
+                fila.saldoCostoProm = Math.abs(saldoCantidad) > 0.0000001 ? round2(saldoValor / saldoCantidad) : 0;
+                filas.push(fila);
+            });
+            return filas;
+        }
+
+        function contarMovimientosHastaFecha(fechaCorte) {
+            return stockMovimientos.filter(m => !fechaCorte || (m.fecha || '') <= fechaCorte).length;
+        }
+
+        // ==================================================================
+        // CIERRE CONTABLE — puente hacia 04 Libro Diario (Costo de Ventas real)
+        // y hacia 07 Reportes (comparativo Existencias contables vs. Kardex).
+        // ==================================================================
+        function fechaHoyISO() { return new Date().toISOString().split('T')[0]; }
+
+        // Convierte una fecha YYYY-MM-DD (o vacío = hoy) a formato legible dd/mm/aaaa para
+        // mostrar en pantalla, reportes impresos y archivos exportados. Las fechas son
+        // información crítica en un reporte de saldos de inventario, así que esta función se
+        // usa en todos los lugares donde antes solo se decía "a hoy" sin mostrar la fecha real.
+        function fmtFecha(iso) {
+            const valor = iso || fechaHoyISO();
+            const partes = String(valor).split('-');
+            if (partes.length !== 3) return valor;
+            const [y, m, d] = partes;
+            return `${d}/${m}/${y}`;
+        }
+
+        function renderCierre() {
+            const inputFecha = document.getElementById('cierre-fecha-corte');
+            if (!inputFecha.value) inputFecha.value = fechaHoyISO();
+            const fechaCorte = inputFecha.value;
+            const metodo = config.metodoValorizacion;
+
+            const stock = calcularStockActual(metodo, fechaCorte).filter(g => Math.abs(g.cantidad) > 0.0000001 || Math.abs(g.valor) > 0.005);
+            const valorTotal = round2(stock.reduce((s, g) => s + g.valor, 0));
+
+            document.getElementById('cierre-kpi-valor').innerText = `S/ ${valorTotal.toFixed(2)}`;
+            document.getElementById('cierre-kpi-fecha').innerText = `Al ${fmtFecha(fechaCorte)}`;
+            document.getElementById('cierre-kpi-metodo').innerText = `Método: ${metodo === 'PEPS' ? 'PEPS (FIFO)' : 'Promedio Ponderado'}`;
+            document.getElementById('cierre-kpi-productos').innerText = stock.length;
+            document.getElementById('cierre-kpi-movimientos').innerText = contarMovimientosHastaFecha(fechaCorte);
+
+            const tbody = document.getElementById('tabla-cierre-valorizacion');
+            const vacio = document.getElementById('msg-cierre-vacio');
+            tbody.innerHTML = '';
+            if (stock.length === 0) { vacio.classList.remove('hidden'); } else {
+                vacio.classList.add('hidden');
+                stock.slice().sort((a, b) => b.valor - a.valor).forEach(g => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-slate-100';
+                    const grupoProd = grupoContableDe(g.productoCodigo);
+                    tr.innerHTML = `<td class="px-3 py-1.5">${g.productoNombre}</td><td class="px-3 py-1.5 ${grupoProd ? 'text-slate-600' : 'text-rose-600 font-bold'}">${grupoProd ? grupoProd + ' ' + GRUPOS_CONTABLES_EXISTENCIA[grupoProd].nombre : 'Sin grupo'}</td><td class="px-3 py-1.5">${nombrePVGlobal(g.puntoVenta)}</td><td class="px-3 py-1.5 text-right">${g.cantidad.toLocaleString('es-PE')}</td><td class="px-3 py-1.5">${g.unidad || ''}</td><td class="px-3 py-1.5 text-right">S/ ${g.costoProm.toFixed(2)}</td><td class="px-3 py-1.5 text-right font-semibold">S/ ${g.valor.toFixed(2)}</td>`;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            renderResumenPorGrupo(stock);
+            renderListadoFisico(stock);
+        }
+
+        // Subtotal por grupo contable: es exactamente lo que 04 Libro Diario usará como
+        // Saldo Final de cada grupo al importar este archivo.
+        function renderResumenPorGrupo(stock) {
+            const cont = document.getElementById('cierre-resumen-grupos');
+            if (!cont) return;
+            if (stock.length === 0) { cont.innerHTML = ''; return; }
+            const r = valorizacionPorGrupo(stock);
+            const fmt = v => `S/ ${v.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const chips = Object.keys(GRUPOS_CONTABLES_EXISTENCIA).filter(g => Math.abs(r[g]) >= 0.005).map(g =>
+                `<span class="bg-teal-50 border border-teal-200 text-teal-800 rounded-lg px-2 py-1">${g} ${GRUPOS_CONTABLES_EXISTENCIA[g].nombre} (${GRUPOS_CONTABLES_EXISTENCIA[g].existencia}): <b>${fmt(r[g])}</b></span>`);
+            if (Math.abs(r.sin_grupo) >= 0.005) chips.push(`<span class="bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-2 py-1"><i class="fa-solid fa-triangle-exclamation"></i> Sin grupo contable: <b>${fmt(r.sin_grupo)}</b> — asígnalo en Ajustes → Catálogo de Productos</span>`);
+            cont.innerHTML = `<p class="text-[10px] uppercase font-bold text-slate-500 mb-1.5">Saldo final por grupo contable (lo que recibirá 04 Libro Diario)</p><div class="flex flex-wrap gap-2 text-[11px]">${chips.join('')}</div>`;
+        }
+
+        function nombrePVGlobal(codigo) {
+            return (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+        }
+
+        function renderListadoFisico(stockPrecalculado) {
+            const fechaCorte = document.getElementById('cierre-fecha-corte').value || fechaHoyISO();
+            const stock = stockPrecalculado || calcularStockActual(config.metodoValorizacion, fechaCorte);
+            const tbody = document.getElementById('tabla-listado-fisico');
+            tbody.innerHTML = '';
+            stock.slice().sort((a, b) => (a.productoNombre || '').localeCompare(b.productoNombre || '')).forEach(g => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100';
+                tr.innerHTML = `<td class="px-3 py-1.5">${g.productoNombre}</td><td class="px-3 py-1.5">${nombrePVGlobal(g.puntoVenta)}</td><td class="px-3 py-1.5">${g.unidad || ''}</td><td class="px-3 py-1.5 text-right">${g.cantidad.toLocaleString('es-PE')}</td><td class="px-3 py-1.5 text-right">S/ ${g.costoProm.toFixed(2)}</td><td class="px-3 py-1.5 text-right">S/ ${g.valor.toFixed(2)}</td><td class="px-3 py-1.5 text-center border-l border-dashed border-slate-300">&nbsp;</td><td class="px-3 py-1.5 text-center border-l border-dashed border-slate-300">&nbsp;</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function exportarValorizacionContable() {
+            const fechaCorte = document.getElementById('cierre-fecha-corte').value || fechaHoyISO();
+            const metodo = config.metodoValorizacion;
+            const stock = calcularStockActual(metodo, fechaCorte).filter(g => Math.abs(g.cantidad) > 0.0000001 || Math.abs(g.valor) > 0.005);
+            const valorTotal = round2(stock.reduce((s, g) => s + g.valor, 0));
+            const alertasStockMinimo = calcularAlertasStockMinimo(stock).map(a => ({ ...a, puntoVentaNombre: nombrePVGlobal(a.puntoVenta) }));
+            // Mermas: todo lo registrado con categoría "merma" hasta la fecha de corte (no solo
+            // el mes en curso), para que 07 Reportes y 08 Auditoría puedan acotar el rango que
+            // necesiten a partir de la fecha de cada movimiento.
+            const mermas = calcularMermas(null, fechaCorte).map(m => ({ ...m, puntoVentaNombre: nombrePVGlobal(m.puntoVenta) }));
+            const payload = {
+                tipo: 'valorizacion_inventario',
+                generadoEl: new Date().toISOString(),
+                fechaCorte,
+                metodoValorizacion: metodo,
+                valorTotal,
+                valorPorGrupo: valorizacionPorGrupo(stock),
+                empresa: { ruc: config.ruc, razonSocial: config.razonSocial, nombreComercial: config.nombreComercial },
+                puntosVenta: config.puntosVenta,
+                productos: stock.map(g => ({ grupoContable: grupoContableDe(g.productoCodigo), productoCodigo: g.productoCodigo, productoNombre: g.productoNombre, puntoVenta: g.puntoVenta, puntoVentaNombre: nombrePVGlobal(g.puntoVenta), unidad: g.unidad, cantidad: g.cantidad, costoUnitario: g.costoProm, valor: g.valor })),
+                alertasStockMinimo,
+                mermas
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Valorizacion_Inventario_${fechaCorte}_${config.ruc}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            registrarBitacora('exportar', `Valorización de inventario al ${fechaCorte} exportada para Contabilidad (S/ ${valorTotal.toFixed(2)})`);
+            persistAll();
+            showToast('Valorización exportada. Súbela en 04 Libro Diario (pestaña Almacén) o en 07 Reportes.');
+        }
+
+        // "Compartir" no adjunta el archivo automáticamente (ninguna app web puede hacerlo por
+        // seguridad del navegador) — abre WhatsApp/Correo con el resumen ya escrito, listo para
+        // adjuntar manualmente el .json o el Excel ya exportado.
+        function compartirCierreWhatsApp() {
+            const fechaCorte = document.getElementById('cierre-fecha-corte').value || fechaHoyISO();
+            const valor = document.getElementById('cierre-kpi-valor').innerText;
+            const texto = `*Valorización de Inventario*\n${config.nombreComercial || config.razonSocial || ''}\nAl corte del ${fechaCorte}\n\nValor total: ${valor}\nMétodo: ${config.metodoValorizacion === 'PEPS' ? 'PEPS (FIFO)' : 'Promedio Ponderado'}\nProductos con stock: ${document.getElementById('cierre-kpi-productos').innerText}\n\n(Adjunta aquí el archivo exportado)`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+        }
+        function compartirCierreCorreo() {
+            const fechaCorte = document.getElementById('cierre-fecha-corte').value || fechaHoyISO();
+            const valor = document.getElementById('cierre-kpi-valor').innerText;
+            const asunto = `Valorización de Inventario al ${fechaCorte}`;
+            const cuerpo = `Valorización de inventario de ${config.nombreComercial || config.razonSocial || ''} al corte del ${fechaCorte}.\n\nValor total: ${valor}\nMétodo: ${config.metodoValorizacion === 'PEPS' ? 'PEPS (FIFO)' : 'Promedio Ponderado'}\nProductos con stock: ${document.getElementById('cierre-kpi-productos').innerText}\n\n(Recuerda adjuntar el archivo exportado)`;
+            window.open(`mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`, '_blank');
+        }
+
+        function imprimirListadoFisico() {
+            const bloqueValorizacion = document.getElementById('tabla-cierre-valorizacion').closest('.bg-white');
+            const bloqueFecha = document.getElementById('cierre-fecha-corte').closest('.bg-white');
+            const kpis = bloqueValorizacion.previousElementSibling;
+            [bloqueValorizacion, bloqueFecha, kpis].forEach(el => el && el.classList.add('hidden'));
+            window.print();
+            [bloqueValorizacion, bloqueFecha, kpis].forEach(el => el && el.classList.remove('hidden'));
+        }
+
+        function compartirListadoFisicoWhatsApp() {
+            const fechaCorte = document.getElementById('cierre-fecha-corte').value || fechaHoyISO();
+            const texto = `*Listado para Toma de Inventario Físico*\n${config.nombreComercial || config.razonSocial || ''}\nAl ${fechaCorte}\n\n(Adjunta aquí el Excel exportado para hacer el conteo)`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+        }
+        function compartirListadoFisicoCorreo() {
+            const fechaCorte = document.getElementById('cierre-fecha-corte').value || fechaHoyISO();
+            const asunto = `Listado para Toma de Inventario Físico al ${fechaCorte}`;
+            const cuerpo = `Listado para toma de inventario físico de ${config.nombreComercial || config.razonSocial || ''} al ${fechaCorte}.\n\n(Adjunta aquí el Excel exportado)`;
+            window.open(`mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`, '_blank');
+        }
+
+        async function exportarListadoFisicoExcel() {
+            const fechaCorte = document.getElementById('cierre-fecha-corte').value || fechaHoyISO();
+            const stock = calcularStockActual(config.metodoValorizacion, fechaCorte).filter(g => Math.abs(g.cantidad) > 0.0000001 || Math.abs(g.valor) > 0.005);
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet('Toma de Inventario');
+            ws.columns = [
+                { header: 'Producto', key: 'producto', width: 30 },
+                { header: 'Punto de Venta', key: 'pv', width: 18 },
+                { header: 'Unidad', key: 'unidad', width: 10 },
+                { header: 'Stock Según Sistema', key: 'stock', width: 16 },
+                { header: 'Costo Unit.', key: 'costo', width: 12 },
+                { header: 'Valor Según Sistema', key: 'valor', width: 16 },
+                { header: 'Conteo Físico', key: 'conteo', width: 14 },
+                { header: 'Diferencia', key: 'dif', width: 14 }
+            ];
+            ws.getRow(1).font = { bold: true };
+            stock.slice().sort((a, b) => (a.productoNombre || '').localeCompare(b.productoNombre || '')).forEach(g => {
+                ws.addRow({ producto: g.productoNombre, pv: nombrePVGlobal(g.puntoVenta), unidad: g.unidad, stock: g.cantidad, costo: g.costoProm, valor: g.valor, conteo: null, dif: null });
+            });
+            const buf = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Toma_Inventario_${fechaCorte}_${config.ruc}.xlsx`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Listado para toma de inventario exportado a Excel.');
+        }
+
+        function compartirDashboardWhatsApp() {
+            const valor = document.getElementById('kpi-valor-inventario').innerText;
+            const alertas = document.getElementById('kpi-alertas-stock').innerText;
+            const texto = `*Resumen de Inventario*\n${config.nombreComercial || config.razonSocial || ''}\n\nValor total de inventario: ${valor}\nProductos catalogados: ${document.getElementById('kpi-total-productos').innerText}\nAlertas de stock mínimo: ${alertas}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+        }
+        function compartirDashboardCorreo() {
+            const valor = document.getElementById('kpi-valor-inventario').innerText;
+            const alertas = document.getElementById('kpi-alertas-stock').innerText;
+            const asunto = `Resumen de Inventario — ${config.nombreComercial || config.razonSocial || ''}`;
+            const cuerpo = `Resumen de inventario al ${new Date().toLocaleDateString('es-PE')}.\n\nValor total de inventario: ${valor}\nProductos catalogados: ${document.getElementById('kpi-total-productos').innerText}\nAlertas de stock mínimo: ${alertas}`;
+            window.open(`mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`, '_blank');
+        }
+
+        // ==================================================================
+        // REPORTES (Saldos de Inventario, Stock Menor al Mínimo, Mermas)
+        // ==================================================================
+        function renderReportesTab() {
+            if (!document.getElementById('mermas-fecha-desde').value) {
+                const hoy = new Date();
+                const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+                document.getElementById('mermas-fecha-desde').value = primerDiaMes;
+                document.getElementById('mermas-fecha-hasta').value = fechaHoyISO();
+            }
+            renderReporteSaldos();
+            renderReporteStockMinimo();
+            renderReporteMermas();
+        }
+
+        function renderReporteSaldos() {
+            const fechaEl = document.getElementById('reporte-saldos-fecha');
+            if (fechaEl) fechaEl.innerText = fmtFecha();
+            const stock = calcularStockActual(config.metodoValorizacion).filter(g => Math.abs(g.cantidad) > 0.0000001 || Math.abs(g.valor) > 0.005);
+            const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+            const tbody = document.getElementById('tabla-reporte-saldos');
+            const vacio = document.getElementById('msg-reporte-saldos-vacio');
+            tbody.innerHTML = '';
+            if (stock.length === 0) { vacio.classList.remove('hidden'); document.getElementById('reporte-saldos-total').innerText = 'S/ 0.00'; return; }
+            vacio.classList.add('hidden');
+            stock.slice().sort((a, b) => a.productoNombre.localeCompare(b.productoNombre) || nombrePV(a.puntoVenta).localeCompare(nombrePV(b.puntoVenta))).forEach(g => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100';
+                tr.innerHTML = `<td class="px-3 py-1.5">${g.productoNombre}</td><td class="px-3 py-1.5">${nombrePV(g.puntoVenta)}</td><td class="px-3 py-1.5 text-right">${g.cantidad.toLocaleString('es-PE')}</td><td class="px-3 py-1.5">${g.unidad || ''}</td><td class="px-3 py-1.5 text-right">S/ ${g.costoProm.toFixed(2)}</td><td class="px-3 py-1.5 text-right font-semibold">S/ ${g.valor.toFixed(2)}</td>`;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('reporte-saldos-total').innerText = 'S/ ' + round2(stock.reduce((s, g) => s + g.valor, 0)).toFixed(2);
+        }
+
+        function calcularAlertasStockMinimo(stockPrecalculado) {
+            const stock = stockPrecalculado || calcularStockActual(config.metodoValorizacion);
+            return stock.filter(g => {
+                const p = getProducto(g.productoCodigo);
+                return p && p.stockMinimo > 0 && g.cantidad < p.stockMinimo;
+            }).map(g => {
+                const p = getProducto(g.productoCodigo);
+                return { productoCodigo: g.productoCodigo, productoNombre: g.productoNombre, puntoVenta: g.puntoVenta, unidad: g.unidad, cantidad: g.cantidad, stockMinimo: p.stockMinimo, faltante: round2(p.stockMinimo - g.cantidad) };
+            });
+        }
+
+        function renderReporteStockMinimo() {
+            const fechaEl = document.getElementById('reporte-stockminimo-fecha');
+            if (fechaEl) fechaEl.innerText = fmtFecha();
+            const alertas = calcularAlertasStockMinimo();
+            const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+            const tbody = document.getElementById('tabla-reporte-stockminimo');
+            const vacio = document.getElementById('msg-reporte-stockminimo-vacio');
+            tbody.innerHTML = '';
+            if (alertas.length === 0) { vacio.classList.remove('hidden'); return; }
+            vacio.classList.add('hidden');
+            alertas.sort((a, b) => b.faltante - a.faltante).forEach(a => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100 bg-rose-50';
+                tr.innerHTML = `<td class="px-3 py-1.5 font-medium">${a.productoNombre}</td><td class="px-3 py-1.5">${nombrePV(a.puntoVenta)}</td><td class="px-3 py-1.5">${a.unidad || ''}</td><td class="px-3 py-1.5 text-right text-rose-600 font-bold">${a.cantidad}</td><td class="px-3 py-1.5 text-right">${a.stockMinimo}</td><td class="px-3 py-1.5 text-right font-semibold">${a.faltante}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Costo promedio "vigente" de un producto (consolidado en todos los puntos de venta),
+        // usado solo para valorizar mermas — un ajuste de salida no captura su propio costo
+        // unitario (a diferencia de una entrada), así que se valoriza al costo promedio actual.
+        function costoPromedioVigentePorProducto() {
+            const stock = calcularStockActual(config.metodoValorizacion);
+            const mapa = {};
+            config.productos.forEach(p => {
+                const filas = stock.filter(g => g.productoCodigo === p.codigo);
+                const cant = filas.reduce((s, g) => s + g.cantidad, 0);
+                const val = filas.reduce((s, g) => s + g.valor, 0);
+                mapa[p.codigo] = cant > 0.0000001 ? val / cant : 0;
+            });
+            return mapa;
+        }
+
+        function calcularMermas(fechaDesde, fechaHasta) {
+            const costoProm = costoPromedioVigentePorProducto();
+            return stockMovimientos
+                .filter(m => m.origen === 'ajuste' && categoriaDeAjuste(m) === 'merma' && (!fechaDesde || m.fecha >= fechaDesde) && (!fechaHasta || m.fecha <= fechaHasta))
+                .map(m => {
+                    const costoUnitario = m.costoUnitario !== null && m.costoUnitario !== undefined ? m.costoUnitario : (costoProm[m.productoCodigo] || 0);
+                    return { ...m, costoUnitarioValorizado: round2(costoUnitario), valor: round2(costoUnitario * m.cantidad) };
+                })
+                .sort((a, b) => b.fecha.localeCompare(a.fecha));
+        }
+
+        function renderReporteMermas() {
+            const desde = document.getElementById('mermas-fecha-desde').value;
+            const hasta = document.getElementById('mermas-fecha-hasta').value;
+            const periodoEl = document.getElementById('reporte-mermas-periodo');
+            if (periodoEl) periodoEl.innerText = `Periodo: ${fmtFecha(desde)} al ${fmtFecha(hasta)}`;
+            const mermas = calcularMermas(desde, hasta);
+            const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+            const tbody = document.getElementById('tabla-reporte-mermas');
+            const vacio = document.getElementById('msg-reporte-mermas-vacio');
+            tbody.innerHTML = '';
+            if (mermas.length === 0) { vacio.classList.remove('hidden'); document.getElementById('reporte-mermas-total').innerText = 'S/ 0.00'; return; }
+            vacio.classList.add('hidden');
+            mermas.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100';
+                tr.innerHTML = `<td class="px-3 py-1.5">${m.fecha}</td><td class="px-3 py-1.5">${m.productoNombre}</td><td class="px-3 py-1.5">${nombrePV(m.puntoVenta)}</td><td class="px-3 py-1.5 text-right">${m.cantidad}</td><td class="px-3 py-1.5">${m.unidad || ''}</td><td class="px-3 py-1.5 text-right">S/ ${m.costoUnitarioValorizado.toFixed(2)}</td><td class="px-3 py-1.5 text-right font-semibold text-amber-700">S/ ${m.valor.toFixed(2)}</td><td class="px-3 py-1.5">${m.motivo}</td>`;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('reporte-mermas-total').innerText = 'S/ ' + round2(mermas.reduce((s, m) => s + m.valor, 0)).toFixed(2);
+        }
+
+        // Imprime un solo bloque de reporte (oculta los demás bloques de la pestaña Reportes
+        // mientras dura la impresión, igual que imprimirListadoFisico en Cierre Contable).
+        function imprimirBloqueReporte(idBloque) {
+            const todos = ['reporte-bloque-saldos', 'reporte-bloque-stockminimo', 'reporte-bloque-mermas'];
+            const ocultados = todos.filter(id => id !== idBloque).map(id => document.getElementById(id));
+            ocultados.forEach(el => el && el.classList.add('hidden'));
+            window.print();
+            ocultados.forEach(el => el && el.classList.remove('hidden'));
+        }
+
+        function compartirReporteWhatsApp(reporte) {
+            window.open(`https://wa.me/?text=${encodeURIComponent(textoResumenReporte(reporte))}`, '_blank');
+        }
+        function compartirReporteCorreo(reporte) {
+            const titulos = { saldos: 'Reporte de Saldos de Inventario', stockminimo: 'Reporte de Stock Menor al Mínimo', mermas: 'Reporte de Mermas' };
+            const asunto = `${titulos[reporte]} — ${config.nombreComercial || config.razonSocial || ''}`;
+            window.open(`mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(textoResumenReporte(reporte))}`, '_blank');
+        }
+        function textoResumenReporte(reporte) {
+            const empresa = config.nombreComercial || config.razonSocial || '';
+            if (reporte === 'saldos') {
+                return `*Reporte de Saldos de Inventario*\n${empresa}\nAl ${fechaHoyISO()}\n\nValor total: ${document.getElementById('reporte-saldos-total').innerText}\n\n(Adjunta aquí el Excel exportado)`;
+            }
+            if (reporte === 'stockminimo') {
+                const alertas = calcularAlertasStockMinimo();
+                return `*Reporte de Stock Menor al Mínimo*\n${empresa}\nAl ${fechaHoyISO()}\n\nProductos por debajo del mínimo: ${alertas.length}\n\n(Adjunta aquí el Excel exportado)`;
+            }
+            const desde = document.getElementById('mermas-fecha-desde').value;
+            const hasta = document.getElementById('mermas-fecha-hasta').value;
+            return `*Reporte de Mermas*\n${empresa}\nDel ${desde} al ${hasta}\n\nTotal mermas: ${document.getElementById('reporte-mermas-total').innerText}\n\n(Adjunta aquí el Excel exportado)`;
+        }
+
+        async function exportarReporteExcel(reporte) {
+            const wb = new ExcelJS.Workbook();
+            const empresa = config.nombreComercial || config.razonSocial || '';
+            // Nota: las 3 primeras filas (título + fecha/periodo + fila en blanco) se agregan
+            // manualmente ANTES de la fila de encabezados de columna, para que la fecha quede
+            // grabada dentro del propio archivo — no solo en el nombre del archivo, que se
+            // pierde si alguien lo reenvía o lo guarda con otro nombre.
+            if (reporte === 'saldos') {
+                const stock = calcularStockActual(config.metodoValorizacion).filter(g => Math.abs(g.cantidad) > 0.0000001 || Math.abs(g.valor) > 0.005);
+                const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+                const ws = wb.addWorksheet('Saldos de Inventario');
+                ws.columns = [
+                    { key: 'p', width: 30 }, { key: 'pv', width: 18 },
+                    { key: 'c', width: 12 }, { key: 'u', width: 10 },
+                    { key: 'cp', width: 12 }, { key: 'v', width: 14 }
+                ];
+                ws.addRow([`Reporte de Saldos de Inventario — ${empresa}`]);
+                ws.addRow([`Al ${fmtFecha()}`]);
+                ws.addRow([]);
+                ws.addRow(['Producto', 'Punto de Venta', 'Cantidad', 'Unidad', 'Costo Prom.', 'Valor']);
+                ws.getRow(1).font = { bold: true, size: 12 };
+                ws.getRow(4).font = { bold: true };
+                stock.forEach(g => ws.addRow({ p: g.productoNombre, pv: nombrePV(g.puntoVenta), c: g.cantidad, u: g.unidad, cp: g.costoProm, v: g.valor }));
+                await descargarWorkbook(wb, `Saldos_Inventario_${fechaHoyISO()}_${config.ruc || ''}.xlsx`);
+            } else if (reporte === 'stockminimo') {
+                const alertas = calcularAlertasStockMinimo();
+                const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+                const ws = wb.addWorksheet('Stock Menor al Minimo');
+                ws.columns = [
+                    { key: 'p', width: 30 }, { key: 'pv', width: 18 },
+                    { key: 'u', width: 10 }, { key: 'sa', width: 12 },
+                    { key: 'sm', width: 12 }, { key: 'f', width: 14 }
+                ];
+                ws.addRow([`Reporte de Stock Menor al Mínimo — ${empresa}`]);
+                ws.addRow([`Al ${fmtFecha()}`]);
+                ws.addRow([]);
+                ws.addRow(['Producto', 'Punto de Venta', 'Unidad', 'Stock Actual', 'Stock Mínimo', 'Falta Reponer']);
+                ws.getRow(1).font = { bold: true, size: 12 };
+                ws.getRow(4).font = { bold: true };
+                alertas.forEach(a => ws.addRow({ p: a.productoNombre, pv: nombrePV(a.puntoVenta), u: a.unidad, sa: a.cantidad, sm: a.stockMinimo, f: a.faltante }));
+                await descargarWorkbook(wb, `Stock_Bajo_Minimo_${fechaHoyISO()}_${config.ruc || ''}.xlsx`);
+            } else {
+                const desde = document.getElementById('mermas-fecha-desde').value;
+                const hasta = document.getElementById('mermas-fecha-hasta').value;
+                const mermas = calcularMermas(desde, hasta);
+                const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+                const ws = wb.addWorksheet('Mermas');
+                ws.columns = [
+                    { key: 'f', width: 12 }, { key: 'p', width: 30 },
+                    { key: 'pv', width: 18 }, { key: 'c', width: 12 },
+                    { key: 'u', width: 10 }, { key: 'cu', width: 12 },
+                    { key: 'v', width: 14 }, { key: 'm', width: 30 }
+                ];
+                ws.addRow([`Reporte de Mermas — ${empresa}`]);
+                ws.addRow([`Periodo: ${fmtFecha(desde)} al ${fmtFecha(hasta)}`]);
+                ws.addRow([]);
+                ws.addRow(['Fecha', 'Producto', 'Punto de Venta', 'Cantidad', 'Unidad', 'Costo Unit.', 'Valor', 'Motivo']);
+                ws.getRow(1).font = { bold: true, size: 12 };
+                ws.getRow(4).font = { bold: true };
+                mermas.forEach(m => ws.addRow({ f: m.fecha, p: m.productoNombre, pv: nombrePV(m.puntoVenta), c: m.cantidad, u: m.unidad, cu: m.costoUnitarioValorizado, v: m.valor, m: m.motivo }));
+                await descargarWorkbook(wb, `Mermas_${desde}_a_${hasta}_${config.ruc || ''}.xlsx`);
+            }
+        }
+
+        async function descargarWorkbook(wb, nombreArchivo) {
+            const buf = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nombreArchivo;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Reporte exportado a Excel.');
+        }
+
+        // ==================================================================
+        // DASHBOARD
+        // ==================================================================
+        let chartValorPV = null;
+        function renderDashboard() {
+            const metodo = config.metodoValorizacion;
+            const stock = calcularStockActual(metodo);
+
+            document.getElementById('kpi-total-productos').innerText = config.productos.length;
+            const valorTotal = stock.reduce((s, g) => s + g.valor, 0);
+            document.getElementById('kpi-valor-inventario').innerText = 'S/ ' + round2(valorTotal).toFixed(2);
+            document.getElementById('kpi-metodo-usado').innerText = 'Método: ' + (metodo === 'PEPS' ? 'PEPS (FIFO)' : 'Promedio Ponderado');
+            document.getElementById('kpi-total-movimientos').innerText = stockMovimientos.length;
+            const ultima = historialImportaciones.slice().sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+            document.getElementById('kpi-ultima-importacion').innerText = ultima ? `Última importación: ${new Date(ultima.fecha).toLocaleDateString('es-PE')}` : 'Sin importaciones aún';
+
+            const alertas = stock.filter(g => {
+                const p = getProducto(g.productoCodigo);
+                return p && p.stockMinimo > 0 && g.cantidad < p.stockMinimo;
+            });
+            document.getElementById('kpi-alertas-stock').innerText = alertas.length;
+
+            renderStockActual(stock);
+            renderTopProductosValor(stock);
+            renderChartValorPV(stock);
+        }
+
+        function renderStockActual(stockPrecalculado) {
+            const stock = stockPrecalculado || calcularStockActual(config.metodoValorizacion);
+            const filtro = (document.getElementById('filtro-stock-texto').value || '').toLowerCase();
+            const tbody = document.getElementById('tabla-stock-actual');
+            const msgVacio = document.getElementById('msg-stock-vacio');
+            tbody.innerHTML = '';
+
+            const fechaEl = document.getElementById('stock-actual-fecha');
+            if (fechaEl) fechaEl.innerText = 'Datos en tiempo real — al ' + fmtFecha();
+
+            if (stockMovimientos.length === 0) { msgVacio.classList.remove('hidden'); return; }
+            msgVacio.classList.add('hidden');
+
+            const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+
+            const filas = stock
+                .filter(g => !filtro || g.productoNombre.toLowerCase().includes(filtro) || nombrePV(g.puntoVenta).toLowerCase().includes(filtro))
+                .sort((a, b) => a.productoNombre.localeCompare(b.productoNombre) || a.puntoVenta.localeCompare(b.puntoVenta));
+
+            if (filas.length === 0) { msgVacio.classList.remove('hidden'); msgVacio.innerText = 'No se encontraron resultados para tu búsqueda.'; return; }
+
+            filas.forEach(g => {
+                const producto = getProducto(g.productoCodigo);
+                const stockMinimo = producto ? producto.stockMinimo : 0;
+                const bajoMinimo = stockMinimo > 0 && g.cantidad < stockMinimo;
+                const tr = document.createElement('tr');
+                tr.id = 'stock-row-' + sanitizarIdFila(g.productoCodigo) + '__' + sanitizarIdFila(g.puntoVenta);
+                tr.className = 'border-b border-slate-100 hover:bg-slate-50 ' + (bajoMinimo ? 'bg-rose-50' : '');
+                tr.innerHTML = `
+                    <td class="px-3 py-2 font-medium">${g.productoNombre}</td>
+                    <td class="px-3 py-2">${nombrePV(g.puntoVenta)}</td>
+                    <td class="px-3 py-2 text-right font-bold ${g.cantidad < 0 ? 'text-rose-600' : ''}">${g.cantidad}</td>
+                    <td class="px-3 py-2">${g.unidad || ''}</td>
+                    <td class="px-3 py-2 text-right">S/ ${g.costoProm.toFixed(2)}</td>
+                    <td class="px-3 py-2 text-right font-semibold">S/ ${g.valor.toFixed(2)}</td>
+                    <td class="px-3 py-2 text-center">${stockMinimo || '-'}</td>
+                    <td class="px-3 py-2 text-center">${bajoMinimo ? '<span class="text-rose-600 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Bajo</span>' : '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> OK</span>'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderTopProductosValor(stock) {
+            const cont = document.getElementById('top-productos-valor');
+            cont.innerHTML = '';
+            const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+            const top = stock.slice().sort((a, b) => b.valor - a.valor).slice(0, 8);
+            if (top.length === 0) { cont.innerHTML = '<p class="text-slate-400 text-sm py-4 text-center">Sin datos todavía.</p>'; return; }
+            const maxValor = Math.max(...top.map(t => t.valor), 0.01);
+            top.forEach(t => {
+                const pct = Math.max(2, (t.valor / maxValor) * 100);
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <div class="flex justify-between text-xs mb-0.5"><span class="font-medium">${t.productoNombre} <span class="text-slate-400">(${nombrePV(t.puntoVenta)})</span></span><span class="font-semibold">S/ ${t.valor.toFixed(2)}</span></div>
+                    <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-orange-500 h-2 rounded-full" style="width:${pct}%"></div></div>
+                `;
+                cont.appendChild(div);
+            });
+        }
+
+        function renderChartValorPV(stock) {
+            const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+            const porPV = {};
+            stock.forEach(g => { porPV[g.puntoVenta] = (porPV[g.puntoVenta] || 0) + g.valor; });
+            const labels = Object.keys(porPV).map(nombrePV);
+            const data = Object.values(porPV).map(v => round2(v));
+            const ctx = document.getElementById('chartValorPV');
+            try {
+                if (chartValorPV) chartValorPV.destroy();
+                if (labels.length === 0 || typeof Chart === 'undefined') return;
+                chartValorPV = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { labels, datasets: [{ data, backgroundColor: ['#f97316', '#ea580c', '#c2410c', '#fb923c', '#fdba74', '#dc2626', '#b91c1c'] }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+                });
+            } catch (e) { /* Chart.js no disponible (sin conexión a internet) — el resto del panel sigue funcionando */ }
+        }
+
+        // ==================================================================
+        // KARDEX
+        // ==================================================================
+        function renderKardexTab() {
+            const sel = document.getElementById('kardex-producto');
+            const valorActual = sel.value;
+            sel.innerHTML = '';
+            config.productos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.codigo;
+                opt.textContent = p.nombre;
+                sel.appendChild(opt);
+            });
+            if ([...sel.options].some(o => o.value === valorActual)) sel.value = valorActual;
+            document.getElementById('kardex-metodo').value = config.metodoValorizacion;
+            poblarSelectoresPuntoVenta();
+            renderKardex();
+        }
+
+        function renderKardex() {
+            const productoCodigo = document.getElementById('kardex-producto').value;
+            const puntoVenta = document.getElementById('kardex-punto-venta').value;
+            const metodo = document.getElementById('kardex-metodo').value;
+            const tbody = document.getElementById('tabla-kardex');
+            const msgVacio = document.getElementById('msg-kardex-vacio');
+            tbody.innerHTML = '';
+
+            const fechaConsultaEl = document.getElementById('kardex-fecha-consulta');
+            if (fechaConsultaEl) fechaConsultaEl.innerText = 'Saldo actualizado al ' + fmtFecha();
+
+            if (!productoCodigo) { msgVacio.classList.remove('hidden'); msgVacio.innerText = 'Registra al menos un producto en el catálogo (Ajustes) para ver su Kardex.'; return; }
+
+            const filas = construirKardex(productoCodigo, puntoVenta, metodo);
+            if (filas.length === 0) { msgVacio.classList.remove('hidden'); msgVacio.innerText = 'No hay movimientos para este producto / punto de venta.'; return; }
+            msgVacio.classList.add('hidden');
+
+            const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+            const origenLabel = { venta: '<span class="text-emerald-600"><i class="fa-solid fa-cart-shopping"></i> Venta</span>', compra: '<span class="text-blue-600"><i class="fa-solid fa-truck-ramp-box"></i> Compra</span>', ajuste: '<span class="text-orange-600"><i class="fa-solid fa-sliders"></i> Ajuste</span>' };
+
+            filas.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100 hover:bg-slate-50';
+                tr.innerHTML = `
+                    <td class="px-3 py-2">${f.fecha}</td>
+                    <td class="px-3 py-2">${origenLabel[f.origen] || f.origen}</td>
+                    <td class="px-3 py-2">${f.comprobante || (f.motivo || '-')}</td>
+                    <td class="px-3 py-2">${nombrePV(f.puntoVenta)}</td>
+                    <td class="px-3 py-2 text-right">${f.entradaCant || ''}</td>
+                    <td class="px-3 py-2 text-right">${f.entradaCant ? 'S/ ' + f.entradaCosto.toFixed(2) : ''}</td>
+                    <td class="px-3 py-2 text-right">${f.salidaCant || ''}</td>
+                    <td class="px-3 py-2 text-right">${f.salidaCant ? 'S/ ' + f.salidaCosto.toFixed(2) : ''}</td>
+                    <td class="px-3 py-2 text-right font-bold ${f.saldoCantidad < 0 ? 'text-rose-600' : ''}">${f.saldoCantidad}</td>
+                    <td class="px-3 py-2 text-right">S/ ${f.saldoCostoProm.toFixed(2)}</td>
+                    <td class="px-3 py-2 text-right font-semibold">S/ ${f.saldoValor.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ==================================================================
+        // AJUSTE MANUAL
+        // ==================================================================
+        function renderAjusteManualTab() {
+            poblarSelectoresPuntoVenta();
+            populateProductoDatalist();
+            toggleBloqueCostoAjuste();
+            renderTablaAjustes();
+        }
+
+        document.addEventListener('change', e => { if (e.target && e.target.id === 'ajuste-tipo') toggleBloqueCostoAjuste(); });
+        function toggleBloqueCostoAjuste() {
+            const tipo = document.getElementById('ajuste-tipo').value;
+            document.getElementById('bloque-ajuste-costo').style.display = tipo === 'entrada' ? '' : 'none';
+        }
+
+        function extractCodigoProducto(rawValue) {
+            if (!rawValue) return '';
+            const parts = rawValue.split(' - ');
+            return parts.length > 1 ? parts[0].trim() : rawValue.trim();
+        }
+
+        function onProductoAjusteInput(value) {
+            const codigo = extractCodigoProducto(value);
+            const producto = getProducto(codigo);
+            document.getElementById('ajuste-producto-codigo').value = producto ? producto.codigo : '';
+            document.getElementById('ajuste-unidad').value = producto ? producto.unidad : '';
+        }
+
+        document.addEventListener('submit', async e => {
+            if (e.target && e.target.id === 'form-ajuste') {
+                e.preventDefault();
+                await registrarAjusteManual();
+            }
+        });
+
+        async function registrarAjusteManual() {
+            const tipo = document.getElementById('ajuste-tipo').value;
+            const fecha = document.getElementById('ajuste-fecha').value;
+            const puntoVenta = document.getElementById('ajuste-punto-venta').value;
+            const productoCodigo = document.getElementById('ajuste-producto-codigo').value;
+            const cantidad = parseFloat(document.getElementById('ajuste-cantidad').value);
+            const costoInput = document.getElementById('ajuste-costo').value;
+            const categoria = document.getElementById('ajuste-categoria').value;
+            const motivo = document.getElementById('ajuste-motivo').value.trim();
+
+            const producto = getProducto(productoCodigo);
+            if (!producto) { showToast('Selecciona un producto válido del catálogo (usa las sugerencias).', 'error'); return; }
+            if (!cantidad || cantidad <= 0) { showToast('Ingresa una cantidad válida mayor a cero.', 'error'); return; }
+            if (!motivo) { showToast('Indica el motivo del ajuste.', 'error'); return; }
+
+            let costoUnitario = null;
+            if (tipo === 'entrada') {
+                costoUnitario = costoInput !== '' ? parseFloat(costoInput) : null;
+            }
+
+            const nextId = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1;
+            stockMovimientos.push({
+                id: nextId, fecha, tipo, origen: 'ajuste', origenId: null,
+                comprobante: 'AJUSTE MANUAL', puntoVenta,
+                productoCodigo: producto.codigo, productoNombre: producto.nombre, unidad: producto.unidad,
+                cantidad, costoUnitario, monto: costoUnitario !== null ? round2(costoUnitario * cantidad) : null,
+                categoria, motivo, registradoPor: 'Sin identificar', fechaRegistro: new Date().toISOString()
+            });
+
+            registrarBitacora('ajuste', `Ajuste de ${tipo} (${CATEGORIAS_AJUSTE[categoria] || categoria}) — ${producto.nombre} (${cantidad} ${producto.unidad}) — ${motivo}`);
+            await persistAll();
+
+            document.getElementById('form-ajuste').reset();
+            document.getElementById('ajuste-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('ajuste-producto-codigo').value = '';
+            document.getElementById('ajuste-unidad').value = '';
+            toggleBloqueCostoAjuste();
+
+            renderTablaAjustes();
+            renderDashboard();
+            actualizarBadgeAlertas();
+            showToast('Ajuste registrado correctamente.');
+        }
+
+        let vistaAjustes = 'activos';
+        function switchAjusteVista(vista) {
+            vistaAjustes = vista;
+            renderTablaAjustes();
+        }
+
+        function renderTablaAjustes() {
+            const tbody = document.getElementById('tabla-ajustes');
+            const msgVacio = document.getElementById('msg-ajustes-vacio');
+            const btnPapelera = document.getElementById('btn-ver-papelera-ajustes');
+            tbody.innerHTML = '';
+            const nombrePV = codigo => (config.puntosVenta.find(pv => pv.codigo === codigo) || {}).nombre || codigo;
+
+            if (vistaAjustes === 'papelera') {
+                btnPapelera.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Ver Ajustes Activos';
+                btnPapelera.onclick = () => switchAjusteVista('activos');
+                if (papeleraAjustes.length === 0) { msgVacio.classList.remove('hidden'); msgVacio.innerText = 'La papelera de ajustes está vacía.'; return; }
+                msgVacio.classList.add('hidden');
+                papeleraAjustes.forEach(m => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-slate-100 bg-slate-50 text-slate-400';
+                    tr.innerHTML = `
+                        <td class="px-3 py-2">${m.fecha}</td>
+                        <td class="px-3 py-2">${m.tipo}</td>
+                        <td class="px-3 py-2">${m.productoNombre}</td>
+                        <td class="px-3 py-2">${nombrePV(m.puntoVenta)}</td>
+                        <td class="px-3 py-2 text-right">${m.cantidad}</td>
+                        <td class="px-3 py-2">${CATEGORIAS_AJUSTE[categoriaDeAjuste(m)]}</td>
+                        <td class="px-3 py-2">${m.motivo}</td>
+                        <td class="px-3 py-2 text-center no-print"><button onclick="restaurarAjuste(${m.id})" class="text-emerald-600 hover:text-emerald-800"><i class="fa-solid fa-rotate-left"></i> Restaurar</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                return;
+            }
+
+            btnPapelera.innerHTML = `<i class="fa-solid fa-trash"></i> Ver Papelera (${papeleraAjustes.length})`;
+            btnPapelera.onclick = () => switchAjusteVista('papelera');
+            const ajustes = stockMovimientos.filter(m => m.origen === 'ajuste').sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+            if (ajustes.length === 0) { msgVacio.classList.remove('hidden'); msgVacio.innerText = 'No hay ajustes manuales registrados.'; return; }
+            msgVacio.classList.add('hidden');
+            ajustes.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100 hover:bg-slate-50';
+                tr.innerHTML = `
+                    <td class="px-3 py-2">${m.fecha}</td>
+                    <td class="px-3 py-2">${m.tipo === 'entrada' ? '<span class="text-emerald-600 font-semibold">Entrada</span>' : '<span class="text-rose-600 font-semibold">Salida</span>'}</td>
+                    <td class="px-3 py-2">${m.productoNombre}</td>
+                    <td class="px-3 py-2">${nombrePV(m.puntoVenta)}</td>
+                    <td class="px-3 py-2 text-right">${m.cantidad} ${m.unidad || ''}</td>
+                    <td class="px-3 py-2">${categoriaDeAjuste(m) === 'merma' ? '<span class="text-amber-700 font-semibold">'+CATEGORIAS_AJUSTE.merma+'</span>' : CATEGORIAS_AJUSTE[categoriaDeAjuste(m)]}</td>
+                    <td class="px-3 py-2">${m.motivo}</td>
+                    <td class="px-3 py-2 text-center no-print"><button onclick="eliminarAjuste(${m.id})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function eliminarAjuste(id) {
+            if (!confirm('¿Enviar este ajuste a la papelera? Podrás restaurarlo luego.')) return;
+            const idx = stockMovimientos.findIndex(m => m.id === id && m.origen === 'ajuste');
+            if (idx === -1) return;
+            const [movimiento] = stockMovimientos.splice(idx, 1);
+            papeleraAjustes.push(movimiento);
+            registrarBitacora('ajuste', `Ajuste enviado a papelera: ${movimiento.productoNombre} (${movimiento.cantidad} ${movimiento.unidad || ''})`);
+            await persistAll();
+            renderTablaAjustes();
+            renderDashboard();
+            actualizarBadgeAlertas();
+            showToast('Ajuste enviado a la papelera.');
+        }
+
+        async function restaurarAjuste(id) {
+            const idx = papeleraAjustes.findIndex(m => m.id === id);
+            if (idx === -1) return;
+            const [movimiento] = papeleraAjustes.splice(idx, 1);
+            const nextId = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1;
+            movimiento.id = nextId;
+            stockMovimientos.push(movimiento);
+            registrarBitacora('ajuste', `Ajuste restaurado: ${movimiento.productoNombre}`);
+            await persistAll();
+            renderTablaAjustes();
+            renderDashboard();
+            actualizarBadgeAlertas();
+            showToast('Ajuste restaurado.');
+        }
+
+        // ==================================================================
+        // AJUSTES (settings tab render)
+        // ==================================================================
+        function renderSettings() {
+            syncConfigUI();
+            renderListaPuntosVenta();
+            renderCatalogoProductos();
+        }
+
+        function renderListaPuntosVenta() {
+            const cont = document.getElementById('lista-puntos-venta');
+            cont.innerHTML = '';
+            config.puntosVenta.forEach(pv => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-slate-50 rounded-lg px-3 py-2 text-sm';
+                div.innerHTML = `<span><span class="font-mono text-xs text-slate-400">${pv.codigo}</span> — ${pv.nombre}</span><button onclick="eliminarPuntoVenta('${pv.codigo}')" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button>`;
+                cont.appendChild(div);
+            });
+        }
+
+        function renderCatalogoProductos() {
+            const tbody = document.getElementById('tabla-catalogo-productos');
+            tbody.innerHTML = '';
+            config.productos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).forEach(p => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100';
+                tr.innerHTML = `
+                    <td class="px-3 py-2 font-mono text-[10px] text-slate-400">${p.codigo}</td>
+                    <td class="px-3 py-2">${p.nombre}</td>
+                    <td class="px-3 py-2">${p.unidad}</td>
+                    <td class="px-3 py-2 text-right"><input type="number" min="0" step="1" value="${p.stockMinimo || 0}" onchange="actualizarStockMinimo('${p.codigo}', this.value)" class="w-20 border border-slate-300 rounded px-2 py-1 text-xs text-right"></td>
+                    <td class="px-3 py-2">
+                        <select onchange="actualizarGrupoContable('${p.codigo}', this.value)" class="border ${GRUPOS_CONTABLES_EXISTENCIA[p.grupoContable] ? 'border-slate-300' : 'border-rose-300 bg-rose-50'} rounded px-1.5 py-1 text-[11px]">
+                            <option value="">${GRUPOS_CONTABLES_EXISTENCIA[p.grupoContable] ? 'Automático' : '— Sin grupo —'}</option>
+                            ${Object.keys(GRUPOS_CONTABLES_EXISTENCIA).map(g => `<option value="${g}" ${p.grupoContable === g && p.grupoOrigen === 'manual' ? 'selected' : ''}>${g} ${GRUPOS_CONTABLES_EXISTENCIA[g].nombre} → ${GRUPOS_CONTABLES_EXISTENCIA[g].existencia}</option>`).join('')}
+                        </select>
+                        ${GRUPOS_CONTABLES_EXISTENCIA[p.grupoContable] && p.grupoOrigen !== 'manual' ? `<div class="text-[10px] text-teal-700 mt-0.5">${p.grupoContable} ${GRUPOS_CONTABLES_EXISTENCIA[p.grupoContable].nombre} (deducido de las compras)</div>` : ''}
+                    </td>
+                    <td class="px-3 py-2 text-center no-print"><button onclick="eliminarProducto('${p.codigo}')" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderBitacora() {
+            const cont = document.getElementById('lista-bitacora');
+            const msgVacio = document.getElementById('msg-bitacora-vacio');
+            if (!cont || !msgVacio) return;
+            cont.innerHTML = '';
+            if (bitacora.length === 0) { msgVacio.classList.remove('hidden'); return; }
+            msgVacio.classList.add('hidden');
+            bitacora.slice(0, 100).forEach(b => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between border-b border-slate-100 py-1';
+                div.innerHTML = `<span>${b.detalle}</span><span class="text-slate-400">${b.usuario || 'Sin identificar'} — ${new Date(b.fecha).toLocaleString('es-PE')}</span>`;
+                cont.appendChild(div);
+            });
+        }
+
+        // ==================================================================
+        // RESPALDO Y REINICIO
+        // ==================================================================
+        function exportarBackupCompleto() {
+            const payload = {
+                tipo: 'inventario_backup_completo',
+                generadoEl: new Date().toISOString(),
+                config, stockMovimientos, papeleraAjustes, bitacora, historialImportaciones
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Respaldo_Inventario_${config.ruc || 'sin_ruc'}_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Respaldo completo exportado.');
+        }
+
+        async function handleRestaurarBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const payload = JSON.parse(text);
+                if (payload.tipo !== 'inventario_backup_completo') { showToast('Este archivo no es un respaldo válido de 09 Inventario.', 'error'); return; }
+                if (!confirm('Esto reemplazará TODOS los datos actuales de Inventario por los del respaldo. ¿Continuar?')) return;
+                config = payload.config;
+                stockMovimientos = payload.stockMovimientos || [];
+                papeleraAjustes = payload.papeleraAjustes || [];
+                bitacora = payload.bitacora || [];
+                historialImportaciones = payload.historialImportaciones || [];
+                registrarBitacora('sistema', 'Datos restaurados desde archivo de respaldo');
+                await persistAll();
+                syncConfigUI();
+                switchTab('dashboard');
+                actualizarBadgeAlertas();
+                showToast('Respaldo restaurado correctamente.');
+            } catch (e) {
+                showToast('No se pudo leer el archivo de respaldo.', 'error');
+            } finally {
+                event.target.value = '';
+            }
+        }
+
+        // ==================================================================
+        // VACIAR DATOS DE PRUEBA (mantiene RUC y empresa — igual que 01 a 06)
+        // ==================================================================
+        async function vaciarDatosPrueba() {
+            if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { if (!(await MypecarSync.seguridad.confirmarBorrado({ accion: 'Vaciar Datos de Prueba' }))) return; } // 2026-10-15b: respaldo + confirmación por RUC antes de borrar
+            if (!confirm(`⚠ Esto borrará PERMANENTEMENTE todos los movimientos de stock, el historial de importaciones, la papelera y la bitácora de seguridad guardados para "${config.nombreComercial || 'tu empresa'}" (RUC ${config.ruc || '-'}).\n\nEl RUC, los datos de la empresa, el Catálogo de Productos y los Puntos de Venta NO cambian — igual que en Ventas y Compras.\n\n¿Continuar?`)) return;
+
+            // El Catálogo de Productos y los Puntos de Venta se conservan a propósito:
+            // son configuración del negocio (igual que config.productos en 01 y 02),
+            // no datos de prueba — borrarlos aquí los dejaría desincronizados frente
+            // a lo que Ventas y Compras siguen mostrando para los mismos productos.
+            stockMovimientos = [];
+            papeleraAjustes = [];
+            bitacora = [];
+            historialImportaciones = [];
+
+            await persistAll();
+            renderSettings();
+            switchTab('dashboard');
+            actualizarBadgeAlertas();
+            showToast(`Listo. Datos de prueba de Inventario borrados para "${config.nombreComercial || 'tu empresa'}".`);
+        }
+
+        // ==================================================================
+        // NUEVA EMPRESA / REINICIAR TODO (reutilizar este archivo para otro negocio)
+        // ==================================================================
+        // Mismo cálculo de código de autorización que usan 01 a 06, para que quien
+        // vende el sistema pueda dar un solo código por RUC válido en cualquier app.
+        function calcularCodigoDesbloqueo(ruc) {
+            const CLAVE_PRIVADA = '8383';
+            const ultimos4 = ruc.slice(-4);
+            let codigo = '';
+            for (let i = 0; i < 4; i++) {
+                const suma = parseInt(ultimos4[i], 10) + parseInt(CLAVE_PRIVADA[i], 10);
+                codigo += (suma % 10).toString();
+            }
+            return codigo;
+        }
+
+        async function reiniciarNuevaEmpresa() {
+            if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { if (!(await MypecarSync.seguridad.confirmarBorrado({ accion: 'Reiniciar Todo (Nueva Empresa)' }))) return; } // 2026-10-15b: respaldo + confirmación por RUC antes de borrar
+            if (!confirm('⚠ Esto borrará PERMANENTEMENTE todos los movimientos de stock, el catálogo de productos, los puntos de venta, el historial de importaciones, la papelera y la bitácora de seguridad guardados en este archivo.\n\n¿Continuar?')) return;
+
+            const razonSocial = prompt('Razón Social de la nueva empresa:');
+            if (!razonSocial || !razonSocial.trim()) { showToast('Operación cancelada.', 'error'); return; }
+            const nombreComercial = prompt('Nombre Comercial de la nueva empresa:', razonSocial.trim());
+            if (nombreComercial === null) { showToast('Operación cancelada.', 'error'); return; }
+            const ruc = prompt('RUC de la nueva empresa (11 dígitos):');
+            if (!ruc || !/^\d{11}$/.test(ruc.trim())) { showToast('RUC inválido. Operación cancelada, no se borró nada.', 'error'); return; }
+
+            const codigoIngresado = prompt('Código de autorización para reasignar esta copia a otra empresa (solicítalo a quien te vendió el sistema):');
+            if (codigoIngresado === null) { showToast('Operación cancelada.', 'error'); return; }
+            if (codigoIngresado.trim() !== calcularCodigoDesbloqueo(ruc.trim())) {
+                showToast('Código de autorización incorrecto. Operación cancelada, no se borró nada.', 'error');
+                return;
+            }
+
+            if (!confirm(`Última confirmación: se borrará TODO el historial actual de Inventario y se creará "${razonSocial.trim()}" (RUC ${ruc.trim()}) desde cero. ¿Confirmas?`)) { showToast('Operación cancelada, no se borró nada.', 'error'); return; }
+
+            // Se actualizan solo los campos propios de la empresa — el método de
+            // valorización configurado (Promedio/PEPS) se conserva tal cual.
+            config.razonSocial = razonSocial.trim().toUpperCase();
+            config.nombreComercial = nombreComercial.trim().toUpperCase();
+            config.ruc = ruc.trim();
+            // ARREGLO (16-sept) — antes, "Reiniciar Todo" solo cambiaba estos datos en
+            // este archivo: la empresa seguía "autorizada" en la nube sin volver a pasar
+            // por tu revisión, y los co-dueños/asistentes de la empresa anterior
+            // conservaban su acceso al negocio nuevo. Ahora se avisa a la nube: la
+            // empresa vuelve a quedar pendiente de tu revisión y se le quita el acceso a
+            // los demás miembros. Si esto falla (p.ej. sin internet en este momento), el
+            // reinicio local igual continúa — la próxima vez que haya conexión, Carlos
+            // puede revisarlo manualmente en Supabase.
+            const empresaIdActual = (typeof MypecarSync !== 'undefined') ? MypecarSync.empresas.activaId() : null;
+            if (empresaIdActual) {
+                try {
+                    await MypecarSync.empresas.reiniciarComoNueva(empresaIdActual, {
+                        ruc: ruc.trim(), razonSocial: razonSocial.trim().toUpperCase(), nombreComercial: nombreComercial.trim().toUpperCase()
+                    });
+                } catch (e) {
+                    console.error('No se pudo avisar el reinicio a la nube (el reinicio local continuó igual):', e);
+                }
+            }
+            config.logoBase64 = '';
+            config.puntosVenta = [{ codigo: 'PV1', nombre: 'Principal' }];
+            config.productos = [];
+            stockMovimientos = [];
+            papeleraAjustes = [];
+            bitacora = [];
+            historialImportaciones = [];
+
+            await persistAll();
+            renderSettings();
+            switchTab('dashboard');
+            actualizarBadgeAlertas();
+            showToast(`Listo. Inventario reiniciado para "${config.nombreComercial}".`);
+        }
+
+        // ==================================================================
+        // ARRANQUE
+        // ==================================================================
+        window.addEventListener('DOMContentLoaded', inicializarApp);
+    </script>
+</body>
+</html>

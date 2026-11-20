@@ -1,0 +1,1719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activos Fijos — MYPECAR PLUS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>window.MYPECAR_APP_VERSION = '2026-10-16';</script>
+    <script src="mypecar-sync.js"></script>
+<script src="mypecar-login.js"></script>
+<script src="mypecar-mobile.js"></script>
+    <script>
+    // Blindaje (2026-09-24): si por el nombre, la ubicacion, o la extension del
+    // archivo (ej. quedo guardado como "mypecar-sync.js.txt" o en otra carpeta)
+    // uno de los 2 archivos compartidos no llega a cargar, ANTES esto fallaba
+    // en completo silencio: la app se quedaba con el Periodo Activo en blanco,
+    // sin pedir identificacion, y sin ningun aviso visible del problema real
+    // (solo un error en la consola del navegador, que no es facil de ver). Este
+    // bloque no cambia nada del funcionamiento normal de la app -- solo agrega
+    // un aviso imposible de no ver cuando falta alguno de los 2 archivos.
+    (function () {
+        function avisarSiFaltaAlgo() {
+            var faltan = [];
+            if (typeof MypecarSync === 'undefined') faltan.push('mypecar-sync.js');
+            if (typeof MypecarLogin === 'undefined') faltan.push('mypecar-login.js');
+            if (faltan.length === 0) return;
+            var div = document.createElement('div');
+            div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#b91c1c;color:#fff;padding:14px 18px;font:bold 14px/1.5 sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+            div.innerHTML = '⚠️ No se pudo cargar: <u>' + faltan.join(', ') + '</u>. La aplicacion no puede iniciar.<br>'
+                + 'Verifica que ese archivo este en la MISMA CARPETA que este HTML, con ese nombre EXACTO '
+                + '(sin ".txt" al final, sin numeros ni palabras adelante). Corrige el nombre/ubicacion y vuelve a abrir este archivo.';
+            document.body.insertBefore(div, document.body.firstChild);
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', avisarSiFaltaAlgo);
+        else avisarSiFaltaAlgo();
+    })();
+    </script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    body { font-family: 'Inter', sans-serif; }
+    @media print { .no-print { display: none !important; } }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div id="toast" class="hidden fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3"></div>
+
+    <header class="bg-orange-800 text-white shadow-lg sticky top-0 z-40 no-print">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-3">
+                    <div id="header-logo-circulo" class="bg-white rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 overflow-hidden relative">
+                        <i id="header-logo-generico" class="fa-solid fa-warehouse text-orange-800 text-lg"></i>
+                        <img id="header-logo-cliente" class="hidden absolute inset-0 w-full h-full object-contain" alt="Logo del negocio">
+                    </div>
+                    <div>
+                        <h1 class="font-black text-lg leading-tight">ACTIVOS FIJOS</h1>
+                        <p class="text-[10px] text-orange-200 leading-tight"><img id="header-logo-mypecar-fijo" alt="MYPECAR" style="height:26px;width:auto;vertical-align:middle;margin-right:8px;display:inline-block;"><span id="nav-empresa-name">MYPECAR PLUS</span> — RUC: <span id="nav-empresa-ruc">-</span></p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                    <select id="periodo-selector" onchange="switchPeriod(this.value)" class="bg-orange-700 border border-orange-600 text-white text-xs rounded-lg p-2"></select>
+                    <div class="bg-orange-950 bg-opacity-40 px-3 py-1.5 rounded-lg border border-orange-500 text-right" id="sync-status-cont" title="Estado de guardado en la nube">
+                        <p class="text-[9px] text-orange-200 font-bold uppercase">Guardado en la nube</p>
+                        <p class="text-xs font-bold" id="sync-status-badge">—</p>
+                    </div>
+                </div>
+            </div>
+            <nav class="flex items-center gap-1 mt-3 overflow-x-auto pb-1">
+                <button id="btn-tab-dashboard" onclick="switchTab('dashboard')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-gauge"></i> Panel General
+                </button>
+                <button id="btn-tab-registro" onclick="switchTab('registro')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-boxes-stacked"></i> Registro de Activos
+                </button>
+                <button id="btn-tab-depreciacion" onclick="switchTab('depreciacion')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-chart-line"></i> Depreciación Mensual
+                </button>
+                <button id="btn-tab-bajas" onclick="switchTab('bajas')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-box-archive"></i> Bajas / Ventas
+                </button>
+                <button id="btn-tab-seguridad" onclick="switchTab('seguridad')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-user-shield"></i> Seguridad
+                </button>
+                <button id="btn-tab-alertas" onclick="switchTab('alertas')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-bell"></i> Alertas
+                    <span id="tab-alertas-badge" class="hidden bg-rose-600 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center animate-pulse">0</span>
+                </button>
+                <button id="btn-tab-settings" onclick="switchTab('settings')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all whitespace-nowrap">
+                    <i class="fa-solid fa-gears"></i> Ajustes
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6">
+
+        <!-- ================= PANEL GENERAL ================= -->
+        <section id="tab-dashboard" class="tab-content space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Activos en Uso</p>
+                    <p class="text-2xl font-black text-slate-800 mt-1" id="kpi-num-activos">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Costo Histórico Total</p>
+                    <p class="text-2xl font-black text-slate-800 mt-1" id="kpi-costo-total">S/ 0.00</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Depreciación Acumulada</p>
+                    <p class="text-2xl font-black text-rose-700 mt-1" id="kpi-depre-acum">S/ 0.00</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Valor Neto en Libros</p>
+                    <p class="text-2xl font-black text-emerald-700 mt-1" id="kpi-valor-neto">S/ 0.00</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-3"><i class="fa-solid fa-chart-pie text-orange-600 mr-1"></i> Valor Neto por Categoría</h4>
+                    <div class="h-56"><canvas id="chart-categorias"></canvas></div>
+                </div>
+                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-3"><i class="fa-solid fa-list-check text-orange-600 mr-1"></i> Activos con Vida Útil por Vencer (menos de 6 meses)</h4>
+                    <div class="overflow-x-auto max-h-56 overflow-y-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead class="bg-slate-100 font-semibold sticky top-0"><tr>
+                                <th class="p-2">Activo</th><th class="p-2">Categoría</th><th class="p-2 text-right">Valor Neto</th><th class="p-2 text-right">Meses Restantes</th>
+                            </tr></thead>
+                            <tbody id="dash-vencer-body" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= REGISTRO DE ACTIVOS ================= -->
+        <section id="tab-registro" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-1 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-circle-plus text-orange-600"></i> <span id="activo-form-titulo">Nuevo Activo</span></h4>
+                    <form id="form-activo" class="space-y-3 text-xs">
+                        <input type="hidden" id="act-id">
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Nombre / Descripción</label>
+                            <input type="text" id="act-nombre" required placeholder="Ej: Horno rotativo a gas 4 bandejas" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Categoría</label>
+                            <select id="act-categoria" onchange="onCategoriaChange()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs"></select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Marca</label>
+                                <input type="text" id="act-marca" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Modelo</label>
+                                <input type="text" id="act-modelo" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">N° de Serie</label>
+                            <input type="text" id="act-serie" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Ubicación</label>
+                            <input type="text" id="act-ubicacion" placeholder="Ej: Cocina, Salón, Administración" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Centro de Costo</label>
+                            <select id="act-cc" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                                <option value="90">90 - Costo de Ventas (uso en cocina/producción)</option>
+                                <option value="94">94 - Gastos Administrativos</option>
+                                <option value="95">95 - Gastos de Ventas</option>
+                            </select>
+                        </div>
+                        <div class="border-t pt-3">
+                            <label class="block font-semibold text-slate-600 mb-1">Proveedor</label>
+                            <input type="text" id="act-proveedor" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Documento de Compra (Serie-Número)</label>
+                            <input type="text" id="act-documento" placeholder="Ej: F001-1234" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">F. Adquisición</label>
+                                <input type="date" id="act-fecha-adquisicion" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">F. Inicio de Uso</label>
+                                <input type="date" id="act-fecha-inicio-uso" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                            </div>
+                        </div>
+                        <div class="border-t pt-3 grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Costo de Adquisición (S/.)</label>
+                                <input type="number" step="0.01" id="act-costo" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-600 mb-1">Valor Residual (S/.)</label>
+                                <input type="number" step="0.01" id="act-valor-residual" value="0" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Tasa de Depreciación Anual (%)</label>
+                            <input type="number" step="0.01" id="act-tasa-depreciacion" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
+                            <p class="text-[10px] text-slate-400 mt-1">Se sugiere sola según la categoría (tasas SUNAT en Ajustes); puedes ajustarla si aplica un caso especial.</p>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Observaciones</label>
+                            <textarea id="act-observaciones" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs"></textarea>
+                        </div>
+                        <div class="flex gap-2 pt-2">
+                            <button type="submit" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 rounded-xl text-xs transition-all">
+                                <i class="fa-solid fa-floppy-disk"></i> Guardar Activo
+                            </button>
+                            <button type="button" onclick="cancelarEdicionActivo()" id="btn-cancelar-activo" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs transition-all">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                        <h4 class="font-bold text-slate-800"><i class="fa-solid fa-boxes-stacked text-orange-600 mr-1"></i> Todos los Activos</h4>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="registro-search" oninput="renderRegistroActivos()" placeholder="Buscar..." class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs w-40">
+                            <button onclick="exportarActivosExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5">
+                                <i class="fa-solid fa-file-excel"></i> Excel
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto max-h-[36rem] overflow-y-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead class="bg-slate-100 font-semibold sticky top-0"><tr>
+                                <th class="p-2.5">Activo</th><th class="p-2.5">Categoría</th><th class="p-2.5 text-right">Costo</th><th class="p-2.5 text-right">Valor Neto</th><th class="p-2.5">Estado</th><th class="p-2.5 text-center">Acciones</th>
+                            </tr></thead>
+                            <tbody id="registro-activos-body" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= DEPRECIACIÓN MENSUAL ================= -->
+        <section id="tab-depreciacion" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fa-solid fa-chart-line text-orange-600"></i> Depreciación del Periodo Activo</h3>
+                        <p class="text-xs text-slate-500 mt-1">Calculada en línea recta: (Costo − Valor Residual) × Tasa Anual ÷ 12, desde el mes de inicio de uso hasta que se agota el valor depreciable.</p>
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button onclick="exportarDepreciacionExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-file-excel"></i> Exportar Excel
+                        </button>
+                        <button onclick="generarAsientoDepreciacion()" title="Calcula el asiento con las cuentas y montos reales de la depreciación del mes, y descarga un archivo JSON para subir en el Libro Diario (04)." class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-file-export"></i> Exportar Asiento al Libro Diario
+                        </button>
+                    </div>
+                </div>
+                <p class="text-[10px] text-slate-500 -mt-2 mb-3"><i class="fa-solid fa-circle-info mr-1"></i> "Exportar Asiento al Libro Diario" calcula las cuentas (681/391) y los montos reales de la depreciación del mes, agrupados por centro de costo, y descarga un archivo JSON. Súbelo en <b>04 Libro Diario → Registrar Asiento → "Seleccionar archivo JSON"</b> y las cuentas y montos se cargan solos, sin que tengas que digitarlos.</p>
+                <div id="depre-sin-activos" class="hidden text-center text-slate-400 py-10">
+                    <i class="fa-solid fa-inbox text-3xl mb-2"></i>
+                    <p class="text-sm">No hay activos registrados. Ve a "Registro de Activos" para agregar el primero.</p>
+                </div>
+                <div id="depre-contenido" class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 font-semibold"><tr>
+                            <th class="p-2.5">Activo</th><th class="p-2.5">Categoría</th><th class="p-2.5">CC</th>
+                            <th class="p-2.5 text-right">Costo</th><th class="p-2.5 text-right">Depre. Mensual</th>
+                            <th class="p-2.5 text-right">Depre. Acumulada</th><th class="p-2.5 text-right">Valor Neto</th>
+                        </tr></thead>
+                        <tbody id="depreciacion-body" class="divide-y divide-slate-100"></tbody>
+                        <tfoot id="depreciacion-foot" class="font-bold bg-slate-50"></tfoot>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= BAJAS / VENTAS ================= -->
+        <section id="tab-bajas" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 mb-4"><i class="fa-solid fa-box-archive text-orange-600"></i> Dar de Baja o Vender un Activo</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1 text-xs">Activo</label>
+                        <select id="baja-activo" onchange="calcularBaja()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs"></select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1 text-xs">Fecha de Baja / Venta</label>
+                        <input type="date" id="baja-fecha" onchange="calcularBaja()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1 text-xs">Motivo</label>
+                        <select id="baja-motivo" onchange="calcularBaja()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                            <option value="venta">Venta</option>
+                            <option value="obsolescencia">Obsolescencia / Fin de vida útil</option>
+                            <option value="perdida">Pérdida o Robo</option>
+                            <option value="deterioro">Deterioro / Daño irreparable</option>
+                        </select>
+                    </div>
+                    <div id="wrap-baja-precio">
+                        <label class="block font-semibold text-slate-600 mb-1 text-xs">Precio de Venta (S/., sin IGV)</label>
+                        <input type="number" step="0.01" id="baja-precio-venta" value="0" oninput="calcularBaja()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
+                    </div>
+                </div>
+                <div id="baja-resultado" class="hidden space-y-3">
+                    <table class="w-full text-sm">
+                        <tbody id="baja-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                    <button onclick="confirmarBaja()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl text-xs transition-all">
+                        <i class="fa-solid fa-book"></i> Confirmar Baja y Generar Asiento Contable
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto">
+                <h4 class="font-bold text-slate-800 mb-3"><i class="fa-solid fa-clock-rotate-left text-orange-600 mr-1"></i> Historial de Bajas</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 font-semibold"><tr>
+                            <th class="p-2.5">Activo</th><th class="p-2.5">Fecha</th><th class="p-2.5">Motivo</th><th class="p-2.5 text-right">Resultado</th>
+                        </tr></thead>
+                        <tbody id="historial-bajas-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SEGURIDAD ================= -->
+        <section id="tab-seguridad" class="tab-content hidden space-y-6">
+
+            <div class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 mb-1"><i class="fa-solid fa-user-shield text-indigo-700"></i> Usuario Activo</h3>
+                <p class="text-xs text-slate-500 mb-4">Cada activo que se registre o elimine quedará asociado a este nombre. Útil si varias personas usan el mismo archivo.</p>
+                <div class="flex flex-wrap items-end gap-3">
+                    <div class="flex-1 min-w-[220px]">
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tu Nombre</label>
+                        <input type="text" id="seg-usuario-activo" placeholder="Ej. María Torres" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm">
+                    </div>
+                    <button onclick="guardarUsuarioActivo()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-all">
+                        <i class="fa-solid fa-check mr-1"></i> Guardar
+                    </button>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">Esto es un campo de identificación simple (sin contraseña) — no bloquea el acceso de nadie, solo deja constancia de quién registró cada dato.</p>
+            </div>
+
+            <div class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 mb-1"><i class="fa-solid fa-cloud-arrow-down text-teal-700"></i> Respaldo de Datos</h3>
+                <div id="seg-estado-respaldo" class="text-xs mb-3"></div>
+                <button onclick="switchTab('settings')" class="bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-all">
+                    <i class="fa-solid fa-file-export mr-1"></i> Ir a Ajustes para Exportar un Respaldo
+                </button>
+                <p class="text-[10px] text-slate-400 mt-2">Toda la información se guarda automáticamente en este navegador, pero solo en este navegador — si la computadora falla o se borra el historial, se pierde. Exporta un respaldo periódicamente.</p>
+            </div>
+
+            <div class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fa-solid fa-trash-can-arrow-up text-rose-600"></i> Papelera de Activos Fijos</h3>
+                    <button onclick="vaciarPapelera()" class="text-rose-600 hover:text-rose-800 text-xs font-bold"><i class="fa-solid fa-trash mr-1"></i> Vaciar Papelera</button>
+                </div>
+                <p class="text-xs text-slate-500 mb-4">Los activos eliminados quedan aquí, recuperables, hasta que vacíes la papelera manualmente.</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 font-semibold"><tr>
+                            <th class="p-2">Activo</th><th class="p-2">Categoría</th><th class="p-2">Eliminado por</th><th class="p-2">Fecha</th><th class="p-2"></th>
+                        </tr></thead>
+                        <tbody id="seg-papelera-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 mb-1"><i class="fa-solid fa-clock-rotate-left text-slate-700"></i> Bitácora de Cambios</h3>
+                <p class="text-xs text-slate-500 mb-4">Los últimos 100 movimientos registrados en este archivo, con quién y cuándo los hizo.</p>
+                <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 font-semibold sticky top-0"><tr>
+                            <th class="p-2">Acción</th><th class="p-2">Detalle</th><th class="p-2">Usuario</th><th class="p-2">Fecha y Hora</th>
+                        </tr></thead>
+                        <tbody id="seg-bitacora-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PESTAÑA: ALERTAS ================= -->
+        <section id="tab-alertas" class="tab-content hidden space-y-6">
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+                <i class="fa-solid fa-circle-info text-amber-500 mt-0.5"></i>
+                <p class="text-xs text-amber-800">
+                    Aquí aparecen situaciones detectadas automáticamente sobre los activos fijos que conviene revisar (por ejemplo, un activo que ya terminó su vida útil según la tasa de depreciación configurada, pero sigue figurando "En Uso"). El objetivo es que esta lista llegue a quedar en cero. Si el Contador revisa una alerta y decide que no requiere acción, puede marcarla como <b>Atendida</b> o <b>No aplicable</b> (esta última exige indicar el motivo, que queda registrado en la Bitácora).
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-rose-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Pendientes</p>
+                    <p class="text-2xl font-black text-rose-600 mt-1" id="alertas-count-pendientes">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">Atendidas</p>
+                    <p class="text-2xl font-black text-emerald-600 mt-1" id="alertas-count-atendidas">0</p>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <p class="text-xs text-slate-500 font-semibold uppercase">No Aplicables</p>
+                    <p class="text-2xl font-black text-slate-500 mt-1" id="alertas-count-noaplicable">0</p>
+                </div>
+            </div>
+
+            <div class="max-w-5xl mx-auto space-y-3" id="alertas-pendientes-list"></div>
+
+            <div class="max-w-5xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <button onclick="document.getElementById('alertas-historial-wrap').classList.toggle('hidden')" class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-slate-500"></i> Historial de alertas atendidas / no aplicables
+                </button>
+                <div id="alertas-historial-wrap" class="hidden mt-4 overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 font-semibold"><tr>
+                            <th class="p-2">Alerta</th><th class="p-2">Estado</th><th class="p-2">Motivo</th><th class="p-2">Usuario</th><th class="p-2">Fecha</th><th class="p-2"></th>
+                        </tr></thead>
+                        <tbody id="alertas-historial-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= AJUSTES ================= -->
+        <section id="tab-settings" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto space-y-4">
+                <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-building text-orange-600"></i> Datos de la Empresa</h4>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1 text-xs">Razón Social</label>
+                    <input type="text" id="set-razon-social" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1 text-xs">Nombre Comercial</label>
+                    <input type="text" id="set-nombre-comercial" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1 text-xs">Logo del Negocio (opcional)</label>
+                    <div class="flex items-center gap-3">
+                        <div id="set-logo-preview-wrap" class="hidden w-12 h-12 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            <img id="set-logo-preview" class="w-full h-full object-contain" alt="Logo del negocio">
+                        </div>
+                        <input type="file" id="set-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="subirLogoCliente(event)" class="flex-1 text-[11px] text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100">
+                        <button type="button" id="btn-quitar-logo" onclick="quitarLogoCliente()" class="hidden text-rose-500 hover:text-rose-700 text-xs font-bold px-2"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1">Reemplaza el ícono genérico del encabezado por tu propio logo. Máximo 300 KB — formatos PNG, JPG, WEBP o SVG.</p>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1 text-xs">RUC</label>
+                    <input type="text" id="set-ruc" maxlength="11" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1 text-xs flex items-center gap-1.5"><i class="fa-solid fa-stamp text-amber-500"></i> Licenciado a (marca de agua)</label>
+                    <input type="text" id="set-licenciado-a" placeholder="Ej. Estudio Contable Torres & Asociados" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                </div>
+
+                <div class="border-t pt-4">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2 mb-2"><i class="fa-solid fa-percent text-orange-600"></i> Categorías y Tasas de Depreciación (SUNAT)</h4>
+                    <p class="text-[10px] text-slate-500 mb-3">Tasas máximas anuales aceptadas tributariamente (Art. 22° Reglamento LIR). Ajústalas si tu criterio contable indica otra tasa para un caso particular.</p>
+                    <div class="grid grid-cols-4 gap-2 text-[10px] font-bold text-slate-500 uppercase mb-1 px-1">
+                        <div class="col-span-2">Categoría</div><div>Cuenta PCGE</div><div class="text-right">Tasa Anual</div>
+                    </div>
+                    <div id="categorias-container" class="space-y-1.5"></div>
+                </div>
+
+                <div class="border-t pt-4 flex justify-end">
+                    <button onclick="saveSettings()" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all flex items-center gap-2 shadow-md">
+                        <i class="fa-solid fa-save"></i> Guardar Ajustes
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-amber-50 p-6 rounded-2xl shadow-sm border-2 border-amber-300 max-w-2xl mx-auto">
+                <h4 class="font-bold text-amber-900 flex items-center gap-2 mb-2"><i class="fa-solid fa-broom"></i> Vaciar Datos de Prueba y Empezar en Enero</h4>
+                <p class="text-xs text-amber-800 mb-4">Mantiene el RUC y los datos de la empresa, pero borra todos los activos, depreciaciones y bajas registradas, y crea un periodo de Enero limpio. Esta acción no se puede deshacer.</p>
+                <p class="text-[11px] text-amber-900 font-semibold mb-3">También borra en la nube los datos de la empresa activa (para todos sus usuarios). Si tiene datos, se descarga un respaldo y se pide escribir el RUC.</p>
+                <button onclick="vaciarDatosPrueba()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all flex items-center gap-2 shadow-md">
+                    <i class="fa-solid fa-eraser"></i> Vaciar Datos de Prueba (mismo RUC)
+                </button>
+            </div>
+
+            <div class="bg-rose-50 p-6 rounded-2xl shadow-sm border-2 border-rose-300 max-w-2xl mx-auto">
+                <h4 class="font-bold text-rose-900 flex items-center gap-2 mb-2"><i class="fa-solid fa-triangle-exclamation"></i> Usar esta app para OTRA empresa (Reiniciar Todo)</h4>
+                <p class="text-xs text-rose-800 mb-4">Borra permanentemente todo lo registrado y te pide los datos de la nueva empresa. Esta acción no se puede deshacer.</p>
+                <p class="text-xs text-rose-900 font-bold mb-4 bg-rose-100 border border-rose-300 rounded-lg p-3">⚠ Este botón también borra en la NUBE los datos de la empresa activa, para todos sus usuarios, y cambia su RUC y razón social. NO lo uses para atender a un cliente nuevo: para eso, en el globito de empresa elige «Cambiar de empresa» → «+ Registrar otra empresa». Si la empresa tiene datos, el sistema descargará un respaldo y te pedirá escribir su RUC.</p>
+                <button onclick="reiniciarNuevaEmpresa()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all flex items-center gap-2 shadow-md">
+                    <i class="fa-solid fa-trash-can"></i> Nueva Empresa / Reiniciar Todo
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Sube a la nube, sin tocar el resto del código, cualquier
+        // localStorage.setItem que esta app ya haga en cualquier parte
+        // (ver mypecar-sync.js -> instalarInterceptorLocalStorage).
+        MypecarSync.instalarInterceptorLocalStorage();
+
+        // ==================================================================
+        // ESTADO GLOBAL Y CATÁLOGO
+        // ==================================================================
+        const MESES_NOMBRE = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Setiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+        let config = {
+            razonSocial: '',
+            nombreComercial: '',
+            ruc: '',
+            periodoActivo: '2026-01',
+            categorias: [
+                { key: 'maquinaria', nombre: 'Maquinaria y Equipo de Explotación (hornos, cocinas)', cuentaActivo: '333', tasa: 20 },
+                { key: 'transporte', nombre: 'Unidades de Transporte', cuentaActivo: '334', tasa: 20 },
+                { key: 'muebles', nombre: 'Muebles y Enseres', cuentaActivo: '335', tasa: 10 },
+                { key: 'computo', nombre: 'Equipos de Cómputo y Diversos', cuentaActivo: '336', tasa: 25 },
+                { key: 'herramientas', nombre: 'Herramientas y Unidades de Reemplazo', cuentaActivo: '337', tasa: 10 },
+                { key: 'edificaciones', nombre: 'Edificaciones y Construcciones', cuentaActivo: '332', tasa: 5 }
+            ],
+            licenciadoA: '',
+            usuarioActivo: '',
+            ultimoRespaldoFecha: null
+        };
+        let activos = [];
+        let bajas = [];
+        let papeleraActivos = [];
+        let bitacora = [];
+
+        function getCategoria(key) { return config.categorias.find(c => c.key === key); }
+        function getAccountName(codigo) {
+            const map = { '332': 'Edificaciones', '333': 'Maquinarias y equipos de explotación', '334': 'Unidades de transporte', '335': 'Muebles y enseres', '336': 'Equipos diversos', '337': 'Herramientas y unidades de reemplazo', '391': 'Depreciación acumulada', '681': 'Depreciación', '101': 'Caja', '1041': 'Cuentas corrientes operativas', '6591': 'Otros gastos de gestión', '65913': 'Otros gastos diversos', '7592': 'Utilidad por venta de activos fijos', '759': 'Otros ingresos de gestión diversos' };
+            return map[codigo] || 'Cuenta';
+        }
+
+        function showToast(message, type = 'success') {
+            let toast = document.getElementById('toast');
+            const color = type === 'success' ? 'border-emerald-500' : 'border-rose-500';
+            const icon = type === 'success' ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-rose-400';
+            toast.className = `fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border ${color}`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => { toast.className = "hidden"; }, 3500);
+        }
+        function formatPeriodoLabel(key) {
+            if (!key) return '-';
+            const [anio, mes] = key.split('-');
+            return `${MESES_NOMBRE[parseInt(mes, 10)]} ${anio}`;
+        }
+        function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+        function ultimoDiaMes(periodo) {
+            const [anio, mes] = periodo.split('-').map(Number);
+            const ultimo = new Date(anio, mes, 0).getDate();
+            return `${periodo}-${String(ultimo).padStart(2, '0')}`;
+        }
+        function periodoAnteriorDe(periodo) {
+            const [anio, mes] = periodo.split('-').map(Number);
+            const d = new Date(anio, mes - 2, 1);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }
+        function exportarAsientoJSON(fecha, glosa, origen, lineas) {
+            const sumaDebe = lineas.reduce((s, l) => s + l.debe, 0), sumaHaber = lineas.reduce((s, l) => s + l.haber, 0);
+            if (lineas.length === 0) { showToast('No hay montos para generar el asiento.', 'error'); return; }
+            if (Math.abs(sumaDebe - sumaHaber) > 0.02) { showToast(`⚠ El asiento no cuadra (Debe S/ ${sumaDebe.toFixed(2)} vs Haber S/ ${sumaHaber.toFixed(2)}).`, 'error'); return; }
+            if (!confirm(`Este asiento resume todo lo calculado en ${formatPeriodoLabel(config.periodoActivo)} hasta hoy — no solo lo nuevo desde tu última exportación.\n\nSi ya habías exportado este mismo periodo antes y el Contador guardó ese asiento en el Libro Diario, exportar y guardar este de nuevo DUPLICARÍA el monto. Exporta solo cuando el mes esté completo, o avisa al Contador que reemplace el asiento anterior.\n\n¿Deseas continuar con la exportación?`)) return;
+            const payload = { tipoDocumento: 'asiento_resumen_libro_diario', fecha, glosa, origen, preparadoPor: config.usuarioActivo || 'Sin identificar', fechaExportacion: new Date().toISOString(), lineas };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `Asiento_${origen.replace(/\s+/g, '_')}_${config.periodoActivo}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            showToast('Asiento exportado. Súbelo en el Libro Diario (04) con "Importar JSON".');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('bg-white', 'bg-opacity-20'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            const btn = document.getElementById('btn-tab-' + tabId);
+            if (btn) btn.classList.add('bg-white', 'bg-opacity-20');
+
+            if (tabId === 'dashboard') updateDashboard();
+            else if (tabId === 'registro') renderRegistroActivos();
+            else if (tabId === 'depreciacion') renderDepreciacion();
+            else if (tabId === 'bajas') renderBajasInit();
+            else if (tabId === 'seguridad') renderSeguridad();
+            else if (tabId === 'alertas') renderAlertas();
+        }
+
+        async function persistAll() {
+            localStorage.setItem('activos_config', JSON.stringify(config));
+            localStorage.setItem('activos_lista', JSON.stringify(activos));
+            localStorage.setItem('activos_bajas', JSON.stringify(bajas));
+            localStorage.setItem('activos_papelera', JSON.stringify(papeleraActivos));
+            localStorage.setItem('activos_bitacora', JSON.stringify(bitacora));
+        }
+
+        // ==================================================================
+        // MOTOR DE CÁLCULO DE DEPRECIACIÓN (línea recta)
+        // ==================================================================
+        function calcularDepreciacionActivo(activo, fechaCorte) {
+            const valorDepreciable = Math.max(0, activo.costo - activo.valorResidual);
+            const depreMensual = activo.tasaDepreciacion > 0 ? (valorDepreciable * (activo.tasaDepreciacion / 100)) / 12 : 0;
+            const inicioUso = new Date(activo.fechaInicioUso + 'T00:00:00');
+            const corte = new Date((fechaCorte || new Date().toISOString().split('T')[0]) + 'T00:00:00');
+            let meses = (corte.getFullYear() - inicioUso.getFullYear()) * 12 + (corte.getMonth() - inicioUso.getMonth()) + 1;
+            meses = Math.max(0, meses);
+            let depreAcumulada = depreMensual * meses;
+            depreAcumulada = Math.min(depreAcumulada, valorDepreciable);
+            const valorNeto = activo.costo - depreAcumulada;
+            const mesesVidaUtilTotal = activo.tasaDepreciacion > 0 ? Math.ceil((100 / activo.tasaDepreciacion) * 12) : 0;
+            const mesesRestantes = Math.max(0, mesesVidaUtilTotal - meses);
+            return { valorDepreciable, depreMensual, meses, depreAcumulada, valorNeto, mesesRestantes };
+        }
+
+        function calcularDepreciacionMes(activo, periodo) {
+            const finMes = ultimoDiaMes(periodo);
+            const finMesAnterior = ultimoDiaMes(periodoAnteriorDe(periodo));
+            const actual = calcularDepreciacionActivo(activo, finMes);
+            const anterior = calcularDepreciacionActivo(activo, finMesAnterior);
+            const depreDelMes = Math.max(0, round2(actual.depreAcumulada - anterior.depreAcumulada));
+            return { ...actual, depreDelMes };
+        }
+
+        // ==================================================================
+        // REGISTRO DE ACTIVOS (CRUD)
+        // ==================================================================
+        function poblarSelectorCategorias() {
+            const sel = document.getElementById('act-categoria');
+            sel.innerHTML = config.categorias.map(c => `<option value="${c.key}">${c.nombre} (${c.tasa}%/año)</option>`).join('');
+        }
+        function onCategoriaChange() {
+            const cat = getCategoria(document.getElementById('act-categoria').value);
+            if (cat) document.getElementById('act-tasa-depreciacion').value = cat.tasa;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('form-activo').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const id = document.getElementById('act-id').value;
+                const activo = {
+                    id: id ? parseInt(id) : (activos.length > 0 ? Math.max(...activos.map(a => a.id)) + 1 : 1),
+                    nombre: document.getElementById('act-nombre').value.trim(),
+                    categoria: document.getElementById('act-categoria').value,
+                    marca: document.getElementById('act-marca').value.trim(),
+                    modelo: document.getElementById('act-modelo').value.trim(),
+                    serie: document.getElementById('act-serie').value.trim(),
+                    ubicacion: document.getElementById('act-ubicacion').value.trim(),
+                    cc: document.getElementById('act-cc').value,
+                    proveedor: document.getElementById('act-proveedor').value.trim(),
+                    documento: document.getElementById('act-documento').value.trim(),
+                    fechaAdquisicion: document.getElementById('act-fecha-adquisicion').value,
+                    fechaInicioUso: document.getElementById('act-fecha-inicio-uso').value,
+                    costo: parseFloat(document.getElementById('act-costo').value) || 0,
+                    valorResidual: parseFloat(document.getElementById('act-valor-residual').value) || 0,
+                    tasaDepreciacion: parseFloat(document.getElementById('act-tasa-depreciacion').value) || 0,
+                    observaciones: document.getElementById('act-observaciones').value.trim(),
+                    estado: 'uso'
+                };
+                if (!activo.nombre || !activo.fechaAdquisicion || !activo.fechaInicioUso || activo.costo <= 0) {
+                    showToast('Completa nombre, fechas y costo de adquisición.', 'error'); return;
+                }
+                const idx = activos.findIndex(a => a.id === activo.id);
+                if (idx >= 0) { activo.estado = activos[idx].estado; activos[idx] = activo; }
+                else activos.push(activo);
+
+                await persistAll();
+                cancelarEdicionActivo();
+                renderRegistroActivos();
+                actualizarBadgeAlertas();
+                showToast('Activo guardado correctamente.');
+            });
+        });
+
+        function renderRegistroActivos() {
+            const tbody = document.getElementById('registro-activos-body');
+            const search = (document.getElementById('registro-search').value || '').toLowerCase();
+            const filtrados = activos.filter(a => `${a.nombre} ${a.marca} ${a.serie}`.toLowerCase().includes(search));
+            if (filtrados.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Sin activos registrados.</td></tr>`; return; }
+            const hoy = new Date().toISOString().split('T')[0];
+            tbody.innerHTML = filtrados.map(a => {
+                const cat = getCategoria(a.categoria);
+                const d = calcularDepreciacionActivo(a, a.estado === 'uso' ? hoy : a.fechaBaja);
+                const estadoLabel = { uso: 'En Uso', baja: 'Dado de Baja', vendido: 'Vendido' }[a.estado] || a.estado;
+                const estadoColor = a.estado === 'uso' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600';
+                return `<tr id="activo-row-${a.id}" class="hover:bg-slate-50">
+                    <td class="p-2.5 font-sans font-semibold">${a.nombre}</td>
+                    <td class="p-2.5 font-sans">${cat ? cat.nombre : a.categoria}</td>
+                    <td class="p-2.5 text-right font-mono">${a.costo.toFixed(2)}</td>
+                    <td class="p-2.5 text-right font-mono">${d.valorNeto.toFixed(2)}</td>
+                    <td class="p-2.5"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${estadoColor}">${estadoLabel}</span></td>
+                    <td class="p-2.5 text-center">
+                        <button onclick="editarActivo(${a.id})" class="text-indigo-500 hover:text-indigo-700 mr-2"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="eliminarActivo(${a.id})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function editarActivo(id) {
+            const a = activos.find(x => x.id === id);
+            if (!a) return;
+            document.getElementById('act-id').value = a.id;
+            document.getElementById('act-nombre').value = a.nombre;
+            document.getElementById('act-categoria').value = a.categoria;
+            document.getElementById('act-marca').value = a.marca || '';
+            document.getElementById('act-modelo').value = a.modelo || '';
+            document.getElementById('act-serie').value = a.serie || '';
+            document.getElementById('act-ubicacion').value = a.ubicacion || '';
+            document.getElementById('act-cc').value = a.cc;
+            document.getElementById('act-proveedor').value = a.proveedor || '';
+            document.getElementById('act-documento').value = a.documento || '';
+            document.getElementById('act-fecha-adquisicion').value = a.fechaAdquisicion;
+            document.getElementById('act-fecha-inicio-uso').value = a.fechaInicioUso;
+            document.getElementById('act-costo').value = a.costo;
+            document.getElementById('act-valor-residual').value = a.valorResidual;
+            document.getElementById('act-tasa-depreciacion').value = a.tasaDepreciacion;
+            document.getElementById('act-observaciones').value = a.observaciones || '';
+            document.getElementById('activo-form-titulo').innerText = 'Editar Activo';
+            document.getElementById('btn-cancelar-activo').classList.remove('hidden');
+            document.getElementById('form-activo').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function cancelarEdicionActivo() {
+            document.getElementById('form-activo').reset();
+            document.getElementById('act-id').value = '';
+            document.getElementById('act-valor-residual').value = '0';
+            poblarSelectorCategorias();
+            onCategoriaChange();
+            document.getElementById('activo-form-titulo').innerText = 'Nuevo Activo';
+            document.getElementById('btn-cancelar-activo').classList.add('hidden');
+        }
+
+        async function eliminarActivo(id) {
+            const activo = activos.find(a => a.id === id);
+            if (!activo) return;
+            if (!confirm('¿Eliminar este activo? Se moverá a la Papelera y podrás recuperarlo desde ahí (pestaña "Seguridad").')) return;
+            activos = activos.filter(a => a.id !== id);
+            papeleraActivos.push({ ...activo, eliminadoPor: config.usuarioActivo || 'Sin identificar', fechaEliminacion: new Date().toISOString() });
+            registrarBitacora('eliminar', 'activo', `${activo.nombre} (${getCategoria(activo.categoria) ? getCategoria(activo.categoria).nombre : activo.categoria})`);
+            await persistAll();
+            renderRegistroActivos();
+            actualizarBadgeAlertas();
+            showToast('Activo movido a la Papelera.');
+        }
+
+        function agregarPieDeLicenciaExcel(ws) {
+            let row = (ws.lastRow ? ws.lastRow.number : 1) + 2;
+            const numCols = Math.max(ws.columnCount || 1, 1);
+            ws.mergeCells(row, 1, row, numCols);
+            ws.getCell(row, 1).value = `Generado automáticamente desde MYPECAR CONTABLE — ${(config.nombreComercial || config.razonSocial || '').trim()}.`;
+            ws.getCell(row, 1).font = { italic: true, size: 8, color: { argb: 'FF94A3B8' } };
+            if (config.licenciadoA) {
+                row++;
+                ws.mergeCells(row, 1, row, numCols);
+                ws.getCell(row, 1).value = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros.`;
+                ws.getCell(row, 1).font = { italic: true, size: 8, bold: true, color: { argb: 'FF64748B' } };
+            }
+        }
+
+        async function exportarActivosExcel() {
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet('Activos Fijos');
+            ws.columns = [{ width: 30 }, { width: 26 }, { width: 14 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 10 }];
+            ws.getRow(1).values = ['Nombre', 'Categoría', 'Marca/Modelo', 'F. Inicio Uso', 'Costo', 'Val. Residual', 'Tasa %', 'Depre. Acum.', 'Valor Neto', 'Ubicación', 'Estado'];
+            ws.getRow(1).font = { bold: true };
+            const hoy = new Date().toISOString().split('T')[0];
+            let r = 2;
+            activos.forEach(a => {
+                const cat = getCategoria(a.categoria);
+                const d = calcularDepreciacionActivo(a, a.estado === 'uso' ? hoy : a.fechaBaja);
+                ws.getRow(r).values = [a.nombre, cat ? cat.nombre : a.categoria, `${a.marca || ''} ${a.modelo || ''}`.trim(), a.fechaInicioUso, a.costo, a.valorResidual, a.tasaDepreciacion, d.depreAcumulada, d.valorNeto, a.ubicacion || '', a.estado];
+                r++;
+            });
+            agregarPieDeLicenciaExcel(ws);
+            const buffer = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a2 = document.createElement('a'); a2.href = url; a2.download = `Activos_Fijos_${config.periodoActivo}.xlsx`;
+            document.body.appendChild(a2); a2.click(); document.body.removeChild(a2); URL.revokeObjectURL(url);
+            showToast('Activos exportados a Excel.');
+        }
+
+        // ==================================================================
+        // DEPRECIACIÓN MENSUAL
+        // ==================================================================
+        function renderDepreciacion() {
+            const tbody = document.getElementById('depreciacion-body');
+            const sinAct = document.getElementById('depre-sin-activos');
+            const contenido = document.getElementById('depre-contenido');
+            const enUso = activos.filter(a => a.estado === 'uso');
+            if (enUso.length === 0) { sinAct.classList.remove('hidden'); contenido.classList.add('hidden'); return; }
+            sinAct.classList.add('hidden'); contenido.classList.remove('hidden');
+
+            let totCosto = 0, totDepreMes = 0, totDepreAcum = 0, totValorNeto = 0;
+            tbody.innerHTML = enUso.map(a => {
+                const cat = getCategoria(a.categoria);
+                const d = calcularDepreciacionMes(a, config.periodoActivo);
+                totCosto += a.costo; totDepreMes += d.depreDelMes; totDepreAcum += d.depreAcumulada; totValorNeto += d.valorNeto;
+                return `<tr class="hover:bg-slate-50">
+                    <td class="p-2.5 font-sans font-semibold">${a.nombre}</td>
+                    <td class="p-2.5 font-sans">${cat ? cat.nombre : a.categoria}</td>
+                    <td class="p-2.5">${a.cc}</td>
+                    <td class="p-2.5 text-right font-mono">${a.costo.toFixed(2)}</td>
+                    <td class="p-2.5 text-right font-mono">${d.depreDelMes.toFixed(2)}</td>
+                    <td class="p-2.5 text-right font-mono">${d.depreAcumulada.toFixed(2)}</td>
+                    <td class="p-2.5 text-right font-mono font-bold">${d.valorNeto.toFixed(2)}</td>
+                </tr>`;
+            }).join('');
+            document.getElementById('depreciacion-foot').innerHTML = `<tr>
+                <td colspan="3" class="p-2.5 text-right">TOTALES</td>
+                <td class="p-2.5 text-right">${totCosto.toFixed(2)}</td>
+                <td class="p-2.5 text-right">${totDepreMes.toFixed(2)}</td>
+                <td class="p-2.5 text-right">${totDepreAcum.toFixed(2)}</td>
+                <td class="p-2.5 text-right">${totValorNeto.toFixed(2)}</td>
+            </tr>`;
+        }
+
+        function generarAsientoDepreciacion() {
+            const enUso = activos.filter(a => a.estado === 'uso');
+            if (enUso.length === 0) { showToast('No hay activos en uso.', 'error'); return; }
+
+            const porCC = {};
+            let totalDepre = 0;
+            enUso.forEach(a => {
+                const d = calcularDepreciacionMes(a, config.periodoActivo);
+                if (d.depreDelMes <= 0.005) return;
+                porCC[a.cc] = (porCC[a.cc] || 0) + d.depreDelMes;
+                totalDepre += d.depreDelMes;
+            });
+            if (totalDepre <= 0.005) { showToast('No hay depreciación que registrar en este periodo (activos ya depreciados por completo, o sin activos con inicio de uso en el rango).', 'error'); return; }
+
+            const lineas = [];
+            Object.keys(porCC).forEach(cc => lineas.push({ cuenta: '681', cc, debe: round2(porCC[cc]), haber: 0 }));
+            lineas.push({ cuenta: '391', cc: '', debe: 0, haber: round2(totalDepre) });
+
+            exportarAsientoJSON(ultimoDiaMes(config.periodoActivo), `Depreciación de activos fijos de ${formatPeriodoLabel(config.periodoActivo)}`, 'Depreciación', lineas);
+        }
+
+        async function exportarDepreciacionExcel() {
+            const enUso = activos.filter(a => a.estado === 'uso');
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet('Depreciación');
+            ws.columns = [{ width: 30 }, { width: 26 }, { width: 6 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }];
+            ws.getRow(1).values = ['Activo', 'Categoría', 'CC', 'Costo', 'Depre. Mes', 'Depre. Acum.', 'Valor Neto'];
+            ws.getRow(1).font = { bold: true };
+            let r = 2, totMes = 0, totAcum = 0;
+            enUso.forEach(a => {
+                const cat = getCategoria(a.categoria);
+                const d = calcularDepreciacionMes(a, config.periodoActivo);
+                totMes += d.depreDelMes; totAcum += d.depreAcumulada;
+                ws.getRow(r).values = [a.nombre, cat ? cat.nombre : a.categoria, a.cc, a.costo, d.depreDelMes, d.depreAcumulada, d.valorNeto];
+                r++;
+            });
+            ws.getRow(r).values = ['TOTALES', '', '', '', totMes, totAcum, '']; ws.getRow(r).font = { bold: true };
+            agregarPieDeLicenciaExcel(ws);
+            const buffer = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a2 = document.createElement('a'); a2.href = url; a2.download = `Depreciacion_${config.periodoActivo}.xlsx`;
+            document.body.appendChild(a2); a2.click(); document.body.removeChild(a2); URL.revokeObjectURL(url);
+            showToast('Depreciación exportada a Excel.');
+        }
+
+        // ==================================================================
+        // BAJAS / VENTAS DE ACTIVOS
+        // ==================================================================
+        function renderBajasInit() {
+            const sel = document.getElementById('baja-activo');
+            sel.innerHTML = '<option value="">-- Selecciona --</option>' + activos.filter(a => a.estado === 'uso').map(a => `<option value="${a.id}">${a.nombre}</option>`).join('');
+            document.getElementById('baja-resultado').classList.add('hidden');
+            renderHistorialBajas();
+        }
+
+        function calcularBaja() {
+            const id = parseInt(document.getElementById('baja-activo').value);
+            const fecha = document.getElementById('baja-fecha').value;
+            const motivo = document.getElementById('baja-motivo').value;
+            document.getElementById('wrap-baja-precio').classList.toggle('hidden', motivo !== 'venta');
+            const resultDiv = document.getElementById('baja-resultado');
+            if (!id || !fecha) { resultDiv.classList.add('hidden'); return; }
+            const a = activos.find(x => x.id === id);
+            if (!a) return;
+
+            const d = calcularDepreciacionActivo(a, fecha);
+            const precioVenta = motivo === 'venta' ? (parseFloat(document.getElementById('baja-precio-venta').value) || 0) : 0;
+            const utilidad = precioVenta - d.valorNeto;
+
+            window._ultimaBaja = { activoId: id, fecha, motivo, precioVenta, depreAcumulada: d.depreAcumulada, valorNeto: d.valorNeto, costo: a.costo, utilidad, cuentaActivo: getCategoria(a.categoria).cuentaActivo };
+
+            document.getElementById('baja-body').innerHTML = `
+                <tr><td class="py-2 text-slate-600">Costo Histórico</td><td class="py-2 text-right font-mono">S/ ${a.costo.toFixed(2)}</td></tr>
+                <tr><td class="py-2 text-slate-600">Depreciación Acumulada a la Fecha</td><td class="py-2 text-right font-mono">S/ ${d.depreAcumulada.toFixed(2)}</td></tr>
+                <tr><td class="py-2 text-slate-600">Valor Neto en Libros</td><td class="py-2 text-right font-mono">S/ ${d.valorNeto.toFixed(2)}</td></tr>
+                ${motivo === 'venta' ? `<tr><td class="py-2 text-slate-600">Precio de Venta</td><td class="py-2 text-right font-mono">S/ ${precioVenta.toFixed(2)}</td></tr>` : ''}
+                <tr class="border-t-2 border-slate-300"><td class="py-2 font-bold">${utilidad >= 0 ? 'Utilidad' : 'Pérdida'} en la Baja</td><td class="py-2 text-right font-mono font-bold ${utilidad >= 0 ? 'text-emerald-700' : 'text-rose-700'}">S/ ${Math.abs(utilidad).toFixed(2)}</td></tr>
+            `;
+            resultDiv.classList.remove('hidden');
+        }
+
+        async function confirmarBaja() {
+            const b = window._ultimaBaja;
+            if (!b) { showToast('Primero completa los datos de la baja.', 'error'); return; }
+            if (!confirm('¿Confirmar la baja de este activo? Se generará el asiento contable y el activo dejará de aparecer como "en uso".')) return;
+
+            const lineas = [];
+            if (b.depreAcumulada > 0.005) lineas.push({ cuenta: '391', cc: '', debe: round2(b.depreAcumulada), haber: 0 });
+            if (b.precioVenta > 0.005) lineas.push({ cuenta: '1041', cc: '', debe: round2(b.precioVenta), haber: 0 });
+            if (b.utilidad < -0.005) lineas.push({ cuenta: '65913', cc: '94', debe: round2(-b.utilidad), haber: 0 });
+            lineas.push({ cuenta: b.cuentaActivo, cc: '', debe: 0, haber: round2(b.costo) });
+            if (b.utilidad > 0.005) lineas.push({ cuenta: '7592', cc: '', debe: 0, haber: round2(b.utilidad) });
+
+            const a = activos.find(x => x.id === b.activoId);
+            a.estado = b.motivo === 'venta' ? 'vendido' : 'baja';
+            a.fechaBaja = b.fecha;
+            bajas.push({ id: Date.now(), activoId: b.activoId, nombre: a.nombre, fecha: b.fecha, motivo: b.motivo, precioVenta: b.precioVenta, utilidad: b.utilidad });
+            await persistAll();
+
+            exportarAsientoJSON(b.fecha, `${b.motivo === 'venta' ? 'Venta' : 'Baja'} de activo fijo: ${a.nombre}`, 'Manual', lineas);
+            renderBajasInit();
+            document.getElementById('form-activo') && renderRegistroActivos();
+            actualizarBadgeAlertas();
+            showToast('Baja registrada y asiento generado.');
+        }
+
+        function renderHistorialBajas() {
+            const tbody = document.getElementById('historial-bajas-body');
+            if (bajas.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Sin bajas registradas.</td></tr>`; return; }
+            const motivoLabel = { venta: 'Venta', obsolescencia: 'Obsolescencia', perdida: 'Pérdida/Robo', deterioro: 'Deterioro' };
+            tbody.innerHTML = bajas.slice().reverse().map(b => `<tr class="hover:bg-slate-50">
+                <td class="p-2.5 font-sans">${b.nombre}</td>
+                <td class="p-2.5">${b.fecha}</td>
+                <td class="p-2.5 font-sans">${motivoLabel[b.motivo] || b.motivo}</td>
+                <td class="p-2.5 text-right font-mono ${b.utilidad >= 0 ? 'text-emerald-700' : 'text-rose-700'}">${b.utilidad >= 0 ? 'Utilidad' : 'Pérdida'} S/ ${Math.abs(b.utilidad).toFixed(2)}</td>
+            </tr>`).join('');
+        }
+
+        // ==================================================================
+        // PANEL GENERAL (Dashboard)
+        // ==================================================================
+        let dashChart = null;
+        function updateDashboard() {
+            const enUso = activos.filter(a => a.estado === 'uso');
+            document.getElementById('kpi-num-activos').innerText = enUso.length;
+
+            let totCosto = 0, totDepreAcum = 0, totValorNeto = 0;
+            const porCategoria = {};
+            const hoy = new Date().toISOString().split('T')[0];
+            enUso.forEach(a => {
+                const d = calcularDepreciacionActivo(a, hoy);
+                totCosto += a.costo; totDepreAcum += d.depreAcumulada; totValorNeto += d.valorNeto;
+                const cat = getCategoria(a.categoria);
+                const nombreCat = cat ? cat.nombre.split(' (')[0] : a.categoria;
+                porCategoria[nombreCat] = (porCategoria[nombreCat] || 0) + d.valorNeto;
+            });
+            document.getElementById('kpi-costo-total').innerText = `S/ ${totCosto.toFixed(2)}`;
+            document.getElementById('kpi-depre-acum').innerText = `S/ ${totDepreAcum.toFixed(2)}`;
+            document.getElementById('kpi-valor-neto').innerText = `S/ ${totValorNeto.toFixed(2)}`;
+
+            const ctx = document.getElementById('chart-categorias');
+            if (dashChart) dashChart.destroy();
+            const labels = Object.keys(porCategoria).filter(k => porCategoria[k] > 0.005);
+            if (ctx && labels.length > 0 && typeof Chart !== 'undefined') {
+                dashChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { labels, datasets: [{ data: labels.map(l => porCategoria[l]), backgroundColor: ['#EA580C', '#6366F1', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444'], borderWidth: 2, borderColor: '#fff' }] },
+                    options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } }, animation: false }
+                });
+            }
+
+            const tbody = document.getElementById('dash-vencer-body');
+            const porVencer = enUso.map(a => ({ a, d: calcularDepreciacionActivo(a, hoy) })).filter(x => x.d.mesesRestantes > 0 && x.d.mesesRestantes <= 6).sort((x, y) => x.d.mesesRestantes - y.d.mesesRestantes);
+            if (porVencer.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Ningún activo con vida útil por vencer en los próximos 6 meses.</td></tr>`; return; }
+            tbody.innerHTML = porVencer.map(({ a, d }) => {
+                const cat = getCategoria(a.categoria);
+                return `<tr class="hover:bg-slate-50"><td class="p-2 font-sans">${a.nombre}</td><td class="p-2 font-sans">${cat ? cat.nombre.split(' (')[0] : a.categoria}</td><td class="p-2 text-right font-mono">${d.valorNeto.toFixed(2)}</td><td class="p-2 text-right">${d.mesesRestantes}</td></tr>`;
+            }).join('');
+        }
+
+        // ==================================================================
+        // GESTIÓN DE PERIODO
+        // ==================================================================
+        function poblarSelectorPeriodo() {
+            const sel = document.getElementById('periodo-selector');
+            const anioActual = new Date().getFullYear();
+            const opciones = [];
+            for (let anio = anioActual - 2; anio <= anioActual + 1; anio++) {
+                for (let mes = 1; mes <= 12; mes++) {
+                    const key = `${anio}-${String(mes).padStart(2, '0')}`;
+                    opciones.push(`<option value="${key}">${MESES_NOMBRE[mes]} ${anio}</option>`);
+                }
+            }
+            sel.innerHTML = opciones.join('');
+            sel.value = config.periodoActivo;
+        }
+
+        async function switchPeriod(value) {
+            config.periodoActivo = value;
+            await persistAll();
+            const activeTabBtn = document.querySelector('.tab-btn.bg-white');
+            const activeTab = activeTabBtn ? activeTabBtn.id.replace('btn-tab-', '') : 'dashboard';
+            switchTab(activeTab);
+            showToast(`Periodo activo: ${formatPeriodoLabel(config.periodoActivo)}.`);
+        }
+
+        // ==================================================================
+        // AJUSTES
+        // ==================================================================
+        function renderCategoriasInputs() {
+            const cont = document.getElementById('categorias-container');
+            cont.innerHTML = config.categorias.map((c, i) => `
+                <div class="grid grid-cols-4 gap-2 items-center">
+                    <div class="col-span-2 text-xs text-slate-600">${c.nombre}</div>
+                    <div class="text-xs font-mono text-slate-500 text-center">${c.cuentaActivo}</div>
+                    <input type="number" step="0.01" id="cat-tasa-${i}" value="${c.tasa}" class="bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-right">
+                </div>
+            `).join('');
+        }
+
+        function syncConfigUI() {
+            document.getElementById('nav-empresa-name').innerText = config.nombreComercial;
+            document.getElementById('nav-empresa-ruc').innerText = config.ruc;
+            // El <title> de la pestaña también debe reflejar la empresa activa — antes
+            // quedaba fijo en el nombre de la empresa de ejemplo con la que se armó el
+            // sistema, y así se habría visto igual para cualquier cliente distinto.
+            try { document.title = `Activos Fijos — ${(config.nombreComercial || config.razonSocial || 'MYPECAR PLUS').trim()}`; } catch (e) { console.error('Error al actualizar el título de la pestaña:', e); }
+            document.getElementById('set-razon-social').value = config.razonSocial;
+            document.getElementById('set-nombre-comercial').value = config.nombreComercial;
+            document.getElementById('set-ruc').value = config.ruc;
+            aplicarLogoCliente();
+            const licInput = document.getElementById('set-licenciado-a');
+            if (licInput) licInput.value = config.licenciadoA || '';
+            renderCategoriasInputs();
+        }
+
+        async function saveSettings() {
+            const rucInput = document.getElementById('set-ruc').value;
+            if (rucInput.length !== 11 || isNaN(rucInput)) { showToast('El RUC debe tener 11 dígitos numéricos.', 'error'); return; }
+            if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { const chk = await MypecarSync.seguridad.validarRucEmpresaActiva(rucInput); if (!chk.ok) { alert(chk.mensaje); return; } } // 2026-10-15b
+            config.razonSocial = document.getElementById('set-razon-social').value;
+            config.nombreComercial = document.getElementById('set-nombre-comercial').value;
+            config.ruc = rucInput;
+            config.categorias.forEach((c, i) => { c.tasa = parseFloat(document.getElementById(`cat-tasa-${i}`).value) || c.tasa; });
+            const licInput2 = document.getElementById('set-licenciado-a');
+            if (licInput2) config.licenciadoA = licInput2.value.trim();
+            await persistAll();
+            syncConfigUI();
+            aplicarMarcaDeAgua();
+            showToast('Ajustes guardados correctamente.');
+        }
+
+        async function vaciarDatosPrueba() {
+            if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { if (!(await MypecarSync.seguridad.confirmarBorrado({ accion: 'Vaciar Datos de Prueba' }))) return; } // 2026-10-15b: respaldo + confirmación por RUC antes de borrar
+            if (!confirm(`⚠ Esto borrará PERMANENTEMENTE todos los activos, bajas, la papelera y la bitácora de seguridad registrados para "${config.nombreComercial}" (RUC ${config.ruc}).\n\nEl RUC y los datos de la empresa NO cambian.\n\n¿Continuar?`)) return;
+            activos = []; bajas = [];
+            papeleraActivos = []; bitacora = [];
+            config.periodoActivo = `${new Date().getFullYear()}-01`;
+            await persistAll();
+            poblarSelectorPeriodo();
+            switchTab('dashboard');
+            showToast('Listo. Datos de prueba borrados.');
+        }
+
+        function calcularCodigoDesbloqueo(ruc) {
+            const CLAVE_PRIVADA = '8383';
+            const ultimos4 = ruc.slice(-4);
+            let codigo = '';
+            for (let i = 0; i < 4; i++) {
+                const suma = parseInt(ultimos4[i], 10) + parseInt(CLAVE_PRIVADA[i], 10);
+                codigo += (suma % 10).toString();
+            }
+            return codigo;
+        }
+
+        async function reiniciarNuevaEmpresa() {
+            if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { if (!(await MypecarSync.seguridad.confirmarBorrado({ accion: 'Reiniciar Todo (Nueva Empresa)' }))) return; } // 2026-10-15b: respaldo + confirmación por RUC antes de borrar
+            if (!confirm('⚠ Esto borrará PERMANENTEMENTE todo lo registrado en este archivo (incluida la papelera y la bitácora de seguridad), y te pedirá los datos de la nueva empresa.\n\n¿Continuar?')) return;
+            const razonSocial = prompt('Razón Social de la nueva empresa:');
+            if (!razonSocial || !razonSocial.trim()) { showToast('Operación cancelada.', 'error'); return; }
+            const nombreComercial = prompt('Nombre Comercial de la nueva empresa:', razonSocial.trim());
+            if (nombreComercial === null) { showToast('Operación cancelada.', 'error'); return; }
+            const ruc = prompt('RUC de la nueva empresa (11 dígitos):');
+            if (!ruc || !/^\d{11}$/.test(ruc.trim())) { showToast('RUC inválido. Operación cancelada.', 'error'); return; }
+
+            const codigoIngresado = prompt('Código de autorización para reasignar esta copia a otra empresa (solicítalo a quien te vendió el sistema):');
+            if (codigoIngresado === null) { showToast('Operación cancelada.', 'error'); return; }
+            if (codigoIngresado.trim() !== calcularCodigoDesbloqueo(ruc.trim())) {
+                showToast('Código de autorización incorrecto. Operación cancelada, no se borró nada.', 'error');
+                return;
+            }
+
+            if (!confirm(`Última confirmación: se borrará TODO y se creará "${razonSocial.trim()}" desde cero. ¿Confirmas?`)) return;
+
+            config.razonSocial = razonSocial.trim().toUpperCase();
+            config.nombreComercial = nombreComercial.trim().toUpperCase();
+            config.ruc = ruc.trim();
+            // ARREGLO (16-sept) — antes, "Reiniciar Todo" solo cambiaba estos datos en
+            // este archivo: la empresa seguía "autorizada" en la nube sin volver a pasar
+            // por tu revisión, y los co-dueños/asistentes de la empresa anterior
+            // conservaban su acceso al negocio nuevo. Ahora se avisa a la nube: la
+            // empresa vuelve a quedar pendiente de tu revisión y se le quita el acceso a
+            // los demás miembros. Si esto falla (p.ej. sin internet en este momento), el
+            // reinicio local igual continúa — la próxima vez que haya conexión, Carlos
+            // puede revisarlo manualmente en Supabase.
+            const empresaIdActual = (typeof MypecarSync !== 'undefined') ? MypecarSync.empresas.activaId() : null;
+            if (empresaIdActual) {
+                try {
+                    await MypecarSync.empresas.reiniciarComoNueva(empresaIdActual, {
+                        ruc: ruc.trim(), razonSocial: razonSocial.trim().toUpperCase(), nombreComercial: nombreComercial.trim().toUpperCase()
+                    });
+                } catch (e) {
+                    console.error('No se pudo avisar el reinicio a la nube (el reinicio local continuó igual):', e);
+                }
+            }
+            config.logoBase64 = '';
+            config.periodoActivo = `${new Date().getFullYear()}-01`;
+            activos = []; bajas = [];
+            papeleraActivos = []; bitacora = [];
+            await persistAll();
+            syncConfigUI(); poblarSelectorPeriodo();
+            switchTab('dashboard');
+            showToast(`Listo. Esta app ahora es el módulo Activos Fijos de "${config.nombreComercial}".`);
+        }
+
+        // ==================================================================
+        // INICIALIZADOR
+        // ==================================================================
+        const demoActivos = [
+            { id: 1, nombre: 'Horno rotativo a gas 4 bandejas', categoria: 'maquinaria', marca: 'Rational', modelo: 'RG-400', serie: 'RG400-2025-001', ubicacion: 'Cocina', cc: '90', proveedor: 'Equipos Industriales del Perú SAC', documento: 'F001-3456', fechaAdquisicion: '2025-02-10', fechaInicioUso: '2025-02-15', costo: 8500, valorResidual: 500, tasaDepreciacion: 20, observaciones: '', estado: 'uso' },
+            { id: 2, nombre: 'Juego de mesas y sillas para salón (10 unidades)', categoria: 'muebles', marca: '', modelo: '', serie: '', ubicacion: 'Salón', cc: '95', proveedor: 'Muebles Lima EIRL', documento: 'F002-1289', fechaAdquisicion: '2025-01-05', fechaInicioUso: '2025-01-10', costo: 3200, valorResidual: 0, tasaDepreciacion: 10, observaciones: '', estado: 'uso' },
+            { id: 3, nombre: 'Laptop y sistema POS', categoria: 'computo', marca: 'HP', modelo: 'ProBook 440', serie: 'HP-2025-778', ubicacion: 'Caja', cc: '94', proveedor: 'Tiendas Corp SAC', documento: 'F003-9021', fechaAdquisicion: '2025-04-01', fechaInicioUso: '2025-04-05', costo: 2400, valorResidual: 100, tasaDepreciacion: 25, observaciones: '', estado: 'uso' }
+        ];
+
+        function actualizarBadgeSincronizacion(estado) {
+            const el = document.getElementById('sync-status-badge');
+            const cont = document.getElementById('sync-status-cont');
+            if (!el || !estado) return;
+            if (!estado.online) {
+                el.innerHTML = '<i class="fa-solid fa-wifi text-amber-300"></i> Guardado en este equipo';
+                if (cont) cont.title = 'No hay conexión a internet en este momento. Todo lo que registres se sigue guardando con normalidad en este equipo, y se respaldará solo en la nube en cuanto vuelva la señal.';
+            } else if (!estado.conectadoASupabase) {
+                el.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-300"></i> Sin conexión con el servidor';
+                if (cont) cont.title = 'No se pudo conectar con el servidor de la nube. Tus datos siguen guardados en este equipo con normalidad. Si el problema continúa, avisa a soporte.';
+            } else if (estado.atascado) {
+                el.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-rose-300"></i> Cambios sin respaldar en la nube';
+                if (cont) cont.title = `Llevamos varios minutos intentando respaldar ${estado.pendientesEnCola} cambio(s) en la nube y no se ha podido. Tranquilo: tus datos NO se han perdido, siguen guardados en este equipo. Revisa tu conexión a internet; si el problema sigue, avísale a soporte.` + (estado.ultimoError ? ` (Detalle técnico: ${estado.ultimoError})` : '');
+            } else if (estado.pendientesEnCola > 0) {
+                el.innerHTML = '<i class="fa-solid fa-arrows-rotate text-yellow-300"></i> Guardando en la nube…';
+                if (cont) cont.title = 'Se están respaldando tus últimos cambios en la nube. Esto suele tardar solo unos segundos.';
+            } else {
+                el.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-300"></i> Todo guardado';
+                if (cont) cont.title = 'Toda tu información está guardada y respaldada en la nube.';
+            }
+        }
+
+        window.onload = async function () {
+            MypecarSync.init({
+                url: 'https://byucdwgerwpoqicklycf.supabase.co',
+                anonKey: 'sb_publishable_hmEycJi0F0OoEn9cE6S_aA_XS60thr8',
+                app: 'activos'
+            });
+            MypecarSync.onEstadoCambio(actualizarBadgeSincronizacion); // 2026-10-17: indicador de guardado en la nube (igual que 01 a 05)
+            actualizarBadgeSincronizacion(MypecarSync.getEstado());
+            await MypecarLogin.asegurarAcceso({ tituloApp: 'Activos Fijos' });
+            // Blindaje: un fallo de red al sincronizar con la nube nunca debe
+            // impedir que el resto de la app se termine de pintar con lo que ya
+            // había guardado en este dispositivo (ver mypecar-sync.js).
+            let resultadoPull = null;
+            try { resultadoPull = await MypecarSync.pullAll(); } catch (e) { console.error('No se pudo sincronizar con la nube al iniciar (se sigue con los datos locales):', e); resultadoPull = { aplicadas: 0, motivo: 'excepcion-en-llamada', error: e }; }
+            // (2026-09-24b) Empresa limpiada desde la nube (script 127.01): debe arrancar
+            // VACÍA, sin los datos de ejemplo que se siembran para una empresa recién creada.
+            if (typeof MypecarSync.empresaFueReiniciada === 'function' && MypecarSync.empresaFueReiniciada()) { demoActivos.length = 0; }
+            // ARREGLO CRÍTICO (2026-09-18): ver el mismo arreglo en 01 Ventas, 02
+            // Compras, 03 Caja y Bancos, 04 Libro Diario y 05 Personal. Antes, si
+            // este equipo no tenía "activos_lista" guardado localmente (por
+            // ejemplo, porque el navegador borró los datos guardados al cerrarse),
+            // se asumía sin más que este archivo era "nuevo" — se sembraban los 3
+            // activos de ejemplo Y SE SUBÍAN DE INMEDIATO a la nube (vía el
+            // interceptor de localStorage, en el persistAll() de más abajo), sin
+            // verificar primero si la nube realmente estaba vacía o si solo no se
+            // pudo consultar. Eso podía sobrescribir activos reales guardados en la
+            // nube durante un corte de conexión momentáneo. Ahora solo se siembra
+            // y sube demo si se CONFIRMÓ que la nube está vacía (pullAll() tuvo
+            // éxito y no trajo nada, o de plano no hay empresa conectada a
+            // Supabase); si no se pudo confirmar, no se guarda ni se sube NADA en
+            // esta carga (ni siquiera bajas/papelera/bitacora, aunque localmente
+            // aparezcan vacías) — se avisa al usuario al final de esta función.
+            const estadoSyncInicial = MypecarSync.getEstado();
+            const cloudConfirmadaComoVacia = !estadoSyncInicial.conectadoASupabase
+                || (resultadoPull && !resultadoPull.motivo);
+
+            const cfgGuardado = localStorage.getItem('activos_config');
+            if (cfgGuardado) {
+                // Blindaje: si lo guardado (nube o local) quedó literalmente como null
+                // —por ejemplo, al sincronizar una fila de app_config cuyo "valor" es
+                // NULL— no se deja pasar: se conserva el config por defecto en vez de
+                // dejar que el resto del arranque intente leer propiedades de null.
+                const parseado = JSON.parse(cfgGuardado);
+                if (parseado && typeof parseado === 'object') config = { ...config, ...parseado };
+            }
+
+            // AUTO-POBLAR datos legales de la empresa (razón social, nombre comercial, RUC) --
+            // ver MypecarSync.empresas.obtenerDatos() en 105 mypecar-sync.js. Si el config local
+            // todavía está en blanco (empresa recién creada, o abierta por primera vez en este
+            // equipo), se completa automáticamente con lo que se ingresó al crear la empresa en
+            // Supabase, y se guarda para no tener que volver a consultarlo cada vez.
+            // ARREGLO (2026-09-24b, 6ta ronda) -- los datos legales de la empresa
+            // (RUC, razón social, nombre comercial) salen SIEMPRE de Supabase, que es
+            // la fuente oficial de la empresa activa. Antes solo se completaban si el
+            // config estaba en blanco: si el config traía datos de OTRA empresa (así
+            // pasó con DEMO DOS mostrando la Pollería, y la Pollería mostrando PRUEBA),
+            // nunca se corregían. Ahora, si el RUC guardado no coincide con el de la
+            // empresa activa, se reemplazan los 3 datos y se limpian también el
+            // "Licenciado a" y el logo, porque eran de la otra empresa.
+            try {
+                const empresaIdActual = MypecarSync.empresas.activaId();
+                if (empresaIdActual) {
+                    const datosEmpresa = await MypecarSync.empresas.obtenerDatos(empresaIdActual);
+                    if (datosEmpresa) {
+                        const rucLocal = String(config.ruc || '').trim();
+                        const rucNube = String(datosEmpresa.ruc || '').trim();
+                        const configEnBlanco = !config.ruc && !config.razonSocial;
+                        const configDeOtraEmpresa = !!rucLocal && !!rucNube && rucLocal !== rucNube;
+                        if (configEnBlanco || configDeOtraEmpresa) {
+                            if (configDeOtraEmpresa) {
+                                console.warn('[MYPECAR] La configuración guardada era de otra empresa (RUC ' + rucLocal + '); se corrige con los datos oficiales de la empresa activa (RUC ' + rucNube + ').');
+                                config.licenciadoA = '';
+                                config.logoBase64 = '';
+                            }
+                            config.ruc = datosEmpresa.ruc || '';
+                            config.razonSocial = datosEmpresa.razonSocial || '';
+                            config.nombreComercial = datosEmpresa.nombreComercial || '';
+                            localStorage.setItem('activos_config', JSON.stringify(config));
+                        }
+                    }
+                }
+            } catch (e) { console.error('No se pudo verificar los datos de la empresa con la nube (se reintentará en la próxima carga):', e); }
+
+            // Blindaje (2026-09-12): el usuario activo nunca debe sobrevivir una
+            // carga fresca — se limpia acá siempre, venga de donde venga (nube o
+            // local), porque el borrado que hace beforeunload no llega a la nube.
+            config.usuarioActivo = '';
+            try { pedirUsuarioSiNoExiste(); } catch (e) { console.error('Error al pedir usuario activo:', e); }
+            try { aplicarMarcaDeAgua(); } catch (e) { console.error('Error al aplicar marca de agua:', e); }
+            try { aplicarSelloMypecar(); } catch (e) { console.error('Error al aplicar el sello MYPECAR:', e); }
+            try { aplicarLogoCliente(); } catch (e) { console.error('Error al aplicar el logo del cliente:', e); }
+            try { aplicarLogoMypecarFijo(); } catch (e) { console.error('Error al aplicar el logo fijo de MYPECAR en el encabezado:', e); }
+            if (config.usuarioActivo == null) config.usuarioActivo = '';
+            if (config.ultimoRespaldoFecha === undefined) config.ultimoRespaldoFecha = null;
+
+            // parsearGuardado: helper local de blindaje — si la clave no existe, o si
+            // quedó guardada literalmente como "null" (nube o local, ej. una fila de
+            // app_config cuyo "valor" es NULL), devuelve null en vez de dejarlo pasar
+            // como si fuera un dato real. Sin esto, el resto del arranque intentaría
+            // leer propiedades de null y se detendría a medias, dejando en blanco
+            // secciones enteras sin ningún aviso visible de qué falló.
+            function parsearGuardado(raw) {
+                if (!raw) return null;
+                try { return JSON.parse(raw); } catch (e) { return null; }
+            }
+
+            const actGuardados = parsearGuardado(localStorage.getItem('activos_lista'));
+            let sembrarDemo = false;
+            let localVacioSinConfirmarConNube = false;
+            if (Array.isArray(actGuardados)) {
+                activos = actGuardados;
+            } else if (cloudConfirmadaComoVacia) {
+                activos = demoActivos.map(a => ({ ...a }));
+                sembrarDemo = true;
+            } else {
+                // No se pudo confirmar con la nube que esto está realmente vacío --
+                // se muestra vacío SOLO en pantalla, sin sembrar demo ni guardar nada
+                // todavía (ver el persistAll() condicionado más abajo).
+                activos = [];
+                localVacioSinConfirmarConNube = true;
+            }
+
+            const bajasGuardadas = parsearGuardado(localStorage.getItem('activos_bajas'));
+            bajas = Array.isArray(bajasGuardadas) ? bajasGuardadas : [];
+
+            const papGuardada = parsearGuardado(localStorage.getItem('activos_papelera'));
+            papeleraActivos = Array.isArray(papGuardada) ? papGuardada : [];
+
+            const bitGuardada = parsearGuardado(localStorage.getItem('activos_bitacora'));
+            bitacora = Array.isArray(bitGuardada) ? bitGuardada : [];
+
+            alertasResueltas = cargarAlertasResueltas();
+
+            // ARREGLO CRÍTICO (2026-09-18): si no se pudo confirmar con la nube que
+            // este equipo está vacío de verdad, NO se llama a persistAll() en esta
+            // carga -- antes, este persistAll() se ejecutaba SIEMPRE, sin condición,
+            // y como cada localStorage.setItem que hace pasa por el interceptor de
+            // mypecar-sync.js, terminaba subiendo a la nube (y así sobrescribiendo)
+            // no solo el activos_lista con demo, sino también activos_bajas,
+            // activos_papelera y activos_bitacora vacíos, aunque la nube sí tuviera
+            // información real ahí. Al saltar por completo el guardado esta vez, no
+            // se arriesga ningún dato real -- se reintentará solo en la próxima
+            // carga, cuando (con suerte) sí haya conexión.
+            if (!localVacioSinConfirmarConNube) {
+                // Blindaje: un fallo al SUBIR a la nube no debe impedir que la app
+                // termine de pintarse (los datos ya quedaron guardados en local).
+                try { await persistAll(); } catch (e) { console.error('No se pudo sincronizar con la nube (los datos igual quedaron guardados en este dispositivo):', e); }
+            }
+
+            syncConfigUI();
+            poblarSelectorPeriodo();
+            poblarSelectorCategorias();
+            cancelarEdicionActivo();
+            switchTab('dashboard');
+            verificarRecordatorioRespaldo();
+            actualizarBadgeAlertas();
+
+            // Aviso (2026-09-18, ver "localVacioSinConfirmarConNube" más arriba): se
+            // usa alert() a propósito, en vez de un toast que desaparece solo -- esta
+            // situación es poco común pero delicada (no se pudo confirmar si el
+            // registro de activos está vacío de verdad), y no debe pasar
+            // desapercibida mientras el Contador sigue trabajando.
+            if (localVacioSinConfirmarConNube) {
+                alert(`⚠️ Aviso importante de MYPECAR PLUS\n\nEste equipo apareció sin ningún activo fijo registrado, y no se pudo confirmar con la nube si eso es correcto (no se logró conectar al abrir el archivo).\n\nPor seguridad, esta vez NO se guardó ni se subió nada todavía -- así se evita el riesgo de borrar información real que ya estuviera guardada en la nube.\n\nAntes de registrar algo nuevo: revisa tu conexión a internet y cierra y vuelve a abrir este archivo. Si sigue apareciendo vacío ya con buena conexión, no sigas registrando datos y avisa a soporte.`);
+            }
+        };
+
+        window.addEventListener('beforeunload', function () {
+            config.usuarioActivo = '';
+            try { localStorage.setItem('activos_config', JSON.stringify(config)); } catch (e) { /* almacenamiento no disponible */ }
+        });
+
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                config.usuarioActivo = '';
+                pedirUsuarioSiNoExiste();
+            }
+        });
+
+        // ==================================================================
+        // SEGURIDAD Y TRAZABILIDAD
+        // ==================================================================
+        function registrarBitacora(accion, entidad, detalle) {
+            bitacora.unshift({ accion, entidad, detalle, usuario: config.usuarioActivo || 'Sin identificar', fecha: new Date().toISOString() });
+            if (bitacora.length > 500) bitacora = bitacora.slice(0, 500);
+        }
+
+        // ==================================================================
+        // PANEL DE ALERTAS
+        // ==================================================================
+        const PREFIJO_ALERTA_RESUELTA = 'activos_alerta_resuelta__';
+        function claveAlertaResuelta(alertaId) { return PREFIJO_ALERTA_RESUELTA + alertaId; }
+
+        let alertasResueltas = {}; // { alertaId: { estado: 'atendida'|'no_aplicable', motivo, usuario, fecha } }
+
+        // Reconstruye alertasResueltas a partir de las claves individuales guardadas en
+        // localStorage — lectura directa (sin storageGet), porque esta app usa el
+        // interceptor de MypecarSync para subir los cambios a la nube automáticamente.
+        function cargarAlertasResueltas() {
+            const datos = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.indexOf(PREFIJO_ALERTA_RESUELTA) === 0) {
+                    const alertaId = key.slice(PREFIJO_ALERTA_RESUELTA.length);
+                    try {
+                        const raw = localStorage.getItem(key);
+                        const valor = raw ? JSON.parse(raw) : null;
+                        if (valor) datos[alertaId] = valor;
+                    } catch (e) { /* clave corrupta, se ignora */ }
+                }
+            }
+            return datos;
+        }
+
+        // Activos que siguen "En Uso" pero cuya vida útil (según su tasa de
+        // depreciación configurada) ya se cumplió al 100% — es decir, mesesRestantes
+        // llegó a 0. Conviene revisarlos: o se les asigna un nuevo uso/tasa, o se
+        // regulariza su baja contable.
+        const REGLAS_ALERTAS = [
+            {
+                key: 'activo_depreciado_en_uso',
+                evaluar: function () {
+                    const resultado = [];
+                    const hoy = new Date().toISOString().split('T')[0];
+                    activos.forEach(a => {
+                        if (a.estado !== 'uso') return;
+                        const d = calcularDepreciacionActivo(a, hoy);
+                        if (d.mesesRestantes > 0) return;
+                        const cat = getCategoria(a.categoria);
+                        resultado.push({
+                            id: `activo_depreciado_en_uso__${a.id}`,
+                            regla: 'activo_depreciado_en_uso',
+                            recordId: a.id,
+                            titulo: 'Activo con vida útil 100% depreciada, sigue en uso',
+                            detalle: `${a.nombre} (${cat ? cat.nombre.split(' (')[0] : a.categoria}): ya alcanzó el 100% de su depreciación (valor neto en libros S/ ${d.valorNeto.toFixed(2)}) y sigue figurando "En Uso".`,
+                            severidad: 'media'
+                        });
+                    });
+                    return resultado;
+                }
+            }
+        ];
+
+        function calcularTodasLasAlertas() {
+            const todas = [];
+            REGLAS_ALERTAS.forEach(regla => {
+                try { todas.push(...regla.evaluar()); }
+                catch (e) { console.error(`Error evaluando la regla de alerta "${regla.key}":`, e); }
+            });
+            return todas;
+        }
+        function alertasPendientes() { return calcularTodasLasAlertas().filter(a => !alertasResueltas[a.id]); }
+
+        function actualizarBadgeAlertas() {
+            const badge = document.getElementById('tab-alertas-badge');
+            if (!badge) return;
+            const n = alertasPendientes().length;
+            if (n > 0) { badge.classList.remove('hidden'); badge.innerText = n > 99 ? '99+' : String(n); }
+            else { badge.classList.add('hidden'); }
+        }
+
+        // Lleva al usuario hasta el activo que originó la alerta: abre la pestaña
+        // "Registro de Activos" y resalta la fila.
+        function irAlActivoDeAlerta(recordId) {
+            switchTab('registro');
+            setTimeout(() => {
+                const fila = document.getElementById('activo-row-' + recordId);
+                if (fila) {
+                    fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    fila.classList.add('ring-2', 'ring-rose-500');
+                    setTimeout(() => fila.classList.remove('ring-2', 'ring-rose-500'), 2500);
+                }
+            }, 150);
+        }
+
+        // El resumen de la alerta (título + detalle) se busca internamente por
+        // id en vez de recibirlo como argumento — así el onclick del botón solo
+        // lleva el id (siempre seguro: regla__id) y nunca texto libre que pudiera
+        // traer comillas y romper el HTML generado.
+        function buscarAlertaPorId(alertaId) { return calcularTodasLasAlertas().find(a => a.id === alertaId); }
+
+        async function marcarAlertaAtendida(alertaId) {
+            const alerta = buscarAlertaPorId(alertaId);
+            const resumen = alerta ? alerta.titulo + ' (' + alerta.detalle + ')' : alertaId;
+            const registro = { estado: 'atendida', motivo: '', usuario: config.usuarioActivo || 'Sin identificar', fecha: new Date().toISOString() };
+            alertasResueltas[alertaId] = registro;
+            localStorage.setItem(claveAlertaResuelta(alertaId), JSON.stringify(registro));
+            registrarBitacora('atender_alerta', 'alerta', `${resumen} — marcada como Atendida`);
+            await persistAll();
+            renderAlertas(); actualizarBadgeAlertas();
+            showToast('Alerta marcada como atendida.');
+        }
+
+        async function marcarAlertaNoAplicable(alertaId) {
+            const motivo = prompt('Indica el motivo por el que esta alerta NO aplica (obligatorio — quedará registrado en la Bitácora):');
+            if (!motivo || !motivo.trim()) { showToast('Debes indicar un motivo para marcar la alerta como No aplicable.', 'error'); return; }
+            const alerta = buscarAlertaPorId(alertaId);
+            const resumen = alerta ? alerta.titulo + ' (' + alerta.detalle + ')' : alertaId;
+            const registro = { estado: 'no_aplicable', motivo: motivo.trim(), usuario: config.usuarioActivo || 'Sin identificar', fecha: new Date().toISOString() };
+            alertasResueltas[alertaId] = registro;
+            localStorage.setItem(claveAlertaResuelta(alertaId), JSON.stringify(registro));
+            registrarBitacora('descartar_alerta', 'alerta', `${resumen} — marcada como No aplicable. Motivo: ${motivo.trim()}`);
+            await persistAll();
+            renderAlertas(); actualizarBadgeAlertas();
+            showToast('Alerta marcada como No aplicable.');
+        }
+
+        async function reabrirAlerta(alertaId) {
+            if (!confirm('¿Reabrir esta alerta? Volverá a aparecer como pendiente.')) return;
+            delete alertasResueltas[alertaId];
+            try { await MypecarSync.removeClave(claveAlertaResuelta(alertaId)); } catch (e) { console.error('No se pudo borrar la resolución de la alerta en la nube:', e); }
+            registrarBitacora('reabrir_alerta', 'alerta', `Se reabrió la alerta ${alertaId}`);
+            await persistAll();
+            renderAlertas(); actualizarBadgeAlertas();
+            showToast('Alerta reabierta — vuelve a figurar como pendiente.');
+        }
+
+        function renderAlertas() {
+            const pendientes = alertasPendientes();
+            const todasResueltasIds = Object.keys(alertasResueltas);
+            const atendidas = todasResueltasIds.filter(id => alertasResueltas[id].estado === 'atendida');
+            const noAplicables = todasResueltasIds.filter(id => alertasResueltas[id].estado === 'no_aplicable');
+
+            document.getElementById('alertas-count-pendientes').innerText = pendientes.length;
+            document.getElementById('alertas-count-atendidas').innerText = atendidas.length;
+            document.getElementById('alertas-count-noaplicable').innerText = noAplicables.length;
+
+            const lista = document.getElementById('alertas-pendientes-list');
+            if (pendientes.length === 0) {
+                lista.innerHTML = `<div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center text-emerald-700 font-bold"><i class="fa-solid fa-circle-check mr-2"></i> No hay alertas pendientes.</div>`;
+            } else {
+                lista.innerHTML = pendientes.map(a => `
+                    <div class="bg-white border-l-4 border-rose-500 rounded-xl shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div class="flex-1">
+                            <p class="font-bold text-rose-700 text-sm flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i> ${a.titulo}</p>
+                            <p class="text-xs text-slate-600 mt-1">${a.detalle}</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2 shrink-0">
+                            <button onclick="irAlActivoDeAlerta(${Number(a.recordId)})" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-3 py-2 rounded-lg transition-all"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Ir al activo</button>
+                            <button onclick="marcarAlertaAtendida('${a.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3 py-2 rounded-lg transition-all"><i class="fa-solid fa-check mr-1"></i> Atendida</button>
+                            <button onclick="marcarAlertaNoAplicable('${a.id}')" class="bg-slate-500 hover:bg-slate-600 text-white text-[11px] font-bold px-3 py-2 rounded-lg transition-all"><i class="fa-solid fa-ban mr-1"></i> No aplicable</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            const histBody = document.getElementById('alertas-historial-body');
+            if (todasResueltasIds.length === 0) {
+                histBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Sin alertas resueltas todavía.</td></tr>`;
+            } else {
+                histBody.innerHTML = todasResueltasIds.sort((x, y) => new Date(alertasResueltas[y].fecha) - new Date(alertasResueltas[x].fecha)).map(id => {
+                    const r = alertasResueltas[id];
+                    const estadoTxt = r.estado === 'atendida' ? '<span class="text-emerald-700 font-bold">Atendida</span>' : '<span class="text-slate-500 font-bold">No aplicable</span>';
+                    return `<tr>
+                        <td class="p-2 font-mono text-[10px]">${id}</td>
+                        <td class="p-2">${estadoTxt}</td>
+                        <td class="p-2">${r.motivo || ''}</td>
+                        <td class="p-2">${r.usuario}</td>
+                        <td class="p-2">${new Date(r.fecha).toLocaleString('es-PE')}</td>
+                        <td class="p-2"><button onclick="reabrirAlerta('${id}')" class="text-indigo-600 hover:text-indigo-800 text-[10px] font-bold"><i class="fa-solid fa-rotate-left mr-1"></i> Reabrir</button></td>
+                    </tr>`;
+                }).join('');
+            }
+        }
+
+        function pedirUsuarioSiNoExiste() {
+            if (config.usuarioActivo) return;
+            const nombre = prompt('¿Cuál es tu nombre? Quedará asociado a lo que registres en este archivo.');
+            if (nombre && nombre.trim()) {
+                config.usuarioActivo = nombre.trim();
+                // No persistimos aquí: config aún no tiene los catálogos/periodos cargados.
+                // El persistAll() al final de inicializarApp() guardará esto junto con todo lo demás.
+                showToast(`Bienvenido/a, ${config.usuarioActivo}.`);
+            }
+        }
+
+        async function guardarUsuarioActivo() {
+            const valor = document.getElementById('seg-usuario-activo').value.trim();
+            config.usuarioActivo = valor;
+            await persistAll();
+            showToast(valor ? `Usuario activo: ${valor}` : 'Usuario activo borrado.');
+        }
+
+        function verificarRecordatorioRespaldo() {
+            const el = document.getElementById('seg-estado-respaldo');
+            if (!el) return;
+            if (!config.ultimoRespaldoFecha) {
+                el.innerHTML = `<span class="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-block"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Todavía no has exportado ningún respaldo desde este archivo. Se recomienda hacerlo cada semana.</span>`;
+                return;
+            }
+            const dias = Math.floor((Date.now() - new Date(config.ultimoRespaldoFecha).getTime()) / 86400000);
+            const fechaTxt = new Date(config.ultimoRespaldoFecha).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
+            if (dias > 7) {
+                el.innerHTML = `<span class="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 inline-block"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Tu último respaldo fue el ${fechaTxt} (hace ${dias} días). Se recomienda exportar uno nuevo.</span>`;
+            } else {
+                el.innerHTML = `<span class="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 inline-block"><i class="fa-solid fa-circle-check mr-1"></i> Último respaldo: ${fechaTxt} (hace ${dias} día${dias === 1 ? '' : 's'}).</span>`;
+            }
+        }
+
+        async function marcarRespaldoRealizado() {
+            config.ultimoRespaldoFecha = new Date().toISOString();
+            await persistAll();
+            verificarRecordatorioRespaldo();
+        }
+
+        async function restaurarActivoDePapelera(id) {
+            const idx = papeleraActivos.findIndex(a => a.id === id);
+            if (idx === -1) return;
+            const [activo] = papeleraActivos.splice(idx, 1);
+            delete activo.eliminadoPor; delete activo.fechaEliminacion;
+            activos.push(activo);
+            registrarBitacora('restaurar', 'activo', `${activo.nombre} (${getCategoria(activo.categoria) ? getCategoria(activo.categoria).nombre : activo.categoria})`);
+            await persistAll();
+            renderSeguridad();
+            renderRegistroActivos();
+            actualizarBadgeAlertas();
+            showToast('Activo restaurado.');
+        }
+
+        async function vaciarPapelera() {
+            if (papeleraActivos.length === 0) { showToast('La papelera ya está vacía.'); return; }
+            if (!confirm(`Esto eliminará PERMANENTEMENTE los ${papeleraActivos.length} activo(s) de la papelera. No se pueden recuperar después. ¿Continuar?`)) return;
+            registrarBitacora('eliminar_permanente', 'papelera', `Se vació la papelera (${papeleraActivos.length} activo(s))`);
+            papeleraActivos = [];
+            await persistAll();
+            renderSeguridad();
+            showToast('Papelera vaciada.');
+        }
+
+        const ICONOS_BITACORA = { crear: '➕', eliminar: '🗑️', restaurar: '♻️', eliminar_permanente: '⚠️', editar: '✏️' };
+        function renderSeguridad() {
+            const inputUsuario = document.getElementById('seg-usuario-activo');
+            if (inputUsuario) inputUsuario.value = config.usuarioActivo || '';
+            verificarRecordatorioRespaldo();
+
+            const papBody = document.getElementById('seg-papelera-body');
+            if (papBody) {
+                if (papeleraActivos.length === 0) {
+                    papBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">La papelera está vacía.</td></tr>`;
+                } else {
+                    papBody.innerHTML = papeleraActivos.slice().reverse().map(a => `<tr>
+                        <td class="p-2">${a.nombre}</td>
+                        <td class="p-2">${getCategoria(a.categoria) ? getCategoria(a.categoria).nombre : a.categoria}</td>
+                        <td class="p-2">${a.eliminadoPor}</td>
+                        <td class="p-2">${new Date(a.fechaEliminacion).toLocaleDateString('es-PE')}</td>
+                        <td class="p-2 text-right"><button onclick="restaurarActivoDePapelera(${a.id})" class="text-teal-600 hover:text-teal-800 font-bold"><i class="fa-solid fa-rotate-left mr-1"></i>Restaurar</button></td>
+                    </tr>`).join('');
+                }
+            }
+
+            const bitBody = document.getElementById('seg-bitacora-body');
+            if (bitBody) {
+                if (bitacora.length === 0) {
+                    bitBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Sin movimientos registrados todavía.</td></tr>`;
+                } else {
+                    bitBody.innerHTML = bitacora.slice(0, 100).map(b => `<tr>
+                        <td class="p-2">${ICONOS_BITACORA[b.accion] || ''} ${b.accion.replace('_', ' ')}</td>
+                        <td class="p-2">${b.detalle}</td>
+                        <td class="p-2">${b.usuario}</td>
+                        <td class="p-2 text-slate-500">${new Date(b.fecha).toLocaleString('es-PE')}</td>
+                    </tr>`).join('');
+                }
+            }
+        }
+
+        function aplicarMarcaDeAgua() {
+            let barra = document.getElementById('marca-agua-licencia');
+            if (!config.licenciadoA) {
+                if (barra) barra.remove();
+            } else {
+                if (!barra) {
+                    barra = document.createElement('div');
+                    barra.id = 'marca-agua-licencia';
+                    barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0F172A;color:#94A3B8;font-size:10px;text-align:center;padding:3px 8px;font-family:Arial,sans-serif;';
+                    document.body.appendChild(barra);
+                    document.body.style.paddingBottom = '20px';
+                }
+                barra.innerText = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros`;
+            }
+        }
+
+        const MYPECAR_ICONO_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAFsAAAA3CAYAAABjADa4AAApSElEQVR4nLWceZweVZX+v+feW/VuvaaTTnf2EEIgIRAWQwyyCYZFEcQFVFRcUMQFF9QZHcdxRh1xVGZUBEUEBUHEBQU3kEUFZCcEAiEL2bdO0nv3u1Tde35/VHUnOgxmdH63P91587711nLq3HOe8zznlqgq//9GAISAEBQsnr406LpdDYILWEK+nQFVwJCdj9DsIg7oKEhEQABEUATBAx40guwTEA9o9rkmJFrEUsUMb1GtD6NAKg5nYkxxEpQmSBAwCuSXrwYCHsEg+X6zv2P2kb/JAqqKSPZd9zftYT9HwGAURBSDgMK63cN8/bdP0Si3kFoH+cUFVYKHEAI2NFja6bng5CO11VoxgFWPYhFVvBhEwOT3SvMbEVAcDm+gtvYB3Xr7l2g1I2AMEpTBUKF02CuZ/LLzVeJ2MXgwiuJQQNTm+8tvhAD4/Gr231R/6cBj////auy9PqGoCKJQlSI90kpCOzZpgAiCwRiDWEGcoKTUCzWwhgCYfGcqAAaDQZTMo9UiwRAk/1xBJKG+ZSWT6j1EtkZqitgQKDHI8PbHiOvLSKN2wAIeZczLcwuPH5T8RWB/x4tFCvM/fvJ/MIQAKIHMaGjmxYpk8xabe5Ogqoz9GDFEpkQhqEQoNtsNKhDEZFHDD0GyUwn9ioINZGFJGxTqmzTZ9iSx1AkSMGEUGxpAgt+9EXavxaUjBAHUYjSAViHdo/ghkGT8GhSD/hWfVNXx3xcb++XZL7oT+Z+j2b7vj+3BkOJCipCCUfJwhmpANXOuIIqkMdZnYSjbWXbrEDA6QnXHct21cTmtE6bTOuVwpdSCH+2j3ruLas/jyOBGXOzwmmKCR4wF5ygwyPBTv4FqorZzPqVKG0jCUO8GhreupdLarS0zDoO4U8DsDSnoC1zRX9pF/ttrlYCoALJ/xh4L8OOH2cf4L5Y2RLPpDeBQvBGChDxZCjo+sSQ3dLZfj9LQBC9jB9A8QYJhkNEdK3Tg99egWx5loNyFzllK1DGR4b6tpJtXEY3upEkVwRCLEGwJMMTiiaRBuvGPjG54BOk8BD9tAWoCveuewO5Yz2hbF/qS19I67zQNxRYJCEaj7Dz2zZUy9kZA1KL7GD57FVCElCxfiP9r82N/hr6IuRWM/Pn9D/lvFhqzOA46FlwAxarPvT+/sDwgFUJCffPD2v/wjyntepymeJBGDdKnf0swKYY6RQJFVwMK1G0ZpIhTxYgQJEMwElLiMEBj+wMMbXuIiCKVhqdgUpLBYYYfuQXjA82HLdPgOiVIPn2zk+XPXc1iVcadQQW8wtBwVXt27eK5DTvZtv55pndP+vuNrS8SRvY9pX2396J5yhFEMyNnv7nRRVFjSQ3qJQd9IZDuWqM9f7oRt2sFRRogBYJRNFQxmlL2NVKJSKyjbgrUpBlbLBNZR2qE0KhRTqpEYRSLJdIG1icYVZxY0JQQPIX+tQw8eAuhUKJlwRmIbwKbAiG/3nxW5uilYRLqDc/W7Xv0udWbefSJZ3luzUYGh6r09vfRv2sTH/vA2/8+Y4vsO7de2Mx/hlJlb6QLYQzTamZwk80CIxYrCtbiTb53BaOBan8P1V1r6Q6j4LMEayyIDaQiJI2YalpioDSV8gGLmTjzcKRpItZEJOLRxghh5xpGNzxC2LWOcjJIrCn1kBKMIFi8CLH3NAZ3M7pnO62hqmgsqMvnnkERRmuBXbt7dcVTz3DfY8+x4qmnGR6tUk08e/oHGRypEjBE4kgGB1l4+KL/vbHHsq5IhiBEXyhRjG0sBJvBNBHNEsU+mdvIPuEPCJr5jCLYkOBCwJhAEEcaLM3dc9jZdQjJ1uWUZJQkkswrQ4MUy+5iJ9Gc45m6+HSk7QAi0yTOGEhSLUgsSVTCT3kp5QWn6PDaP9H/6K9oG95IFIbxwZPgsaGBDSVG2qYzc8HxQEGCSagmMRs3b9flK57liadX8+TK59i0eTuYiJFGkVq9TiBk+E4cxE1AIKSKGGHugbP/98YeS5Zj/waRF/XtQOaxISiqWdgzImAEu6/f59AvzV254YUQPGryMGMM2jRZph//et32kw3EDSVQBWNJXDt9pWlMXPwGmueeTKPQJjEG/KBW19/PjifupnnW4Trx4FOIihMlLR8o7Qtn0N65QDfe+32adz1KMfQTRLBGqEqJriWvQCceKD5UgDpbdmzVy77yX/z6jvtx5Yk0TIwXg5oEMBgrqBrEZBhVshIM51IWHLmQ5kosf3MYGanW2LazR/uSQDB74bqOwySw3lOMhQOmTpVK5BABZwyRtagIhL3FQhiL2prdlJqWSIgIpFjNKlAVi22eTFQREi9UPDQc9Fem0LrkzVTmnC6YIpECGvC1GvU962is/x2pHWBkxkHEhRJRaCJIAd99lHS+wmrPvaOEHSsoJDXURoxELVQqrVgMGINVx9yZk+WfPv4hDSHmd394jCCCFAooKZ40ux4MEsBis7pYBEKDJYsXYcx+V5ApHofN7ehFWLW9Rz93/a9ZuXknYgSRzICq4HODhRCY3VHmqg+fp/MmTxGAMkJBFK8BLxlvokDIQ5IomBBw6RBKims4xCYEAdGE3tVPYIf6cL5KVR2Jm0zh0FdRnHssRmK8gGGYdNdKHVpxB6Nr72FCqNJY/xC7B3pomn2ctsw7FSYfIgZDPGGutB19jvb+sY4MriImoUnr9D/zMN2zTlAiJ0qMUWHOzCnyjx+9QDEN7rnvOaoe1HoKwWYzXEyGmyS7NjWWaFg57RXHYGj8DQlyPM4KcRQTx8Ws5JbMCyQvv7OALFSa4iwo57k08JfQKRuGbHsjAJaadQRxBLJcqJJSGN2pw0//gaa0TsMPE0wrtmM2LdMX4ewEQQ1WwQ9v062/+x6y7VGss/im6YDHD2xnz4M/Ronp6JiNUAZboXXSMejMTaRPb0R8AydVRnasoLF7LdK9BCMynuDnzJkt77/oQl2/8cs8t7EHIcWLya5KxzBWVgBJUAqxYfbMWQjm70Mjqff4oEhODKFZMjACEgSxgjEWEcNYHaRjZfe4sbMEa4wZh7LOCAXjsRqwfhiG12s6tJnq5tWUdj6N1QYqgTRuJuo+jGjCgTlayHiR/vWPI7tX0lx0pLNfSjTjGBJVtH8b0a6ttMxaQN2VKSogKZTaJJ42Xxubp5H21bChQXujj4HHfkHl0ERt2zRMpUtsVCFJAtt29OC9Bw0YVVIBQ/aaHBaKZnN2SvcEOjraRQl/u7E1RyGqGRTK7r6gQQmiGBNQL3ifET1jThxEsjAjY7yPZAxeDgGNCE6gYpSCjjK46U86uvIX2IENhIF+SmkvwVpiLZGWp+C656NR0/itwydUe7YS0wAc5Y6ZVA46lrTQJtQT9UODuNZOqQNeMioqGCGaMB3TOp20dz2IwWiC3fAHagNbGJ58NJX5p2nLpLly132P6lev+h5rt+0mGJtzjWTGVSWoQUUwQTGaMvfAeRlA0f0s119oiAjWWiT33CxHZp4qqmgIBCD1bh/GLiti/RjHOxZPsrPNvksOBW0RR0J9z2rSTY8Rp30U1CIu5xm0DHErcXtXvguf8XO2SDyhg9EUjG1QXXUvfmSAaPaRWpo0D9PRLUKRmHy6qwOBqNSKKbYivkYkVYKNKYYRqsO7MdMrFEtN3PfQCv3GNbfw7KZeUlfOnCOAGIsNnsgoic8qSFVldGiQ4449EqOKhhcw9r5k9wuO3HBiDNY6XGQzTxj/PGSkUvAEheAzLmQsjATNjO0yumMf9JJtIDnPBikEELE4V8KYGsZrfiwlCYqxShxHqEoe81NMsEycdzwb1z7N6LbllPq30+jfzejq+9nZOoWmhcfpxHnLkEJnlkjEZsdzQnCOyNdxWqNBkT22g+K8k2k7+lUsXzPI5Vf/mGfW7iBIjEoudJgIZ4QIgbSBs1HGj4cEa+DQBXOzxC/ywhTrvpThCzF+QoaVrbVZrJXMY4P6rCSRzPPHsbgqPsfZqpobPBDCmIEzbzW5wZ0EJhbrOBOLjztI4za8c4gEjFosULMNCEPg69ndTzP+JBhImmZJ91kfou3EdzDctYghV4Labio7HmTknqvZs/IeSAyGvCoMBkLAhEBDhSG19KYgByylY/G5PLutwT985Xs89MxWGqlFvMeEBBEFF+GMZdb06bzp3POycCoG6wyzZk5nxrSu8aLNoZ5Exi40gy/7ol+D4kkpBAdeURvykCAkEkGunmSVoWTFB4AFCX7c6CJCCgSJCRIjxKSqeFFcsBjA24TW0M+Rk1o4Z9F8rE1on388PY0atZW3EvvnSTSlkgSKqac3CYyO7qbcNKBILB6HJ1AkhcI0iY94E82HnarV3vXsWv4b3Lr7qCS76X32d0w4+BTFdAkCiQHbSJHqALaRMBg1EeaewvST38faHnjfx/+Z1RsGEBPjJaMWRD0RFqcxB3QEfnTlp2muGCrxKFf/8G4wwqypE2krFsQhIIoDoT9BaxrwQUjVE1RywiWb3nVTpKzQaUUqYrPMC0QhIBr20qD5DRpLhs4anLVZ6MkjRQg+y+TBYxFQj5ASiDBpnXntjje9dDabtm7l3jt/r4fOP4QlR7ySaiVi8ImfUul9nkY6jNFAXB0g9O5EJwE2xgWIfICRLTq8eyOVzplIpVNKE+cz/ehIB4Z7KGwawA3Vs1lgAxEeh5AO7cSP9jBSbkYPPJ6px17Ahp3KBy/5LM+s2oUrFPC+gViDBEOkgg01pk9p5tor/42p3ZMEhYvf+RatNpSf3/pLFs6bg3N7I7VLxPD7Fat5dJcjVSUJkIZcY8mNaKROs3hOP3iKLpnRIZGDoAFNGoQ0RXN8/Zf0X5ZEDSbHz3uzdmZsEYuIEsRQZpQFbYF3nnw4Q5vXcfk3b+Qnv7qfBQfN5aK3nc0ZL19GxVYYfeSHmJ7lNHmIqoNUe9bQNOtoKFZQLHXXYGjV3Wx54BamzD2MlpmL1JWbqfftIB3sQTUmbp+COpcnIItonWrfVvqrCcW5J9O5+M08uaXIP372Mp54ZjNEzVmYMYp6JZKI2CcsOLCLb1z+WQ6aPkHGJLXO9rJc+t7zVEZ2cfJxS4jjaB9jA1tHElYOQKpCooJXIYwnScH5Ik1mmKNqGcIIIVDXlLpPSH2KYPfGaJNh6rGvGzE5m5fdi8hk0G5M4gIoapUjOy3nL57N8LatfOGr13HbHQ9jm1t5ZuM2Pv/l77Jtw+lc8IZjqZzczp4Hb0A2LqdY38Po5sepH3A0hakTCVrEypDu6R+kxRVhzcP0rn6IYLLo7K1juH0G7YedgIuahDQrvhrVYe3r3w3TjmTi/JN5ap3y6S99gwdXrsMWCsTayICDz2apYZRF82fzpc9+lIOmTxRI0awawxCY3N4sn/r4JRoXmsQYMz7rDUBdCpnoKgYrFmcsVizWZO8FaSU1hYwPyFyWRJVEAkqGPsIYCtGsRtQxQnLM0JodzBmTGzzjrsu+xuJOx2uPmEGtd4hPf/4qfvbbP2HjCho8imHXQJVvXnszX7zyxzzfmEbnSR/EH7qMkbgZ6XmekdX3klY3ajCKo0lmLX4NpSVvJsw9FtvagtMBbEmIZh3NpMXn0DrnGFSLORwaYbBvEw1bYPKi03lmh+WyK27isec2EBcdMYbIGyyKDYpNahw+byqf+MjbOejAbiEEVKKsfpCQO5Cjta1VCmX7Z7PdAfhgUE3JlGsFGaeFUAJeFIvHkmTGU8GKzVB1HoxlDEtrYFx/y4scdO8xDYoVwYqn4Ec4cnKFMw+fAkMD/OuXvsuv7nmcYqmCSiAKkh3VOIY14eZf3MWzm/fwmQ++iUNf+jZGK5NoPP0H6uufwk26j8rBkxTXKYW22TLp6E6qg4u0tvwX7P7Tj2iddiATjzybePLB4JpyZrhGdXCLDg72MvmARazpEb52zU94+Jn1NOIyLgxniEUE0RRJRzliwRw+dPFbOfLweWJthp/H1EnJf8bUkHGoN9Y3YkLIqj41qOQFyvi9yKGZSylISuwCzoBVoYgjDmbvZrJXQ1Qy7jrTG/cB2TksNAac8RzRVeR1C7sxjSr/+rVr+ePvH6Q5LlC3Fkjx6iAEIkkJAnVT4YFHn+cT/3I5H7r4TZxxwhuotc+m/8k72b3iEdASzYecor7YKYYy5dbpYua9QpuoUJ44Fdt6AF4qohIQ9ujAto0M9/TSfeAhrN05yOVX3c49D64lTQzGCJgiVQxG6phRZdH82Xz4A29j6UsWSimOMgLNZTKeBMk6Bsw+6tVfaMTOiOAFgpLBN8kKBySTY8UY1NQpSBMFKWWfq1LSgIkE5wIEMrlfQ4axfSaSGvGkqSdRh5esqSEVKPg6i1ojXnvoDEqq/PvXr+eu+1fSiMqgCUaUyEc0xBNMwGFwmtOWhYRnNo3wz1+5ji27XsU7zjuNjrZJ7Hzsl/Q9fjvVjU/QedQrVboPJ9iSVCbOpNI8GWwExkO6WcOe9ax/6mGS0M4Bx7yOZ3c3+OIVP+Heh9cxHJSitUQ+IYmysFoMloULJ/DJS9/DMUceIkUHIp6AQzWPyeMIYB/7/gVgcONCZc7s6744TbJCxGmCE3Dj7xvUOohijI8xaZUDpreybvMW0rgJtTFoiqqSKDQkkGg2I+LaCNPtAGcddSgTizFfuPxqbrv3Uap+rBI1GA1ZGFGPVw/GkkqEyWeehpgdfQ2u+PbP6N85yvsvei2zji2w+d6b0XUPs3HNE8iEyUycc5BGEydDqYT6Oo3eHvo3PE9fTy90LuDgM17H+sGUL/77NdzzwNMkpRinHg2g4lDrMGmVGZNb+PD738XSJYskEkU0HQuSmH1F2BcpvMdjNvvEXkXHvZdM1iQKHiuK4BGEIJBqBuOaxfOGV5/EG159LFd972Zuf2AVI0SkJmACeJ8QaGSKTTC0R4ZzjzuciQ6u+Ob1/PDn91DVQoa31aAUMgnND9NSSHBO6R/1JKZEGgzGKFIwWI3oG/RcecMd9Aw3+PjFZzP95Lez+d6Arv8DHXsepj74FINagDSTIUTB2CaaJx/B7GXns6naxucvu4Lf3P0nTLkdTRvZdiaigSGkdaa2Gj73qYs5+bij9vKsYseN/eI61QsaWwljFGhu8oy3EAIBT0wiHi8yfvusJjTT4HUnLeANyxZT272DC193JqViGz//4xPsSXKsntYwCjbHg50dEyWxVf3Wd2/i2zfcRlUtztbJms5KBImIJeXQWV1c8sE3MqVrAl//xg+579GNDKWBxNQhpNStwVgDAb5/y+1s27OVT1x0Pkcv+xDbH5rB4Oo7aKltp9nXMCJ4H1E1RcLUo+h+xYVsTCfzL//2TX5++/1ouYmUlBiX9bokKZH1dDYL3/7SZ3jZ0QdL1vOXVdjKWF4LgEdzlf2vjbE2urz9a+9QzQqXgDIaHKNqqAcdV7tLLnDaksN4w2nHs3H1Oj71qS+z6ul1nHfqcZx/6jFMLQtWk6zg18K4cNA/OKQ33fhTrrrup1R9xmETAl4NASUOI8yfUuFj7z2PM19xohx92KHy+X+6hNefdjQTig1sCBknoSHrrDRCsdjMPfc+yb984fvc8chWJi15M01L3sJg+4GMWkctdgw0dzA89xi6TjyXrcPNfPYLV3PLbXdjyk2oLWBNATw0vOLTGlPbI6647JMsPfoQIQ8bio5H2L1jLwe0X54tSNaeRSZTZel0zNWz4FFNExo+HQcWXRM75OTOafrEU2v5wpeuZPnK9WzcdgUfev/5nLb0KEqx45Z7HyRtpBhvQAL9VdXrbvgZV1/9AxohRiTrTE3UoQomDHLg1BY+ctHrOeP0YzMGNBhmTJ8kH/vY27RlcivX/fDX9PWPQK4QZYldsK6Jx55cx6cv+y7b3/hyznvVEtKozMiK25C+jZipR9Jx1DlsHm3my1fcxI9v/yOFplaMNAhGQQtY9aR+lHmzurjkfW9n4eLD6KnXdUKxLGMkmYW8oyCznCJ/LVT/ubEzRcqwN2qPBYu8DVIToIGSjpOhcaHCk8uf4T+uuJHHVm/Fx02s2z7MV752Exe+tcppy5bS1lzkyRXP0BYHkrTKN757K9+79nZqIabhDG6M8VJwaZWZHZZPfvhCXnHqSRJMzhVLRvKX29vkPe95u3Z2dvP9797Ms9t2olFzBr/GUIuB9Zt384XLv8/KNeu56MLzmPyyLka2raZl6sHsqE7kP6/5GT++63Gk0kbqEyIMxitWE5LGKIcumMIH3v1WXnrisVz/2ztob2tj2eIl2h6LxGT9K2OwTsXsY6v9MLZqoKAZXao5b+EJudqd7SwYwYoBL4QQEGN4bs0G/ca3buKxJ1ZlM9oEGiFi3fYq/3XNT6n6BuecfhxHzeqmuaXIf337R/r9G3/DiCohcgQxeAORVzQdZUpnmU9d+i5OX3acjLX+EqCnWtU/rFnNE8+t5oDp03jdmacyd3o73/juLdz78Cq8K+Il4y18EDCBXYly7U/vYddAwqXvexPzjjhbtmzZpV+79ufcdtcjeCkDAXFKEgLiIU0aLDhoOh963/m85Nil3Hjvfdzwh/tpKzZxz1OrObBrgr5s4SEcM2OWlJ3N2jE07xHfv5CNU1Es4NSgkuBFAYfLZ0oigjdK0RtcyHS+zVu36ZXX3MTdDzxOoiWMAQ0pwRgSI2zbM8BV1/0IX29wzqtP4zs3/pzrf3QX1aoDyZqfHWSaZRqYMrHCP136Ds445SQRbA5BM/z/8LqtfOfO+1jXs4vKqnVs76vxzjNO4B8mTmbSVTdw62/vox43ITiikBJweFvAYLj7j09SG6nzunPO1IcffoLb7nyIaqLjPZGZdhqwJmXOnE4+fOF5HLt0MTf//j5+8eAKBmyZkdGUzWs28dD6DfQMDTOruUMP6GwXEc1WKtgAxPtnbAAVwUmDIOBxGHU4TQgEahJRSKu0+UEOnD6frT279ZvfuoEf/eJuUolyVSnjw5UEFY+KoWd3ja9951bu+OMKnt/wPHuGPF5jIGAkI+oleLraKnzmo2/hzGWLpRC5LAL6RtanKwWGRvvY1b+HRhCqqfKDRx7h+R2b+Pib38jHPvJuJnVM5Oof/ppELKhBTIbH1Qi1UOf+x9fy6NNXUUs8SciuNUg2Oy0OGxKmdTVz6cXnctYpx8qP739Yf/bQE+xpZASFiyNMEEaDZ89QndFafXzajYnWL9bkvq/4YgJ5W6+tEXCIFhAUbz1ilRZRDvBV3nPaobS6Gld//zauvuGXJK6CugJBlBBAQhb7SDw+FYKW6a8qDzz5DD2Do6S5CJHheMBaKuUyl1zyFl7zyhOkGDuCTQjWk62tycCWisW7CDEFTBJRrxv++NxaLvz8f9BTKvHej76HT3zwjbRXEhqZvfEEEuokrkGNQH81oRo8KT47X8CKw4QGk9uKfObjF3PWq04W4hIrt/eyuaGZXKwBo56IQEUsBSOIzUTrkPU7YUL0ggZ+IZXLgJAGpW4MDWNRUqCBN4KThCm6k4tOmsXcipXbb/0d11z/c6LWSQQbIThEA4YUST2x2gyrBiF4RX3I4rw3IDnnjcEa6KgYPvKuMzn/lQsJm+/V+uM/0OHHb9LQu0oxCcEW8AbERVCISKOsz9mkgTQtsKE/4R+/cTXPbt/Ixe85V/7l0ncyu6sJpI6alGA8iMmmuqQIdZAGhASnBklGmdQCn/r4hbzyFUvFieCtUHURqQXBExlLEEsqFu8gtUqCz/X0vfzHfq888ECqSjWJMJLiJKsWiyjTXJ1zFk7n4G7Dr3/5uH7xyzdgojKeet5NnxHv2qgxtbuL0aFRekfqGFcEE/KEa1BxIBnlGhNoiYW3vuZE3vvGk5D+Z9nx2C2Udq0kNc3UqjUmv7RLLbF4DGUTaLZCX05GJQRsKODimKFGytPr1rN0zizOP+dVMqHSpF+99ic8uXojhBgxDhMU8EiO860okozQ0Wy45D1v5pxXniRjbRQ173WwPoKEBiIxqYmzpv2QZisYRIiMyzijMaNbYH+LGk9QHwI+ARqBNHX4AF3RCGccMonFU7vk13c+zsf/41tUXQn1YEImQakE1CvdnS189lMXccFbltHZbtB0CLRKBhd9xnnTwOkwzXaUC15zHB9919lEIxsZeO4uov4NlNIa5bSfdOsT1Dc+DtUeNWm/zmoucPzMGRzRMYkOa8GnaCFFC4ZREbb1jzJQSzXgOf3U4+SyT7+fl79kHnFSxXnJ1svkdIFohKYNujsiPvjuc3n7eWeLHePhgW27+9hdraJqCWIICi3imV2GpRM7WDJtKlPK5Qw85P0y/4tqHSfB0BBBfCDJEWN7VOe42e28ZMZkfnfnA/rPX76WPbUMEFpDjlSUEIRZk1u59AMXcNrJL5XjlizU5qYWrrvxNjZu64UoytkDj+goNtR42xvP48PvOp14233sefou0l3LKTf6UbVYqVPYuYK+3w9RPmARodjEbDeBD5xwOBtHKyxft4GfPvooz40GEieQwrPbd7Jqx046Zk0l0sCiw+bIV/79H/Wyr1zL7Xc+yFA9RW1GHdjQYMqEMpe8+1ze/PpXimEvh58oPLp+M5t2D0NwBCcU0irHHziT4+cfxILuqUzp7KAtjiVjRwWD3afnJRsvFkqck2yBmxch1cAEM8rS6U0snd3Fn+57lC9843p2DY4i4sA4gjH4kGC9Z/rENj7yrlfz2tNPkAKKK5fkza8/S5ub2rnqOzeyZvMOjAGRFKWP977jfD74jjMx2+5jz59uxPVtQKIiQ4VJJHEzVpV4dDeFvlXUH3+OxFokmkDpqDdy9MJXc8Scl4ltivSLt96foSAR1vfs4b5n1rCge7JOijKec8rEFvnXT1yoc2Z08/0f/5ZNuwZRUaZ1Frj4gtfy+rNPk4K1oIKKkIqyqb9P//jsKnp6BzHGZYzQ0C4uOPktHDpzmsT7cPUw1uCzt/lovzzbChRCSorQTMLSqS2ctmAKq55awVevvoH123tJbMBoivMWTIQR6Gi3XPS203j1q19OoWAgr/haW4py1pkv16bmIldceS1Pr9lMqqNcesnbePcbz6K453F67v8+xd1rSKwldL2EpgXLsC2dGDwjq+9ndOWvaU4HiNSTqDC4dQ3lA/qIiq2cesSh3HLn/ayv1ahKzGjV87uHn+Tw6dN4+YI5lHEISntrSd711rOZMWuqXn3dD9nd08sH3vF6Xn3WMoqVIj4EXAgolr6A3r1yNY+tXgdpGG/DOKS7m4OmT5H/q/WLToA265lEgyOmFDn7iKlsWfEk//mf3+XJZ7egxuYrAsDk8lglUs5/7am88TWn0NJUEMl7rUWyBprWipPTTl5MZ3tB//mLV7Ds1GW8901n0RqNsPbRX1HqXUOCEjoPZcJRryeefZyoK+IR2ifO0T6JGH3ql0R2kHqpg8Lkg9DKRKlhmFBuljOPPUY//4vbEdtMI8DGPYNc9as7aWlv0pdO6ZYob98tViKWnXKCzJ7eqb46xMKDF0hcqeABKymYQBW4b9XzXH/XA/QmSmQM3qeERpXz33Eupb167d809iWpnARlom3wso4ar1s6n74tm/jm1Tfz6FObEOcQTXFSyJhsSYhlhNeefiLvveC1tLeWJOtJlkzdyYdBaSpGHLf4CPnJ9d/WcqEgJWfQILR3zdDq5hING1OZfgSl6UcgtghpwFiLlDulef7J2r/2T2gyiuuYTsvsRbhCE56AEcNAw6NGEBuIjCFxjlV9g1x2y2187g1n6sFTu6UAWIWyg4XzDxFDkkldkHEyIaJmlN+v2ahfvOU2ttZBXZE4JEDIpFTdSzSNGW0sJu8v07fvMMZAV9Hw9pMWEA8N851rbuXOB1ehcYHIgpEISRUbUiQd5MQlB/HJD7+djpaihIwD++97zRdZiinQ0VySUpTRodW4RFKZBKaZoitiS61oVBENAiabFQZPHBewziAhX7BnIwSPocGanb1642/uQaICxgoSGcQZGtbxbO8g7/r6lVz/yCO6La1pXROQgLGgNspEDxKGFNbWRS+/4yH9yFU3sDOxBBuDsXjnCJHFlipcft317G409G+w6wsOZwic8JLDpW9Pv17xvVu56bbfUyg2oaFBqoaQs0KxH2HpUXO57DMfZ0Jrc9aIMN4fMiaf73tWdu9q++BAPJHfpqXGLhKTZg0voz1IdaemlRlZgFKllAxp2P40jYGtxGkdO7ILN7QV0z6DYRdx+Q9/Sr1QouAgWEMaDCpKFAKJCD3RBC770W+4+uZbOfukE3T+nANpqTQRiSGEQH91lEefe46bf3M3dVfGlpvQkBJLIIjFR278crbV6tz8uzv5wBmvBOSvFi1/1diCMDQ4rN+67ja+ft0tROVWxAcsMYkoQRqQjLBw/iy+/G+fYuqkjkypVMHImCw0lqn3rtjNzJ5mnpl1uzHw7P30L7+TSWaU1Bjq255k9Pl7Kc05UU2hjTR4Gj2r2LP818SNPpwGaltXsWP5XXS3zFRtnUJzU5myc4w4EHU0jGTrGdWTJlkTZxoidmH51t2P0PjtA4RGJjpgLK5cwLiAlorY4DBJg9RmIoQRm60Psg5nDEVXxtiIoD6DeX/ncCN14dof/IRv/+BXFIoVUp+g6vIpnVV9h81q5rLPXsrsWVME9umhHmuQGDfxXw6TVVriERIGNm8jrg6hkoIWiPs2MvTwDwk7nydunYKGOv3rHiPa+QzGxfgwik0bDPZvp1EfotVG8sk3v0b1ptu5a9XzDMUFjK8jfoTgUwqpo2aUyBZywRaKBYfRCmocolnVl+a9MS4JSFIn8oo3lmBTnIsQhBatcvbh87jglFPEoX8Ws/+WeA3grvveLXrllT+gTke+AiAnxY3BpCMsnNvFZz7ybg5feFCuJ+z/VEqzPqLsJDHMWnQia7Y+TaPWi3MGO7qN8p4N+N6NDLkKKpbIgMYxVVqoiVDXIh0HL6U4oRtMoKlYkPeds0z52W/41fKVNMTT1VJkycGH0GxiHnj2eTb09lKLihAVsDgCiqrPWCoRIhFsqFLxDeZN6WD+QTPZ2rObR9ZupD8xNEWO171kEe8//RW0yN/v0ePGXvnsGoaG61DOn7thTUYe+hrz50zmnz70Dk582UuyuDDWf83eleYvdo8zCQkga8synQdL98vfqWl1AGuU6pblDK25h+bhjbgwhI8iRuMJ6JRjaJ5zDHFUJhDR3D0fLXYJIYNmB7SW5P2vWqaTCgW27d7JKUuOZvEh8yhayymHbmHdrt3csXIVj2zZSmKKSCD3Z8UFpUk9yxYv4qjpU5nXOZE5U7vp6evjrhUr+cPyJ1m88FDOPX4pbQXZf81rP4Y8vW6bfumrV3Lbrx/AFJtJxUKoMXNymc/+w/s47eUvlaJzedzI18fkVMze2PzCI0uPaSbOSkyq2RNxRH3WHziyXQee+hnh8Z8Rj+6iVi5Qm3Ec3S97P1HbLFEX5YRPnB/Nk2CJCBAMfcNVHa4O0z2hXZyxYCSTyBLlwU3b9YPXXMseLWEbBiXFi6eY1jmiawKfu+gdzGprkqyXNUv2o7WE7Xt6tHNCG63lomRX6/4nzPW/Hm7uAZPl0598n5qQ8PPfPoCJy3S2Fbn04rdwyvFHS+wse1H93gT41ww9ZuysD2iftWFis76LAKapS+zURdqz6hmieokRMUyadiTRhDmCGeOJ81VYIevXyDpgDWKgtaUgLS1xvj4zO5sGhqIRDuzuoqNSYfeAB2+I1CDWoY2Ug2cfRGdbMzZfhSkhCxXNxYjmaZPHnseBy5cG/l85t4tUmdHdKZ/714/q1KmTufGmn/K+d76NM884hWKcNb6jjj/vq3rhXra/HHsfzJLdJINmTCFZ+EQtTdMOZ8ZZ3Uitn2AgnjATjOZP68gPMf4Iir0pI4wTbkJCttTEAXHeoWStMqOtwnM7nqfuCnibYtSg9WEWzpxOk89XAuX7DfkFmXxB09jDOoya/xNrZy3HSUCNkJoGI31V7esdpLOrS6Kiw4nHiYJGWcPgPl+WvDcwXyX6P4wkWzFGlLULj30H2fsYplAHmxszxASTKdhjQqGSEnKNz5KQ9XAUshPQvV2M2TK7BNIIHNSps333gK5Yt43BpIFNqxQi6GydwJFz50k5inNVJz909vgwbP5Gw2i+KrfwV51qPzZAVfl/wSBvgNNOztoAAAAASUVORK5CYII=';
+        function aplicarSelloMypecar() {
+            if (document.getElementById('sello-mypecar')) return;
+            const sello = document.createElement('div');
+            sello.id = 'sello-mypecar';
+            sello.style.cssText = 'position:fixed;bottom:' + (config.licenciadoA ? '26px' : '8px') + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
+            sello.innerHTML = '<img src="data:image/png;base64,' + MYPECAR_ICONO_B64 + '" style="height:14px;width:auto;display:block;" alt="MYPECAR CONTABLE">';
+            document.body.appendChild(sello);
+        }
+
+        // Marca visual permanente en el encabezado (barra de navegación), junto al
+        // nombre de la empresa — distinta del sello decorativo de aplicarSelloMypecar()
+        // (que es una marca de agua sobre reportes/pantalla completa). Reutiliza la
+        // misma constante MYPECAR_ICONO_B64 para no duplicar el base64 en el HTML.
+        function aplicarLogoMypecarFijo() {
+            const imgFijo = document.getElementById('header-logo-mypecar-fijo');
+            if (imgFijo && !imgFijo.src) imgFijo.src = 'data:image/png;base64,' + MYPECAR_ICONO_B64;
+        }
+
+        function subirLogoCliente(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const tiposValidos = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+            if (!tiposValidos.includes(file.type)) {
+                showToast('El archivo debe ser una imagen (PNG, JPG, WEBP o SVG) — no un documento Word, PDF, ni otro tipo de archivo. Si tu logo está dentro de un Word, ábrelo y guárdalo primero como imagen.', 'error');
+                event.target.value = '';
+                return;
+            }
+            if (file.size > 300 * 1024) {
+                showToast('El logo es muy grande (máximo 300 KB). Comprime la imagen e inténtalo de nuevo.', 'error');
+                event.target.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                config.logoBase64 = e.target.result;
+                persistAll();
+                aplicarLogoCliente();
+                showToast('Logo actualizado.');
+            };
+            reader.onerror = function () {
+                showToast('No se pudo leer el archivo. Intenta con otra imagen.', 'error');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function quitarLogoCliente() {
+            if (!confirm('¿Quitar el logo actual y volver al ícono genérico?')) return;
+            config.logoBase64 = '';
+            persistAll();
+            aplicarLogoCliente();
+            const inputEl = document.getElementById('set-logo-input');
+            if (inputEl) inputEl.value = '';
+            showToast('Logo eliminado.');
+        }
+
+        function aplicarLogoCliente() {
+            const generico = document.getElementById('header-logo-generico');
+            const clienteImg = document.getElementById('header-logo-cliente');
+            const previewWrap = document.getElementById('set-logo-preview-wrap');
+            const preview = document.getElementById('set-logo-preview');
+            const btnQuitar = document.getElementById('btn-quitar-logo');
+            if (config.logoBase64) {
+                if (generico) generico.classList.add('hidden');
+                if (clienteImg) { clienteImg.src = config.logoBase64; clienteImg.classList.remove('hidden'); }
+                if (preview) preview.src = config.logoBase64;
+                if (previewWrap) previewWrap.classList.remove('hidden');
+                if (btnQuitar) btnQuitar.classList.remove('hidden');
+            } else {
+                if (generico) generico.classList.remove('hidden');
+                if (clienteImg) clienteImg.classList.add('hidden');
+                if (previewWrap) previewWrap.classList.add('hidden');
+                if (btnQuitar) btnQuitar.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
