@@ -341,6 +341,11 @@
         font-family:inherit; margin-left:4px; }
       .mps-pestana:hover { background:rgba(255,255,255,.26); }
       @media print { .mps-pestana { display:none !important; } }
+      .mps-pago { margin-top:12px; padding:11px 12px; border:1px solid #bbf7d0; background:#f0fdf4; border-radius:12px; }
+      .mps-pago-tit { font-weight:800; font-size:14px; color:#166534; margin-bottom:6px; }
+      .mps-pago-planes { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; margin-bottom:6px; }
+      .mps-pago-planes label { display:flex; align-items:center; gap:5px; cursor:pointer; }
+      .mps-pago-paso { font-size:12.5px; color:#334155; margin:2px 0; }
       .mps-selector { cursor:pointer; }
       .mps-selector::after { content:" ▾"; opacity:.85; }
       .mps-selector:hover { filter:brightness(1.15); }
@@ -517,6 +522,63 @@
     });
   }
 
+  // ---------------------------------------------------------------------
+  // Pago por Yape con activación automática (2026-11-20)
+  // ---------------------------------------------------------------------
+  function cajaPagoHtml() {
+    const num = YAPE.numero.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
+    return `
+      <div class="mps-pago" id="mps-caja-pago">
+        <div class="mps-pago-tit">Paga con Yape y entra al instante</div>
+        <div class="mps-pago-planes">
+          <label><input type="radio" name="mps-plan" value="mensual" checked /> Mensual <b>S/ ${YAPE.mensual}</b></label>
+          <label><input type="radio" name="mps-plan" value="anual" /> Anual <b>S/ ${YAPE.anual}</b></label>
+        </div>
+        <p class="mps-pago-paso">1. Yapea al <b>${num}</b> el monto exacto.</p>
+        <p class="mps-pago-paso">2. Escribe tu nombre como aparece en Yape y pulsa el botón.</p>
+        <input class="mps-input" id="mps-pago-nombre" placeholder="Tu nombre en Yape (ej. Juan Pérez)" autocomplete="name" />
+        <button class="mps-btn mps-btn-primario" id="mps-pago-btn" style="margin-top:8px;">Ya hice mi Yape</button>
+        <div id="mps-pago-msg"></div>
+      </div>`;
+  }
+
+  function activarCajaPago(estadoEmpresa) {
+    const caja = overlayEl && overlayEl.querySelector('#mps-caja-pago');
+    if (!caja) return;
+    let sondeo = null;
+    const msg = (t, tipo) => { caja.querySelector('#mps-pago-msg').innerHTML = t ? `<div class="${tipo === 'ok' ? 'mps-ok' : 'mps-error'}">${t}</div>` : ''; };
+    function vigilar(empresaId) {
+      if (sondeo) clearInterval(sondeo);
+      sondeo = setInterval(async () => {
+        if (!document.body.contains(caja)) { clearInterval(sondeo); return; }
+        try {
+          const est = await global.MypecarSync.empresas.obtenerEstado(empresaId);
+          if (est === 'autorizada') { clearInterval(sondeo); window.location.reload(); }
+        } catch (e) { /* se reintenta */ }
+      }, 6000);
+    }
+    caja.querySelector('#mps-pago-btn').addEventListener('click', async () => {
+      const nombre = caja.querySelector('#mps-pago-nombre').value.trim();
+      const plan = (caja.querySelector('input[name="mps-plan"]:checked') || {}).value || 'mensual';
+      if (nombre.length < 3) { msg('Escribe tu nombre como aparece en Yape.', 'er'); return; }
+      const btn = caja.querySelector('#mps-pago-btn');
+      btn.disabled = true; btn.textContent = 'Enviando…';
+      const empresaId = global.MypecarSync.empresas.activaId();
+      try {
+        const r = await global.MypecarSync.empresas.reportarPago(empresaId, plan, nombre);
+        global.MypecarSync.empresas.avisar(empresaId, 'pago_reportado');
+        if (r && r.activada && estadoEmpresa === 'autorizada') { window.location.reload(); return; }
+        msg('Listo. Apenas lleguemos a ver tu Yape, tu empresa se activa sola. No cierres esta pantalla.', 'ok');
+        btn.textContent = 'Esperando tu pago…';
+        vigilar(empresaId);
+      } catch (e) {
+        const t = String((e && e.message) || e);
+        msg(/due[nñ]o/i.test(t) ? 'Solo el dueño de la empresa puede avisar el pago.' : 'No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.', 'er');
+        btn.disabled = false; btn.textContent = 'Ya hice mi Yape';
+      }
+    });
+  }
+
   function mostrarBloqueoPorAprobacion(opciones, estadoEmpresa) {
     limpiarOverlay();
     overlayEl = document.createElement('div');
@@ -535,7 +597,7 @@
       msgWa = 'Hola, mi empresa figura suspendida en MYPECAR PLUS y quiero renovar mi licencia.';
     } else {
       titulo = '⏳ Empresa pendiente de aprobación';
-      mensaje = 'Tu empresa fue registrada correctamente, pero todavía no fue activada. Comunícate con tu proveedor del sistema (con tu RUC a la mano) para activarla — apenas la activen, vuelve a abrir esta página.';
+      mensaje = 'Tu empresa fue registrada correctamente. Para activarla, paga con Yape aquí abajo y entrarás en segundos. Si prefieres otra forma de pago, escríbenos.';
       msgWa = 'Hola, registré mi empresa en MYPECAR PLUS y quiero activarla.';
     }
 
@@ -544,6 +606,7 @@
         ${marcaHtml('Cuentas claras para tu empresa')}
         <p class="mps-titulo">${titulo}</p>
         <p class="mps-subtitulo" style="margin-bottom:0;">${mensaje}</p>
+        ${cajaPagoHtml()}
         ${contactoHtml(msgWa)}
         <p style="text-align:center;margin-top:18px;">
           <span class="mps-link" id="mps-link-otra-empresa">Elegir otra empresa</span>
@@ -552,6 +615,7 @@
         </p>
       </div>
     `;
+    activarCajaPago(estadoEmpresa);
     overlayEl.querySelector('#mps-link-otra-empresa').addEventListener('click', () => {
       renderElegirEmpresa(opciones, () => window.location.reload());
     });
@@ -593,6 +657,8 @@
   // COMPLÉTALOS: whatsapp = número con código de país y sin signos (ej. '51999999999');
   // correo = el que quieras mostrar. Si los dejas vacíos, los avisos dicen "tu proveedor".
   const CONTACTO = { whatsapp: '51996378921', correo: 'carlosfloresf2030@gmail.com' };
+  // Yape del negocio (pago automático): el cliente yapea a este número y la empresa se activa sola.
+  const YAPE = { numero: '996378921', mensual: 59, anual: 590 };
 
   function contactoHtml(mensajeWa) {
     const partes = [];
@@ -819,6 +885,7 @@
           const emp = await global.MypecarSync.empresas.crear({ ruc, razonSocial, nombreComercial });
           global.MypecarSync.empresas.seleccionar(emp.id);
           lsSet(claveNombreEmpresa(emp.id), emp.nombre_comercial || emp.razon_social || 'Empresa');
+          try { global.MypecarSync.empresas.avisar(emp.id, 'registro'); } catch (e) {}
           limpiarOverlay();
           alTerminar();
         } catch (e) {
