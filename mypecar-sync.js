@@ -2774,7 +2774,11 @@ var LZString = {
           } catch (e) { warn('enlace.sincronizar: falló al recibir', f.app, f.tipo, e && e.message); }
         }
         if (recibidos.length && typeof alTerminar === 'function') { try { await alTerminar(recibidos); } catch (e) { warn('enlace.alTerminar:', e && e.message); } }
-      } finally { enlace._ocupado = false; }
+      } finally {
+        enlace._ocupado = false;
+        enlace.ultimaRevision = new Date();
+        try { global.dispatchEvent(new CustomEvent('mypecar-enlace', { detail: { recibidos: recibidos.length, fecha: enlace.ultimaRevision } })); } catch (e) {}
+      }
       return recibidos;
     },
     // Programa la revisión automática: al abrir (a los 3 y 12 segundos), al volver a la pestaña, y cada 60 s
