@@ -1680,6 +1680,7 @@ var LZString = {
       let aplicadas = 0;
       const conflictos = [];
       (data || []).forEach(fila => {
+        if (String(fila.clave).indexOf('snap_') === 0) return; // fotos de enlace entre módulos: no se copian al equipo
         const metaKey = '_meta_' + fila.clave;
         const metaLocal = lsGet(metaKey, null);
         // Si hay un cambio local sin sincronizar (en la cola) más nuevo que lo
@@ -1717,6 +1718,7 @@ var LZString = {
     } finally {
       interceptorPausado = false;
       pullInicialHecho = true;
+      try { if (typeof enlace !== 'undefined') enlace.programar(9000); } catch (e) {}
     }
   }
 
@@ -2105,6 +2107,7 @@ var LZString = {
     }
     emitirEstadoCambio();
     await flushOutbox();
+    try { if (typeof enlace !== 'undefined') enlace.programar(); } catch (e) {}
   }
 
   // Sube a Supabase todo lo que esté en la cola. Se llama sola cada
@@ -2509,7 +2512,7 @@ var LZString = {
         .select('app, clave, valor, actualizado_en')
         .eq('empresa_id', empresaId).range(0, 9999);
       if (error) throw error;
-      return data || [];
+      return (data || []).filter(f => String(f.clave).indexOf('snap_') !== 0); // las fotos de enlace son derivadas: no entran al respaldo
     },
     resumirFilas(filas) {
       const porApp = {};
@@ -2657,6 +2660,130 @@ var LZString = {
     }
   };
 
+
+  // =========================================================================
+  // ENLACE AUTOMÁTICO ENTRE MÓDULOS (2026-11-20)
+  // =========================================================================
+  // Antes, para que Reportes, Auditoría, Inventario, Caja o el Libro Diario vieran lo registrado
+  // en Ventas, Compras, etc., había que exportar un archivo .json y subirlo a mano en el otro
+  // módulo. Ahora cada módulo que produce datos (01, 02, 03, 04, 09) publica solo, unos segundos
+  // después de cada cambio, una "foto" de esos mismos datos en la nube de SU empresa
+  // (app_config, clave "snap_<tipo>"), con el MISMO contenido que tendría el archivo exportado. Los
+  // módulos que consumen (03, 04, 07, 08, 09) leen esa foto y la pasan por la misma rutina de
+  // importación que ya usaban con el archivo, así que no cambia ninguna regla de cálculo.
+  // - La foto no se copia a localStorage (no ocupa espacio en el equipo) ni entra a los respaldos.
+  // - Respeta los permisos: si quien usa el módulo no tiene acceso al módulo de origen, la nube no
+  //   le entrega nada y todo sigue funcionando como antes (con el archivo manual).
+  // - Nunca se publica una foto vacía encima de una buena.
+  const enlace = {
+    PREFIJO: 'snap_',
+    _timer: null,
+    _ultimo: {},
+    async publicar(tipo, payload) {
+      requiereSupabase();
+      const empresaId = empresas.activaId();
+      if (!empresaId || !currentApp || !payload) return false;
+      let userId = null;
+      try { const ses = await auth.sesionActual(); userId = ses && ses.user ? ses.user.id : null; } catch (e) {}
+      const { error } = await supabaseClient.from('app_config').upsert([{
+        empresa_id: empresaId, app: currentApp, clave: enlace.PREFIJO + tipo, valor: payload,
+        actualizado_por: userId, actualizado_en: new Date().toISOString()
+      }], { onConflict: 'empresa_id,app,clave' });
+      if (error) { warn('enlace.publicar(' + tipo + '):', error.message); return false; }
+      return true;
+    },
+    // Programa la publicación (con espera, para agrupar varios cambios seguidos en uno).
+    programar(esperaMs) {
+      if (typeof global.mypecarConstruirSnapshots !== 'function') return;
+      if (!supabaseClient || !navigator.onLine) return;
+      clearTimeout(enlace._timer);
+      enlace._timer = setTimeout(enlace.publicarTodo, esperaMs || 5000);
+    },
+    async publicarTodo() {
+      try {
+        if (!empresas.activaId() || typeof global.mypecarConstruirSnapshots !== 'function') return;
+        const snaps = global.mypecarConstruirSnapshots() || {};
+        const empresaId = empresas.activaId();
+        for (const tipo of Object.keys(snaps)) {
+          const payload = snaps[tipo];
+          if (!payload) continue;
+          const copia = Object.assign({}, payload); delete copia.generadoEl;
+          const firma = empresaId + '|' + JSON.stringify(copia);
+          if (enlace._ultimo[tipo] === firma) continue; // sin cambios desde la última publicación
+          if (await enlace.publicar(tipo, payload)) enlace._ultimo[tipo] = firma;
+        }
+      } catch (e) { warn('enlace.publicarTodo:', e && e.message); }
+    },
+    // Devuelve { payload, actualizado_en } o null (sin foto, sin permiso o sin conexión).
+    async leer(app, tipo) {
+      try {
+        requiereSupabase();
+        const empresaId = empresas.activaId();
+        if (!empresaId) return null;
+        const { data, error } = await supabaseClient.from('app_config')
+          .select('valor, actualizado_en').eq('empresa_id', empresaId).eq('app', app).eq('clave', enlace.PREFIJO + tipo).maybeSingle();
+        if (error || !data || !data.valor || typeof data.valor !== 'object') return null;
+        return { payload: data.valor, actualizado_en: data.actualizado_en };
+      } catch (e) { return null; }
+    },
+    // Igual que leer(), pero entrega un File .json listo para la rutina de importación de siempre.
+    async leerComoArchivo(app, tipo, nombre) {
+      const r = await enlace.leer(app, tipo);
+      if (!r) return null;
+      const f = new File([JSON.stringify(r.payload)], nombre || (tipo + '_nube.json'), { type: 'application/json' });
+      f.actualizadoEn = r.actualizado_en;
+      f.generadoEl = r.payload.generadoEl || null;
+      return f;
+    },
+    // Solo la fecha de la última publicación (liviano: no baja los datos).
+    async fechaPublicacion(app, tipo) {
+      try {
+        requiereSupabase();
+        const empresaId = empresas.activaId();
+        if (!empresaId) return null;
+        const { data, error } = await supabaseClient.from('app_config')
+          .select('actualizado_en').eq('empresa_id', empresaId).eq('app', app).eq('clave', enlace.PREFIJO + tipo).maybeSingle();
+        return (error || !data) ? null : data.actualizado_en;
+      } catch (e) { return null; }
+    },
+    _marca(app, tipo) { return 'mypecar_enlace_' + (empresas.activaId() || 'x') + '_' + app + '_' + tipo; },
+    // Revisa cada fuente [{app, tipo}] y, si hay datos más nuevos que los ya recibidos (o si forzar=true),
+    // llama a alRecibir(app, tipo, archivo). Al final llama a alTerminar(listaDeRecibidos) solo si llegó algo.
+    async sincronizar(fuentes, alRecibir, alTerminar, forzar) {
+      if (enlace._ocupado) return [];
+      enlace._ocupado = true;
+      const recibidos = [];
+      try {
+        if (!empresas.activaId() || !navigator.onLine) return [];
+        for (const f of fuentes) {
+          const fecha = await enlace.fechaPublicacion(f.app, f.tipo);
+          if (!fecha) continue;
+          const marca = enlace._marca(f.app, f.tipo);
+          let visto = null; try { visto = localStorage.getItem(marca); } catch (e) {}
+          if (!forzar && visto === fecha) continue;
+          const archivo = await enlace.leerComoArchivo(f.app, f.tipo, (f.nombre || (f.app + '_' + f.tipo)) + '_nube.json');
+          if (!archivo) continue;
+          try {
+            await alRecibir(f.app, f.tipo, archivo);
+            try { localStorage.setItem(marca, fecha); } catch (e) {}
+            recibidos.push(f);
+          } catch (e) { warn('enlace.sincronizar: falló al recibir', f.app, f.tipo, e && e.message); }
+        }
+        if (recibidos.length && typeof alTerminar === 'function') { try { await alTerminar(recibidos); } catch (e) { warn('enlace.alTerminar:', e && e.message); } }
+      } finally { enlace._ocupado = false; }
+      return recibidos;
+    },
+    // Programa la revisión automática: al abrir (a los 3 y 12 segundos), al volver a la pestaña, y cada 60 s
+    // mientras la pestaña está a la vista. Devuelve una función para forzar la actualización a mano.
+    automatico(fuentes, alRecibir, alTerminar) {
+      const correr = () => { if (document.visibilityState === 'visible') enlace.sincronizar(fuentes, alRecibir, alTerminar, false); };
+      setTimeout(correr, 3000); setTimeout(correr, 12000);
+      setInterval(correr, 60000);
+      document.addEventListener('visibilitychange', correr);
+      return () => enlace.sincronizar(fuentes, alRecibir, alTerminar, true);
+    }
+  };
+
   global.MypecarSync = {
     init, getEstado, onEstadoCambio, appActual,
     auth, empresas,
@@ -2672,7 +2799,9 @@ var LZString = {
     // 2026-10-11
     aplicarCatalogoMaestro, mezclarCatalogoMaestroEn, catalogoMaestroAplicado: function () { return ultimoCatalogoMaestro; },
     // 2026-10-15b
-    seguridad
+    seguridad,
+    // 2026-11-20
+    enlace
   };
 
   // Se instala apenas carga este archivo (antes de que cualquier app lea o escriba): a partir

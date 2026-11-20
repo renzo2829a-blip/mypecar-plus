@@ -7891,5 +7891,30 @@
         </div>
     </div>
 <script src="mypecar-ruc-gratis.js"></script>
+
+<script>
+/* Enlace automático (2026-11-20): publica en la nube lo mismo que "Exportar Datos para Reportes" y
+   "Exportar movimientos de inventario" de Compras, para que 03, 04, 07, 08 y 09 lo reciban solos. */
+window.mypecarConstruirSnapshots = function () {
+    try {
+        if (typeof periodsData === 'undefined' || !periodsData || !Object.keys(periodsData).length) return {};
+        const pd = Object.assign({}, periodsData);
+        pd[config.periodoActivo] = Object.assign({}, pd[config.periodoActivo] || {}, { purchases: purchases });
+        const periodsDataExport = {};
+        Object.keys(pd).forEach(periodo => {
+            const datos = pd[periodo] || {};
+            periodsDataExport[periodo] = Object.assign({}, datos, { purchases: (datos.purchases || []).map(c => Object.assign({}, c, {
+                condicionPago: condicionPagoDeCompra(c), cuotas: cuotasDeCompra(c), montoNetoPendiente: c.tipoDoc === '07' ? 0 : montoNetoPendienteDeCompra(c)
+            })) });
+        });
+        const empresa = { ruc: config.ruc, razonSocial: config.razonSocial, nombreComercial: config.nombreComercial };
+        return {
+            reportes: { tipo: 'compras', version: 2, generadoEl: new Date().toISOString(), config: config, periodsData: periodsDataExport, proveedores: proveedores, customAccounts: customAccounts },
+            inventario: { tipo: 'movimientos_inventario', origen: 'compras', generadoEl: new Date().toISOString(), empresa: empresa, puntosVenta: config.puntosVenta, productos: config.productos,
+                movimientos: stockMovimientos.map(m => m.cuenta ? m : Object.assign({}, m, { cuenta: cuentaDeMovimientoInventario(m) })) }
+        };
+    } catch (e) { console.warn('Enlace: no se pudo armar la foto de Compras:', e); return {}; }
+};
+</script>
 </body>
 </html>

@@ -685,6 +685,10 @@ const MypecarPEVista = (function () {
                     En cada uno de los archivos <b>01 Registro de Ventas</b>, <b>02 Registro de Compras</b> y <b>04 Libro Diario</b>, ve a la pestaña "Ajustes" y usa el botón morado <b>"Exportar Datos para Reportes (.json)"</b>. Descárgalos los 3 (quedan en tu carpeta de Descargas) y súbelos <b>todos juntos, de una sola vez</b>, aquí abajo. Los datos de Caja y Bancos (03) no se importan por separado porque ya llegan al Libro Diario a través del asiento resumen.
                 </p>
 
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                    <div><b><i class="fa-solid fa-rotate"></i> Se actualiza solo.</b> Los datos de Ventas, Compras, Libro Diario y Caja y Bancos llegan automáticamente desde los otros módulos; no necesitas subir esos archivos. La <b>valorización de Inventario</b> se sigue subiendo a mano, porque tú eliges la fecha de corte.</div>
+                    <button type="button" onclick="actualizarDesdeLosModulos && actualizarDesdeLosModulos()" class="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white hover:bg-emerald-700">Actualizar ahora</button>
+                </div>
                 <div id="drop-zone" ondragover="event.preventDefault(); this.classList.add('bg-violet-50','border-violet-400');" ondragleave="this.classList.remove('bg-violet-50','border-violet-400');" ondrop="manejarDrop(event)"
                      class="border-2 border-dashed border-violet-300 rounded-2xl p-8 text-center transition-all cursor-pointer" onclick="document.getElementById('input-multi-archivo').click()">
                     <i class="fa-solid fa-cloud-arrow-up text-4xl text-violet-500 mb-3"></i>
@@ -4703,9 +4707,10 @@ const MypecarPEVista = (function () {
 
         // Punto de entrada único: recibe una FileList (1 a 3 archivos, sin importar el
         // orden ni cuáles son) y los procesa todos de una sola vez.
-        async function manejarSeleccionArchivos(fileList) {
+        async function manejarSeleccionArchivos(fileList, opts) {
+            const _auto = !!(opts && opts.auto); // true = llegó solo desde la nube (sin papelera, bitácora ni avisos por cada archivo)
             const archivos = Array.from(fileList || []).filter(f => f.name.endsWith('.json'));
-            if (archivos.length === 0) { showToast('Selecciona al menos un archivo .json exportado por las apps.', 'error'); return; }
+            if (archivos.length === 0) { if (_auto) return []; showToast('Selecciona al menos un archivo .json exportado por las apps.', 'error'); return; }
 
             let cargados = [], noReconocidos = [];
             for (const file of archivos) {
@@ -4717,7 +4722,7 @@ const MypecarPEVista = (function () {
                 const claveStorage = payload.tipo === 'valorizacion_inventario' ? 'inventario' : payload.tipo;
                 // Si ya había un archivo de este tipo importado, se guarda en la papelera antes de reemplazarlo.
                 const anterior = payload.tipo === 'ventas' ? ventasImport : payload.tipo === 'compras' ? comprasImport : payload.tipo === 'diario' ? diarioImport : payload.tipo === 'cajabancos' ? cajaImport : inventarioImport;
-                if (anterior) {
+                if (anterior && !_auto) {
                     papeleraImports.unshift({ tipo: claveStorage, payload: anterior, eliminadoPor: appConfig.usuarioActivo || 'Sin identificar', fecha: new Date().toISOString() });
                     if (papeleraImports.length > 20) papeleraImports = papeleraImports.slice(0, 20);
                     localStorage.setItem('reportes_papelera_imports', JSON.stringify(papeleraImports));
@@ -4729,7 +4734,7 @@ const MypecarPEVista = (function () {
                 if (payload.tipo === 'cajabancos') cajaImport = payload;
                 payload._fechaImportacionLocal = new Date().toISOString();
                 localStorage.setItem('reportes_import_' + claveStorage, JSON.stringify(payload));
-                registrarBitacora('importar', claveStorage, `Se importó el archivo de ${claveStorage} (${file.name})`);
+                if (!_auto) registrarBitacora('importar', claveStorage, `Se importó el archivo de ${claveStorage} (${file.name})`);
                 cargados.push(claveStorage);
             }
 
@@ -4738,6 +4743,7 @@ const MypecarPEVista = (function () {
             const inputInv = document.getElementById('input-importar-valorizacion-inventario');
             if (inputInv) inputInv.value = '';
 
+            if (_auto) return cargados;
             if (cargados.length > 0) {
                 const nombres = { ventas: 'Ventas', compras: 'Compras', diario: 'Libro Diario', inventario: 'Valorización de Inventario', cajabancos: 'Caja y Bancos' };
                 showToast(`Cargado${cargados.length > 1 ? 's' : ''} en un clic: ${cargados.map(t => nombres[t]).join(', ')}.${noReconocidos.length ? ' (' + noReconocidos.length + ' archivo(s) no reconocido(s))' : ''}`);
@@ -10481,5 +10487,40 @@ function renderAnalisisCuenta() {
 
 
     </script>
+
+<script>
+/* Enlace automático (2026-11-20): Ventas, Compras, Libro Diario, Caja publican sus datos en la nube y este módulo
+   los recibe solo (al abrir, al volver a la pestaña y cada minuto), sin subir archivos. El botón "Actualizar ahora" fuerza la revisión.
+   Los archivos subidos a mano siguen funcionando; solo se reemplaza un dato por otro MÁS NUEVO. */
+(function () {
+    const FUENTES = [{ app: 'ventas', tipo: 'reportes', nombre: 'ventas' }, { app: 'compras', tipo: 'reportes', nombre: 'compras' }, { app: 'diario', tipo: 'reportes', nombre: 'diario' }, { app: 'caja', tipo: 'reportes', nombre: 'cajabancos' }];
+    function importActual(app) { return ({ ventas: ventasImport, compras: comprasImport, diario: diarioImport, caja: cajaImport, inventario: inventarioImport })[app]; }
+    async function alRecibir(app, tipo, archivo) {
+        const actual = importActual(app);
+        const nuevaFecha = Date.parse(archivo.generadoEl || '') || 0;
+        const actualFecha = actual ? (Date.parse(actual.generadoEl || '') || 0) : 0;
+        if (actual && nuevaFecha && actualFecha && nuevaFecha <= actualFecha) return; // lo que ya hay es igual o más nuevo
+        const r = await manejarSeleccionArchivos([archivo], { auto: true });
+        if (!r || !r.length) throw new Error('no reconocido');
+    }
+    function alTerminar() {
+        const vis = document.querySelector('.tab-content:not(.hidden)');
+        const id = vis && vis.id ? vis.id.replace(/^tab-/, '') : null;
+        if (id && id !== 'importar' && typeof switchTab === 'function') { try { switchTab(id); } catch (e) {} }
+        if (typeof showToast === 'function') showToast('Datos actualizados desde los módulos.');
+    }
+    function iniciar() {
+        if (!window.MypecarSync || !window.MypecarSync.enlace) return setTimeout(iniciar, 1500);
+        const forzar = window.MypecarSync.enlace.automatico(FUENTES, alRecibir, alTerminar);
+        window.actualizarDesdeLosModulos = async function () {
+            const r = await window.MypecarSync.enlace.sincronizar(FUENTES, alRecibir, null, true);
+            if (typeof actualizarEstadoImportacion === 'function') actualizarEstadoImportacion();
+            if (typeof showToast === 'function') showToast(r.length ? 'Datos actualizados desde los módulos.' : 'No se encontraron datos nuevos en los módulos (o no tienes acceso a ellos).', r.length ? undefined : 'error');
+            if (r.length) alTerminar();
+        };
+    }
+    window.addEventListener('load', () => setTimeout(iniciar, 2000));
+})();
+</script>
 </body>
 </html>

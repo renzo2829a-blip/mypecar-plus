@@ -266,6 +266,11 @@
                 </p>
             </div>
 
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                <div><b><i class="fa-solid fa-rotate"></i> Se actualiza solo.</b> Los movimientos de Ventas y Compras llegan automáticamente (con Detalle de Productos). No necesitas subir archivos; siguen funcionando si los prefieres.</div>
+                <button type="button" onclick="actualizarDesdeLosModulos && actualizarDesdeLosModulos()" class="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white hover:bg-emerald-700">Actualizar ahora</button>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                     <h4 class="font-bold text-slate-800 mb-2 flex items-center gap-2"><i class="fa-solid fa-cart-shopping text-emerald-500"></i> Movimientos de Ventas (Salidas)</h4>
@@ -1572,10 +1577,10 @@
             try {
                 const text = await file.text();
                 const payload = JSON.parse(text);
-                if (payload.tipo !== 'movimientos_inventario') { showToast('El archivo no tiene el formato esperado (movimientos_inventario).', 'error'); return; }
+                if (payload.tipo !== 'movimientos_inventario') { if (event._auto) return; showToast('El archivo no tiene el formato esperado (movimientos_inventario).', 'error'); return; }
                 const origenArchivo = payload.origen === 'ventas' ? 'venta' : (payload.origen === 'compras' ? 'compra' : payload.origen);
                 if (origenArchivo !== origenEsperado) {
-                    showToast(`Este archivo es de ${payload.origen}, pero lo subiste en el casillero equivocado.`, 'error');
+                    if (!event._auto) showToast(`Este archivo es de ${payload.origen}, pero lo subiste en el casillero equivocado.`, 'error');
                     return;
                 }
 
@@ -1614,7 +1619,7 @@
                     empresa: payload.empresa ? payload.empresa.nombreComercial : ''
                 });
 
-                registrarBitacora('importacion', `Importados ${(payload.movimientos || []).length} movimientos de ${origenEsperado === 'venta' ? 'Ventas' : 'Compras'}`);
+                if (!event._auto) registrarBitacora('importacion', `Importados ${(payload.movimientos || []).length} movimientos de ${origenEsperado === 'venta' ? 'Ventas' : 'Compras'}`);
                 const gruposAsignados = inferirGruposContables();
                 if (gruposAsignados > 0) registrarBitacora('catalogo', `Grupo contable deducido de las compras para ${gruposAsignados} producto(s)`);
                 await persistAll();
@@ -1622,7 +1627,7 @@
                 renderImportar();
                 renderDashboard();
                 actualizarBadgeAlertas();
-                showToast(`Se importaron ${(payload.movimientos || []).length} movimientos de ${origenEsperado === 'venta' ? 'Ventas' : 'Compras'}.`);
+                if (!event._auto) showToast(`Se importaron ${(payload.movimientos || []).length} movimientos de ${origenEsperado === 'venta' ? 'Ventas' : 'Compras'}.`);
             } catch (e) {
                 showToast('No se pudo leer el archivo. Verifica que sea un JSON válido exportado desde Ventas o Compras.', 'error');
             } finally {
@@ -2721,5 +2726,26 @@
         // ==================================================================
         window.addEventListener('DOMContentLoaded', inicializarApp);
     </script>
+
+<script>
+/* Enlace automático (2026-11-20): los movimientos de Ventas y Compras llegan solos desde la nube
+   (el mismo contenido que los archivos "Movimientos_Inventario_*.json"; reemplazan los anteriores del mismo origen, no se duplican). */
+(function () {
+    const FUENTES = [{ app: 'ventas', tipo: 'inventario', nombre: 'movimientos_ventas' }, { app: 'compras', tipo: 'inventario', nombre: 'movimientos_compras' }];
+    async function alRecibir(app, tipo, archivo) {
+        await handleImportFile({ target: { files: [archivo], value: '' }, _auto: true }, app === 'ventas' ? 'venta' : 'compra');
+    }
+    function alTerminar() { if (typeof showToast === 'function') showToast('Movimientos de inventario actualizados desde Ventas/Compras.'); }
+    function iniciar() {
+        if (!window.MypecarSync || !window.MypecarSync.enlace) return setTimeout(iniciar, 1500);
+        window.MypecarSync.enlace.automatico(FUENTES, alRecibir, alTerminar);
+        window.actualizarDesdeLosModulos = async function () {
+            const r = await window.MypecarSync.enlace.sincronizar(FUENTES, alRecibir, null, true);
+            if (typeof showToast === 'function') showToast(r.length ? 'Movimientos actualizados desde Ventas/Compras.' : 'No se encontraron datos en Ventas/Compras (o no tienes acceso a esos módulos).', r.length ? undefined : 'error');
+        };
+    }
+    window.addEventListener('load', () => setTimeout(iniciar, 2000));
+})();
+</script>
 </body>
 </html>
