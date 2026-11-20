@@ -59,7 +59,6 @@
                 <div>
                     <h1 class="text-xl md:text-2xl font-black tracking-tight flex items-center gap-2">
                         CONTROL DE INVENTARIO
-                        <span class="text-xs bg-yellow-400 text-red-950 font-bold px-2 py-0.5 rounded-full">09 INVENTARIO</span>
                     </h1>
                     <p class="text-xs text-orange-100 flex items-center gap-1 font-medium">
                         <i class="fa-solid fa-boxes-stacked text-[10px]"></i> Stock, Kardex y Valorización — <span id="nav-empresa-name-sub">Sin datos de empresa</span>
@@ -129,8 +128,7 @@
             <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex items-start gap-3">
                 <i class="fa-solid fa-circle-info text-indigo-500 mt-0.5"></i>
                 <p class="text-xs text-indigo-800">
-                    <b>Cómo funciona:</b> este panel se alimenta de los archivos <b>Movimientos de Inventario</b> exportados desde <b>01 Ventas</b> (salidas) y <b>02 Compras</b> (entradas). Impórtalos en la pestaña <b>Importar</b>. El stock y la valorización se calculan aquí mismo con el método elegido en <b>Ajustes</b>.
-                </p>
+                    <b>Cómo funciona:</b> este panel se alimenta solo de los movimientos de <b>01 Ventas</b> (salidas) y <b>02 Compras</b> (entradas). El stock y la valorización se calculan aquí con el método elegido en <b>Ajustes</b>. Subir archivos en la pestaña Importar es opcional.</p>
             </div>
 
             <div class="flex flex-wrap justify-end gap-2 no-print">
@@ -268,7 +266,6 @@
 
             <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                 <div><b><i class="fa-solid fa-rotate"></i> Se actualiza solo.</b> Los movimientos de Ventas y Compras llegan automáticamente (con Detalle de Productos). No necesitas subir archivos; siguen funcionando si los prefieres.</div>
-                <button type="button" onclick="actualizarDesdeLosModulos && actualizarDesdeLosModulos()" class="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white hover:bg-emerald-700">Actualizar ahora</button>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

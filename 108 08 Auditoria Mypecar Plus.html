@@ -547,13 +547,10 @@ const MypecarPEVista = (function () {
         <section id="tab-importar" class="tab-content space-y-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 mb-2"><i class="fa-solid fa-file-import text-slate-700"></i> Importar Datos para Auditar</h3>
-                <p class="text-xs text-slate-500 mb-6">
-                    En cada uno de los archivos <b>01 Registro de Ventas</b>, <b>02 Registro de Compras</b> y <b>04 Libro Diario</b>, ve a la pestaña "Ajustes" y usa el botón morado <b>"Exportar Datos para Reportes (.json)"</b>. Descárgalos los 3 y súbelos <b>todos juntos, de una sola vez</b>, aquí abajo. Cuantos más archivos cargues, más completos son los procedimientos de auditoría (Ventas y Compras dan acceso al detalle transaccional; el Libro Diario es indispensable para todos los procedimientos). La <b>Valorización de Inventario de 09</b> (Cierre Contable → Exportar para Contabilidad) es opcional y habilita el Procedimiento 8 (Control de Inventario y Mermas).
-                </p>
+                <p class="text-xs text-slate-500 mb-4">Los datos de <b>Ventas, Compras y Libro Diario</b> llegan solos desde cada módulo (cuantos más haya, más completos son los procedimientos: el Libro Diario es indispensable para todos). Si no llegan, puedes subir los archivos <b>.json</b> exportados. La <b>Valorización de Inventario de 09</b> (Cierre Contable → Exportar para Contabilidad) es opcional y habilita el Procedimiento 8; se sube a mano.</p>
 
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                     <div><b><i class="fa-solid fa-rotate"></i> Se actualiza solo.</b> Los datos de Ventas, Compras, Libro Diario llegan automáticamente desde los otros módulos; no necesitas subir esos archivos. La <b>valorización de Inventario</b> se sigue subiendo a mano, porque tú eliges la fecha de corte.</div>
-                    <button type="button" onclick="actualizarDesdeLosModulos && actualizarDesdeLosModulos()" class="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white hover:bg-emerald-700">Actualizar ahora</button>
                 </div>
                 <div id="drop-zone" ondragover="event.preventDefault(); this.classList.add('bg-slate-50','border-slate-500');" ondragleave="this.classList.remove('bg-slate-50','border-slate-500');" ondrop="manejarDrop(event)"
                      class="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center transition-all cursor-pointer" onclick="document.getElementById('input-multi-archivo').click()">
