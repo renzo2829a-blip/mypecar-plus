@@ -188,11 +188,27 @@
         font-weight:700; color:#0f172a; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:62vw; }
       .mps-badge:hover { background:#f0fdfa; }
       @media print { .mps-barra { display:none !important; } }
-      .mps-badge-menu { position:fixed; top:40px; right:12px; z-index:99998; background:#fff;
-        border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.15);
-        font-family: 'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; overflow:hidden; min-width:170px; }
-      .mps-badge-menu div { padding:10px 14px; font-size:13px; color:#0f172a; cursor:pointer; }
-      .mps-badge-menu div:hover { background:#f1f5f9; }
+      .mps-pestana { display:inline-flex; align-items:center; gap:6px; flex:none; white-space:nowrap; cursor:pointer;
+        padding:6px 14px; border-radius:8px; font-size:14px; font-weight:600; line-height:1.4; color:#fff !important;
+        background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.32); text-decoration:none !important;
+        font-family:inherit; margin-left:4px; }
+      .mps-pestana:hover { background:rgba(255,255,255,.26); }
+      @media print { .mps-pestana { display:none !important; } }
+      .mps-selector { cursor:pointer; }
+      .mps-selector::after { content:" ▾"; opacity:.85; }
+      .mps-selector:hover { filter:brightness(1.15); }
+      .mps-badge-menu { position:fixed; top:40px; right:12px; z-index:99998; background:#fff; color:#0f172a;
+        border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.22);
+        font-family:'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; overflow:auto; min-width:230px; max-width:min(340px,92vw); max-height:70vh; }
+      .mps-menu-titulo { padding:9px 14px 4px; font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#64748b; }
+      .mps-menu-emp { padding:8px 14px; cursor:pointer; font-size:13.5px; font-weight:700; line-height:1.25; }
+      .mps-menu-emp small { display:block; font-weight:500; font-size:11.5px; color:#64748b; }
+      .mps-menu-emp.activa { background:#f0fdfa; color:#0f766e; }
+      .mps-menu-emp:hover { background:#f1f5f9; }
+      .mps-menu-sep { border:0; border-top:1px solid #e2e8f0; margin:4px 0; }
+      .mps-menu-item, .mps-menu-carga { padding:9px 14px; font-size:13px; cursor:pointer; }
+      .mps-menu-carga { color:#64748b; cursor:default; }
+      .mps-menu-item:hover { background:#f1f5f9; }
       .mps-aviso-local { position:fixed; bottom:10px; left:10px; z-index:99998; background:#fffbeb;
         border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:7px 11px; font-size:12px;
         font-family: 'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
@@ -705,69 +721,131 @@
 
   function montarBadge(opciones) {
     mostrarAvisoLicencia();
-    const existente = document.getElementById('mps-badge');
-    if (existente) existente.parentNode.removeChild(existente);
+    // Limpia lo que haya de una llamada anterior.
+    ['mps-barra', 'mps-badge', 'mps-badge-menu'].forEach(id => {
+      const e = document.getElementById(id); if (e && e.parentNode) e.parentNode.removeChild(e);
+    });
+    document.querySelectorAll('[data-mps-extra]').forEach(e => e.parentNode && e.parentNode.removeChild(e));
     const empresaIdActiva = global.MypecarSync.empresas.activaId();
     const nombre = lsGet(claveNombreEmpresa(empresaIdActiva), null) || 'Empresa activa';
+
+    // Dónde poner "← Módulos": en la barra de pestañas del encabezado, junto a "Ajustes".
+    const ajustes = document.getElementById('btn-tab-settings');
+    const navEl = ajustes ? ajustes.parentElement : document.querySelector('header nav');
+    // Dónde cambiar de empresa: el recuadro "Sede contable" del encabezado.
+    const nameEl = document.getElementById('nav-empresa-name');
+
+    if (!navEl && !nameEl) { montarBarraRespaldo(opciones, nombre); return; }
+
+    if (navEl) {
+      const volver = document.createElement('a');
+      volver.id = 'mps-volver';
+      volver.setAttribute('data-mps-extra', '1');
+      volver.href = 'modulos.html';
+      volver.className = 'mps-pestana';
+      volver.innerHTML = '<span aria-hidden="true">←</span> Módulos';
+      volver.setAttribute('aria-label', 'Volver a la pantalla de módulos');
+      navEl.appendChild(volver);
+    }
+
+    if (nameEl) {
+      // El recuadro "Sede contable" se vuelve el selector de empresa.
+      const box = (nameEl.parentElement && /sede contable/i.test(nameEl.parentElement.textContent)) ? nameEl.parentElement : nameEl;
+      box.classList.add('mps-selector');
+      box.title = 'Cambiar de empresa';
+      box.setAttribute('role', 'button');
+      box.tabIndex = 0;
+      box.addEventListener('click', () => toggleMenu(opciones, box));
+      box.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleMenu(opciones, box); } });
+    } else if (navEl) {
+      // Módulos sin recuadro de empresa (Reportes, Auditoría): una pestaña con la empresa.
+      const chip = document.createElement('button');
+      chip.id = 'mps-badge';
+      chip.type = 'button';
+      chip.setAttribute('data-mps-extra', '1');
+      chip.className = 'mps-pestana';
+      chip.textContent = '🏢 ' + nombre + ' ▾';
+      chip.title = 'Cambiar de empresa, gestionar accesos o cerrar sesión';
+      chip.addEventListener('click', () => toggleMenu(opciones, chip));
+      navEl.appendChild(chip);
+    }
+  }
+
+  // Respaldo: si un módulo no tuviera encabezado reconocible, se usa una barra delgada arriba.
+  function montarBarraRespaldo(opciones, nombre) {
+    const barra = document.createElement('div');
+    barra.id = 'mps-barra';
+    barra.className = 'mps-barra';
+    const volver = document.createElement('a');
+    volver.id = 'mps-volver';
+    volver.className = 'mps-volver';
+    volver.href = 'modulos.html';
+    volver.textContent = '← Módulos';
+    barra.appendChild(volver);
     const badge = document.createElement('div');
     badge.id = 'mps-badge';
     badge.className = 'mps-badge';
     badge.textContent = '🏢 ' + nombre + ' ▾';
-    badge.title = 'Cambiar de empresa, gestionar accesos o cerrar sesión';
-    badge.addEventListener('click', () => toggleMenu(opciones));
-    // Barra delgada arriba (en el flujo normal de la página, no tapa nada):
-    // a la izquierda "← Módulos", a la derecha la empresa activa (menú para
-    // cambiar de empresa, gestionar accesos y cerrar sesión).
-    let barra = document.getElementById('mps-barra');
-    if (!barra) {
-      barra = document.createElement('div');
-      barra.id = 'mps-barra';
-      barra.className = 'mps-barra';
-      const volver = document.createElement('a');
-      volver.id = 'mps-volver';
-      volver.className = 'mps-volver';
-      volver.href = 'modulos.html';
-      volver.textContent = '← Módulos';
-      volver.setAttribute('aria-label', 'Volver a la pantalla de módulos');
-      barra.appendChild(volver);
-      document.body.insertBefore(barra, document.body.firstChild);
-    }
+    badge.addEventListener('click', () => toggleMenu(opciones, badge));
     barra.appendChild(badge);
+    document.body.insertBefore(barra, document.body.firstChild);
   }
 
-  async function toggleMenu(opciones) {
+  // Menú de empresa: lista de tus empresas (nombre comercial) para cambiar,
+  // y más abajo "Gestionar accesos" (solo dueño) y "Cerrar sesión".
+  async function toggleMenu(opciones, ancla) {
     const existente = document.getElementById('mps-badge-menu');
     if (existente) { existente.parentNode.removeChild(existente); return; }
     const menu = document.createElement('div');
     menu.id = 'mps-badge-menu';
     menu.className = 'mps-badge-menu';
-    const empresaId = global.MypecarSync.empresas.activaId();
-    // "Gestionar accesos" solo se ofrece al dueño (Contador Jefe) — para
-    // cualquier otro usuario, ni siquiera aparece la opción en el menú.
-    let esOwner = false;
-    try { esOwner = await global.MypecarSync.empresas.esOwner(empresaId); } catch (e) {}
-    menu.innerHTML = `
-      ${esOwner ? '<div id="mps-menu-accesos">Gestionar accesos</div>' : ''}
-      <div id="mps-menu-cambiar">Cambiar de empresa</div>
-      <div id="mps-menu-salir">Cerrar sesión</div>
-    `;
-    document.body.appendChild(menu);
-    if (esOwner) {
-      menu.querySelector('#mps-menu-accesos').addEventListener('click', () => {
-        menu.parentNode.removeChild(menu);
-        renderGestionarAccesos(opciones, empresaId);
-      });
+    const r = ancla ? ancla.getBoundingClientRect() : null;
+    if (r) {
+      menu.style.top = Math.round(r.bottom + 6) + 'px';
+      menu.style.bottom = 'auto';
+      const derecha = Math.max(8, Math.round(window.innerWidth - r.right));
+      menu.style.right = derecha + 'px';
     }
-    menu.querySelector('#mps-menu-cambiar').addEventListener('click', () => {
+    menu.innerHTML = '<div class="mps-menu-carga">Cargando…</div>';
+    document.body.appendChild(menu);
+
+    const empresaId = global.MypecarSync.empresas.activaId();
+    let esOwner = false, lista = [];
+    try { esOwner = await global.MypecarSync.empresas.esOwner(empresaId); } catch (e) {}
+    try { lista = (await global.MypecarSync.empresas.listarMias()) || []; } catch (e) {}
+    if (!menu.parentNode) return; // se cerró mientras cargaba
+
+    const nombreDe = emp => emp.nombre_comercial || emp.razon_social || 'Empresa';
+    const filas = lista.map(emp => `
+      <div class="mps-menu-emp${emp.id === empresaId ? ' activa' : ''}" data-emp="${escapeHtml(emp.id)}">
+        <span>${emp.id === empresaId ? '✓ ' : ''}${escapeHtml(nombreDe(emp))}</span>
+        <small>RUC ${escapeHtml(emp.ruc || '-')}</small>
+      </div>`).join('');
+    menu.innerHTML = `
+      ${lista.length ? '<div class="mps-menu-titulo">Cambiar de empresa</div>' + filas + '<hr class="mps-menu-sep">' : ''}
+      ${esOwner ? '<div id="mps-menu-accesos" class="mps-menu-item">Gestionar accesos</div>' : ''}
+      <div id="mps-menu-nueva" class="mps-menu-item">+ Registrar otra empresa</div>
+      <div id="mps-menu-salir" class="mps-menu-item">Cerrar sesión</div>
+    `;
+
+    menu.querySelectorAll('.mps-menu-emp').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = el.getAttribute('data-emp');
+        if (id === empresaId) { menu.parentNode && menu.parentNode.removeChild(menu); return; }
+        const emp = lista.find(x => x.id === id);
+        try { global.MypecarSync.empresas.seleccionar(id); } catch (e) { return; }
+        if (emp) lsSet(claveNombreEmpresa(id), nombreDe(emp));
+        // Recarga para que todo el módulo quede con los datos de la empresa elegida.
+        location.reload();
+      });
+    });
+    const acc = menu.querySelector('#mps-menu-accesos');
+    if (acc) acc.addEventListener('click', () => {
       menu.parentNode.removeChild(menu);
-      // Arreglo (2026-09-24): antes, al terminar de elegir la nueva empresa,
-      // solo se actualizaba el texto del globito (montarBadge) — el resto de
-      // la app (encabezado, Ajustes, todas las cifras) se quedaba pintado con
-      // los datos de la empresa anterior hasta que el usuario recargaba la
-      // página a mano. Los otros 2 caminos para cambiar de empresa (cuando el
-      // sistema bloquea el acceso) sí recargan solos; este se había quedado
-      // sin ese recargo automático. Ahora recarga igual que los demás, así
-      // todo queda consistente con la empresa recién elegida de una sola vez.
+      renderGestionarAccesos(opciones, empresaId);
+    });
+    menu.querySelector('#mps-menu-nueva').addEventListener('click', () => {
+      menu.parentNode.removeChild(menu);
       mostrarFlujoCompleto(opciones, () => location.reload());
     });
     menu.querySelector('#mps-menu-salir').addEventListener('click', async () => {
@@ -777,12 +855,15 @@
       location.reload();
     });
     setTimeout(() => {
-      document.addEventListener('click', function cerrar(ev) {
-        if (!menu.contains(ev.target) && ev.target.id !== 'mps-badge') {
-          if (menu.parentNode) menu.parentNode.removeChild(menu);
-          document.removeEventListener('click', cerrar);
-        }
-      });
+      function cerrar(ev) {
+        if (ev.type === 'keydown' && ev.key !== 'Escape') return;
+        if (ev.type === 'click' && (menu.contains(ev.target) || (ancla && ancla.contains(ev.target)))) return;
+        if (menu.parentNode) menu.parentNode.removeChild(menu);
+        document.removeEventListener('click', cerrar);
+        document.removeEventListener('keydown', cerrar);
+      }
+      document.addEventListener('click', cerrar);
+      document.addEventListener('keydown', cerrar);
     }, 0);
   }
 
