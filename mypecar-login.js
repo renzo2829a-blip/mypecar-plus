@@ -68,6 +68,19 @@
         'header .px-3.py-1\\.5{padding:3px 10px !important}',
         'header .px-3.py-1\\.5 p:first-child{font-size:9px !important}',
         'header .px-3.py-1\\.5 p:last-child{font-size:12px !important}',
+        'header > div:first-child{padding-top:12px !important;padding-bottom:10px !important}',
+        'header .mps-derecha{display:flex !important;align-items:center !important;justify-content:flex-end !important;flex-wrap:wrap !important;gap:8px !important}',
+        'header .px-3.py-1\\.5,header .mps-chip{box-sizing:border-box !important;height:44px !important;min-width:112px !important;padding:4px 12px !important;border-radius:10px !important;display:flex !important;flex-direction:column !important;justify-content:center !important;align-items:flex-end !important;flex:0 0 auto !important;position:relative !important;background:rgba(0,0,0,.28) !important;border:1px solid rgba(255,255,255,.32) !important;text-align:right !important}',
+        'header .px-3.py-1\\.5 > p:first-child,header .mps-chip > small{font-size:9px !important;line-height:1.1 !important;margin:0 !important;font-weight:700 !important;text-transform:uppercase !important;letter-spacing:.3px !important;opacity:.85;display:block}',
+        'header .px-3.py-1\\.5 > p:last-child,header .px-3.py-1\\.5 > select,header .mps-chip > b{font-size:12.5px !important;line-height:1.25 !important;margin:0 !important;font-weight:700 !important;white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important;max-width:230px !important;display:block}',
+        'header .px-3.py-1\\.5 > select{padding:0 !important;height:auto !important;border:0 !important;background:transparent !important;text-align:right !important;direction:rtl}',
+        'header .px-3.py-1\\.5.mps-caja-sel,header .mps-chip.mps-caja-sel{padding-right:28px !important;cursor:pointer}',
+        'header .mps-caja-sel::after{content:"▾";position:absolute;right:10px;top:50%;transform:translateY(-50%);opacity:.9;font-size:12px}',
+        'header .mps-caja-sel:hover{background:rgba(255,255,255,.16) !important}',
+        'header select#periodo-selector{box-sizing:border-box !important;height:44px !important;min-width:112px !important;padding:0 12px !important;border-radius:10px !important;background:rgba(0,0,0,.28) !important;border:1px solid rgba(255,255,255,.32) !important;color:#fff !important;font-size:12.5px !important;font-weight:700 !important}',
+        'header h1 ~ p{font-size:12px !important;line-height:1.3 !important;margin-top:2px !important}',
+        'header h1 ~ img{display:none !important}',
+        'header h1 ~ p img{height:20px !important;width:auto !important;margin-right:6px !important}',
         'header nav, header .mpm-tabs{display:flex !important;flex-wrap:wrap !important;overflow:visible !important;gap:2px !important;margin-top:6px !important;padding-top:4px !important;padding-bottom:4px !important}',
         'header nav > *, header .mpm-tabs > *{flex:0 0 auto !important;white-space:nowrap !important;font-size:13px !important;padding:5px 9px !important;line-height:1.3 !important;border-radius:8px !important;margin-left:0 !important}',
         'main{padding-top:14px !important;padding-bottom:18px !important}',
@@ -347,7 +360,7 @@
       .mps-pago-planes label { display:flex; align-items:center; gap:5px; cursor:pointer; }
       .mps-pago-paso { font-size:12.5px; color:#334155; margin:2px 0; }
       .mps-selector { cursor:pointer; }
-      .mps-selector::after { content:" ▾"; opacity:.85; }
+      .mps-selector:not(.mps-caja-sel)::after { content:" ▾"; opacity:.85; }
       .mps-selector:hover { filter:brightness(1.15); }
       .mps-badge-menu { position:fixed; top:40px; right:12px; z-index:99998; background:#fff; color:#0f172a;
         border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.22);
@@ -968,17 +981,57 @@
       navEl.appendChild(volver);
     }
 
-    if (nameEl) {
+    // Contenedor de la derecha del encabezado (donde viven los recuadros).
+    const sync = document.getElementById('sync-status-cont');
+    const hayCajaSede = !!(nameEl && nameEl.parentElement && /sede contable/i.test(nameEl.parentElement.textContent));
+    let derecha = hayCajaSede ? nameEl.parentElement.parentElement :
+      ((sync && sync.parentElement) ||
+       (document.getElementById('badge-ventas') && document.getElementById('badge-ventas').parentElement) || null);
+    const h1 = document.querySelector('header h1');
+    if (!derecha && h1) {
+      const fila = h1.closest('.justify-between') || (h1.parentElement && h1.parentElement.parentElement && h1.parentElement.parentElement.parentElement);
+      if (fila) { derecha = document.createElement('div'); derecha.setAttribute('data-mps-extra', '1'); fila.appendChild(derecha); }
+    }
+    if (derecha) derecha.classList.add('mps-derecha');
+
+    if (hayCajaSede) {
       // El recuadro "Sede contable" se vuelve el selector de empresa.
-      const box = (nameEl.parentElement && /sede contable/i.test(nameEl.parentElement.textContent)) ? nameEl.parentElement : nameEl;
-      box.classList.add('mps-selector');
+      const box = nameEl.parentElement;
+      box.classList.add('mps-selector', 'mps-caja-sel');
       box.title = 'Cambiar de empresa';
       box.setAttribute('role', 'button');
       box.tabIndex = 0;
       box.addEventListener('click', () => toggleMenu(opciones, box));
       box.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleMenu(opciones, box); } });
+    } else if (derecha) {
+      // Módulos sin recuadro de empresa (Personal, Activos, Reportes, Auditoría): se crean
+      // los mismos recuadros que tienen los demás (Sede contable ▾ y RUC), con el mismo tamaño.
+      const sede = document.createElement('div');
+      sede.className = 'mps-chip mps-caja-sel mps-selector';
+      sede.setAttribute('data-mps-extra', '1');
+      sede.title = 'Cambiar de empresa';
+      sede.innerHTML = '<small>Sede contable</small><b></b>';
+      sede.querySelector('b').textContent = nombre;
+      const ruc = document.createElement('div');
+      ruc.className = 'mps-chip';
+      ruc.setAttribute('data-mps-extra', '1');
+      ruc.innerHTML = '<small>RUC SUNAT</small><b>-</b>';
+      derecha.insertBefore(ruc, derecha.firstChild);
+      derecha.insertBefore(sede, derecha.firstChild);
+      sede.addEventListener('click', () => toggleMenu(opciones, sede));
+      try {
+        Promise.resolve(global.MypecarSync.empresas.listarMias()).then(l => {
+          const emp = (l || []).find(x => x.id === empresaIdActiva);
+          if (emp && emp.ruc) ruc.querySelector('b').textContent = emp.ruc;
+        }).catch(() => {});
+      } catch (e) {}
+      // El nombre de la empresa en el subtítulo ya no hace falta (evita repetirlo).
+      ['nav-empresa-name', 'header-empresa'].forEach(id => {
+        const el = document.getElementById(id); const p = el && el.closest('p');
+        if (p && p.parentElement && p.parentElement.querySelector('h1')) p.style.display = 'none';
+      });
     } else if (navEl) {
-      // Módulos sin recuadro de empresa (Reportes, Auditoría): una pestaña con la empresa.
+      // Último recurso: una pestaña con la empresa al final de las pestañas.
       const chip = document.createElement('button');
       chip.id = 'mps-badge';
       chip.type = 'button';
