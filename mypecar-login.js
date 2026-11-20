@@ -176,16 +176,18 @@
         .mps-input { font-size:16px; }
       }
       .mps-pie { text-align:center; margin-top:12px; font-size:12px; color:#94a3b8; line-height:1.4; }
-      .mps-badge { position:fixed; bottom:10px; right:10px; z-index:99998; background:#fff;
-        border:1px solid #e2e8f0; border-radius:999px; padding:6px 12px; font-size:12.5px;
-        font-weight:600; color:#0f172a; box-shadow:0 2px 8px rgba(0,0,0,.08); cursor:pointer;
-        font-family: 'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
-      .mps-volver { position:fixed; bottom:10px; left:10px; z-index:99998; background:#0b5d52; color:#fff;
-        border-radius:999px; padding:8px 14px; font-size:12.5px; font-weight:700; text-decoration:none;
-        box-shadow:0 4px 14px rgba(0,0,0,.25); font-family:'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
-      .mps-volver:hover { filter:brightness(1.12); }
-      @media print { .mps-volver, .mps-badge { display:none !important; } }
-      .mps-badge-menu { position:fixed; bottom:44px; right:10px; z-index:99998; background:#fff;
+      .mps-barra { display:flex; align-items:center; justify-content:space-between; gap:10px; flex:none; width:100%;
+        box-sizing:border-box; background:#04231f; padding:5px 14px; min-height:36px;
+        font-family:'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
+      .mps-volver { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.12); color:#fff;
+        border:1px solid rgba(255,255,255,.28); border-radius:999px; padding:5px 13px; font-size:12.5px; font-weight:700;
+        text-decoration:none; white-space:nowrap; }
+      .mps-volver:hover { background:rgba(255,255,255,.22); }
+      .mps-badge { background:#fff; border:1px solid #e2e8f0; border-radius:999px; padding:5px 13px; font-size:12.5px;
+        font-weight:700; color:#0f172a; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:62vw; }
+      .mps-badge:hover { background:#f0fdfa; }
+      @media print { .mps-barra { display:none !important; } }
+      .mps-badge-menu { position:fixed; top:40px; right:12px; z-index:99998; background:#fff;
         border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.15);
         font-family: 'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; overflow:hidden; min-width:170px; }
       .mps-badge-menu div { padding:10px 14px; font-size:13px; color:#0f172a; cursor:pointer; }
@@ -710,18 +712,26 @@
     badge.id = 'mps-badge';
     badge.className = 'mps-badge';
     badge.textContent = '🏢 ' + nombre + ' ▾';
-    document.body.appendChild(badge);
+    badge.title = 'Cambiar de empresa, gestionar accesos o cerrar sesión';
     badge.addEventListener('click', () => toggleMenu(opciones));
-    // Botón para volver a la pantalla de módulos (solo en los módulos).
-    if (!document.getElementById('mps-volver')) {
+    // Barra delgada arriba (en el flujo normal de la página, no tapa nada):
+    // a la izquierda "← Módulos", a la derecha la empresa activa (menú para
+    // cambiar de empresa, gestionar accesos y cerrar sesión).
+    let barra = document.getElementById('mps-barra');
+    if (!barra) {
+      barra = document.createElement('div');
+      barra.id = 'mps-barra';
+      barra.className = 'mps-barra';
       const volver = document.createElement('a');
       volver.id = 'mps-volver';
       volver.className = 'mps-volver';
       volver.href = 'modulos.html';
       volver.textContent = '← Módulos';
       volver.setAttribute('aria-label', 'Volver a la pantalla de módulos');
-      document.body.appendChild(volver);
+      barra.appendChild(volver);
+      document.body.insertBefore(barra, document.body.firstChild);
     }
+    barra.appendChild(badge);
   }
 
   async function toggleMenu(opciones) {
