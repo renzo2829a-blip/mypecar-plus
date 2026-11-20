@@ -6074,5 +6074,22 @@
         </div>
     </div>
 <script src="mypecar-ruc-gratis.js"></script>
+
+<script>
+/* Enlace automático (2026-11-20): publica en la nube la misma información que "Exportar Datos para Reportes"
+   y "Exportar movimientos de inventario", para que 07, 08 y 09 la reciban solos (sin archivos). */
+window.mypecarConstruirSnapshots = function () {
+    try {
+        if (typeof periodsData === 'undefined' || !periodsData || !Object.keys(periodsData).length) return {};
+        const pd = Object.assign({}, periodsData);
+        pd[config.periodoActivo] = Object.assign({}, pd[config.periodoActivo] || {}, { sales: sales });
+        const empresa = { ruc: config.ruc, razonSocial: config.razonSocial, nombreComercial: config.nombreComercial };
+        return {
+            reportes: { tipo: 'ventas', generadoEl: new Date().toISOString(), config: config, periodsData: pd, clientes: clientes, customAccounts: customAccounts },
+            inventario: { tipo: 'movimientos_inventario', origen: 'ventas', generadoEl: new Date().toISOString(), empresa: empresa, puntosVenta: config.puntosVenta, productos: config.productos, movimientos: stockMovimientos }
+        };
+    } catch (e) { console.warn('Enlace: no se pudo armar la foto de Ventas:', e); return {}; }
+};
+</script>
 </body>
 </html>

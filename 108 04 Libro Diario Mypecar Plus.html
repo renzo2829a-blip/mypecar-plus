@@ -2407,6 +2407,7 @@ const MypecarPEVista = (function () {
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-2xl mx-auto">
                 <h4 class="font-bold text-slate-800 flex items-center gap-2 mb-2"><i class="fa-solid fa-file-invoice text-amber-600"></i> Verificación de Facturas Provisionadas</h4>
                 <p class="text-xs text-slate-500 mb-3">Al pagar una factura (cargar a la cuenta 421), el sistema verifica que esa factura exacta (Serie + Número + RUC del proveedor) ya haya sido registrada como compra pendiente en <b>02 Registro de Compras</b> — si no la encuentra, te avisa antes de guardar (sin bloquear el registro). Para esto, importa aquí el mismo archivo que exportas desde Compras para Reportes.</p>
+                <p class="text-[11px] text-emerald-700 mb-2"><i class="fa-solid fa-rotate"></i> Se actualiza solo desde Compras (no necesitas subir el archivo).</p>
                 <div id="facturas-provisionadas-estado" class="text-xs mb-3"></div>
                 <label class="inline-block bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg cursor-pointer transition-all">
                     <i class="fa-solid fa-file-import mr-1"></i> Importar Datos_Reportes_Compras.json
@@ -5111,12 +5112,12 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 reader.readAsText(file);
             });
         }
-        async function importarFacturasProvisionadas(fileList) {
+        async function importarFacturasProvisionadas(fileList, auto) {
             const file = fileList && fileList[0];
             if (!file) return;
             const payload = await leerArchivoJSON(file);
             if (!payload || payload.tipo !== 'compras' || !payload.periodsData) {
-                showToast('Ese archivo no parece ser un "Datos_Reportes_Compras.json" válido.', 'error');
+                if (!auto) showToast('Ese archivo no parece ser un "Datos_Reportes_Compras.json" válido.', 'error');
                 return;
             }
             let plano = [];
@@ -5125,7 +5126,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             facturasProvisionadasInfo = { generadoEl: payload.generadoEl, cantidad: plano.length };
             await persistAll();
             renderEstadoFacturasProvisionadas();
-            showToast(`${plano.length} factura(s) de compras importadas para verificación.`);
+            if (!auto) showToast(`${plano.length} factura(s) de compras importadas para verificación.`);
         }
         function renderEstadoFacturasProvisionadas() {
             const el = document.getElementById('facturas-provisionadas-estado');
@@ -9673,5 +9674,32 @@ function mensajeCuentaNoImputable(codigo, origen) {
         </div>
     </div>
 
+
+<script>
+/* Enlace automático (2026-11-20): publica en la nube lo mismo que "Exportar Datos para Reportes" del Libro Diario. */
+window.mypecarConstruirSnapshots = function () {
+    try {
+        if (typeof periodsData === 'undefined' || !periodsData || !Object.keys(periodsData).length) return {};
+        const pd = Object.assign({}, periodsData);
+        pd[config.periodoActivo] = Object.assign({}, pd[config.periodoActivo] || {}, { asientos: asientos });
+        return { reportes: { tipo: 'diario', generadoEl: new Date().toISOString(), config: config, periodsData: pd, customAccounts: customAccounts, pcgeCatalog: pcgeCatalog, existenciasPorPeriodo: existenciasPorPeriodo } };
+    } catch (e) { console.warn('Enlace: no se pudo armar la foto del Libro Diario:', e); return {}; }
+};
+</script>
+
+<script>
+/* Enlace automático (2026-11-20): las facturas de Compras llegan solas desde la nube (sirven para verificar
+   las facturas provisionadas; el mismo contenido que "Datos_Reportes_Compras.json"). */
+(function () {
+    const FUENTES = [{ app: 'compras', tipo: 'reportes', nombre: 'compras' }];
+    async function alRecibir(app, tipo, archivo) { await importarFacturasProvisionadas([archivo], true); }
+    function iniciar() {
+        if (!window.MypecarSync || !window.MypecarSync.enlace) return setTimeout(iniciar, 1500);
+        window.MypecarSync.enlace.automatico(FUENTES, alRecibir, null);
+    }
+    window.addEventListener('load', () => setTimeout(iniciar, 2000));
+
+})();
+</script>
 </body>
 </html>
