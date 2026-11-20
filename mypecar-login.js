@@ -99,8 +99,7 @@
       eu.textContent = [
         '@media (min-width:641px){',
         'header{position:static !important}',
-        'header #header-logo-circulo{width:40px !important;height:40px !important;padding:4px !important;border-width:2px !important}',
-        'header h1{font-size:21px !important;line-height:1.15 !important;letter-spacing:0 !important}',
+                'header h1{font-size:21px !important;line-height:1.15 !important;letter-spacing:0 !important}',
         'header h1 span{font-size:11px !important}',
         'header .px-3.py-1\\.5{padding:3px 10px !important}',
         'header .px-3.py-1\\.5 p:first-child{font-size:9px !important}',
@@ -122,6 +121,9 @@
         'header #badge-ventas::before,header #badge-compras::before,header #badge-diario::before{content:"";width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.4);flex:none}',
         'header #badge-ventas[class*="emerald"]::before,header #badge-compras[class*="emerald"]::before,header #badge-diario[class*="emerald"]::before{background:#34d399}',
         'header h1 ~ img{display:none !important}',
+        'header img:not(#header-logo-cliente)[src^="data:"],header #header-logo-mypecar-fijo{display:none !important}',
+        'header #header-logo-circulo{width:46px !important;height:46px !important;padding:5px !important;border:2px solid #facc15 !important;background:#fff !important;border-radius:9999px !important;box-shadow:0 2px 6px rgba(0,0,0,.25) !important;display:flex !important;align-items:center !important;justify-content:center !important;position:relative !important;flex:none !important;overflow:hidden !important}',
+        'header #header-logo-circulo svg#header-logo-generico{width:100% !important;height:100% !important}',
         'header h1 ~ p img{height:20px !important;width:auto !important;margin-right:6px !important}',
         'header nav, header .mpm-tabs{display:flex !important;flex-wrap:wrap !important;overflow:visible !important;gap:4px !important;margin-top:10px !important;padding-top:6px !important;padding-bottom:8px !important}',
         'header nav > *, header .mpm-tabs > *{flex:0 0 auto !important;white-space:nowrap !important;font-size:13px !important;padding:7px 11px !important;line-height:1.3 !important;border-radius:8px !important;margin-left:0 !important}',
@@ -168,6 +170,24 @@
   // vacío con la misma función de cada módulo ("Nuevo periodo"). No borra ni cambia datos de
   // otros meses; el usuario puede volver a cualquier mes con el selector de periodo.
   // ---------------------------------------------------------------------
+  // Logo uniforme (2026-11-20): los módulos 05 a 09 tenían un icono distinto en el círculo;
+  // ahora todos muestran el mismo logo de MYPECAR (el pollito). Si el cliente sube su logo, ese manda.
+  (function logoUniforme() {
+    const SVG = '<svg id="header-logo-generico" viewBox="0 0 100 100" style="width:100%;height:100%"> <path d="M 50,15 C 35,15 25,28 30,42 C 32,46 36,49 40,51" stroke="#E11D48" stroke-width="4" fill="none" stroke-linecap="round"/> <circle cx="50" cy="20" r="4" fill="#FBBF24" /> <circle cx="43" cy="23" r="3" fill="#FBBF24" /> <polygon points="25,45 15,48 24,53" fill="#F59E0B" stroke="#D97706" stroke-width="1" /> <path d="M 30,42 C 30,55 45,65 60,60 C 75,55 78,38 70,28 C 62,18 52,22 45,28" fill="#FBBF24" /> <path d="M 50,10 C 53,5 57,5 60,10 C 63,15 57,20 50,22" fill="#EF4444" /> <circle cx="40" cy="38" r="3.5" fill="#1E293B" /> <circle cx="39" cy="36" r="1" fill="#FFFFFF" /> <path d="M 68,55 C 75,58 85,55 82,68 C 80,75 70,72 65,68" stroke="#F97316" stroke-width="2" fill="none" stroke-linecap="round" /> </svg>';
+    function aplicar() {
+      try {
+        const g = document.querySelector('header i#header-logo-generico');
+        if (!g) return;
+        const tmp = document.createElement('div');
+        tmp.innerHTML = SVG;
+        const nuevo = tmp.firstChild;
+        if (g.classList.contains('hidden')) nuevo.classList.add('hidden');
+        g.replaceWith(nuevo);
+      } catch (e) {}
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', aplicar); else aplicar();
+  })();
+
   (function irAlMesActual() {
     try {
       let ruta = location.pathname;
