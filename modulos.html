@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#063b36">
+<title>MYPECAR PLUS · Sistema Contable</title>
+<style>
+@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('fonts/manrope-latin-wght-normal.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+:root{
+  --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --bg:#f1f5f9; --card:#ffffff;
+  --navy:#063b36; --navy2:#0f766e;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column}
+
+/* ---------- Encabezado ---------- */
+.top{background:linear-gradient(120deg,var(--navy) 0%,var(--navy2) 100%);color:#fff}
+.top-in{max-width:1180px;margin:0 auto;padding:22px 24px 60px;display:flex;align-items:center;gap:15px}
+.logo{flex:none;width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);display:grid;place-items:center}
+.logo svg{width:24px;height:24px}
+.top h1{font-size:clamp(20px,2.6vw,26px);font-weight:800;letter-spacing:.3px;line-height:1.15}
+.top h1 span{font-weight:500;opacity:.8}
+.top p{margin-top:4px;font-size:clamp(12px,1.3vw,13px);opacity:.82}
+
+/* ---------- Contenido ---------- */
+main{flex:1;width:100%;max-width:1180px;margin:-42px auto 0;padding:0 24px 20px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:17px;box-shadow:0 10px 30px rgba(15,23,42,.08);padding:21px 21px 22px}
+.panel-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.panel-head h2{font-size:17px;font-weight:700}
+.panel-head p{font-size:12px;color:var(--muted);margin-top:2px}
+.pill{font-size:11px;font-weight:600;color:var(--navy2);background:#e1f6f2;border-radius:999px;padding:5px 10px;white-space:nowrap}
+
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.mod{--c:#2563eb;--t:#e8f0ff;
+  position:relative;display:flex;align-items:center;gap:13px;text-decoration:none;color:inherit;
+  background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 14px 14px 13px;
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+  -webkit-tap-highlight-color:transparent}
+.mod::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 4px 4px 0;background:var(--c);opacity:.0;transition:opacity .18s}
+.mod:hover,.mod:focus-visible{transform:translateY(-3px);border-color:var(--c);box-shadow:0 12px 26px rgba(15,23,42,.12);outline:none}
+.mod:hover::before,.mod:focus-visible::before{opacity:1}
+.mod:active{transform:translateY(-1px)}
+.ico{flex:none;width:46px;height:46px;border-radius:12px;background:var(--c);display:grid;place-items:center;box-shadow:0 5px 12px color-mix(in srgb,var(--c) 38%,transparent)}
+.ico svg{width:23px;height:23px;stroke:#fff;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.txt{min-width:0;flex:1}
+.num{font-size:10px;font-weight:800;letter-spacing:.8px;color:var(--c)}
+.txt h3{font-size:14px;font-weight:800;line-height:1.2;margin-top:2px;letter-spacing:.1px}
+.txt p{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.3}
+.go{flex:none;width:26px;height:26px;border-radius:50%;background:var(--t);display:grid;place-items:center;transition:transform .18s,background .18s}
+.go svg{width:14px;height:14px;stroke:var(--c);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.mod:hover .go{transform:translateX(3px)}
+
+.m01{--c:#16a34a;--t:#e3f7ea}.m02{--c:#2563eb;--t:#e6eeff}.m03{--c:#ea7a0c;--t:#fdf0df}
+.m04{--c:#7c3aed;--t:#efe8ff}.m05{--c:#db2777;--t:#fde7f1}.m06{--c:#4338ca;--t:#e9e8ff}
+.m07{--c:#0d9488;--t:#dcf5f2}.m08{--c:#dc2626;--t:#fde6e6}.m09{--c:#57534e;--t:#eeeceb}
+
+.note{margin-top:14px;display:flex;gap:9px;align-items:flex-start;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:9px 12px;font-size:11.5px;color:var(--muted);line-height:1.45}
+.note svg{flex:none;width:16px;height:16px;margin-top:1px;stroke:var(--navy2);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+footer{text-align:center;color:#94a3b8;font-size:12px;padding:4px 20px 16px}
+footer a{color:#64748b;text-decoration:underline}
+
+/* ---------- Tablet ---------- */
+@media (max-width:980px){
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+/* ---------- Celular ---------- */
+@media (max-width:640px){
+  .top-in{padding:24px 18px 66px;gap:14px}
+  .logo{width:44px;height:44px;border-radius:12px}
+  .logo svg{width:24px;height:24px}
+  main{padding:0 14px 28px;margin-top:-42px}
+  .panel{padding:18px 14px 20px;border-radius:18px}
+  .panel-head h2{font-size:18px}
+  .grid{grid-template-columns:1fr;gap:12px}
+  .mod{padding:14px 14px 14px 12px;gap:14px;min-height:78px}
+  .ico{width:50px;height:50px;border-radius:13px}
+  .ico svg{width:25px;height:25px}
+  .txt h3{font-size:15.5px}
+}
+@media (prefers-reduced-motion:reduce){.mod,.go{transition:none}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+    </div>
+    <div>
+      <h1>MYPECAR PLUS <span>· Sistema Contable</span></h1>
+      <p>Contabilidad completa en la nube · SUNAT, PLAME y Libros Electrónicos</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="panel" aria-labelledby="t-mod">
+    <div class="panel-head">
+      <div>
+        <h2 id="t-mod">Módulos del sistema</h2>
+        <p>Elige el módulo con el que quieres trabajar.</p>
+      </div>
+      <span class="pill">9 módulos</span>
+    </div>
+
+    <nav class="grid" aria-label="Módulos">
+
+      <a class="mod m01" href="108%2001%20Registro%20de%20Ventas%20Mypecar%20Plus.html">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg></span>
+        <span class="txt"><span class="num">MÓDULO 01</span><h3>Registro de Ventas</h3><p>Libro 14.1 · IGV · PDT 621</p></span>
+        <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+      <a class="mod m02" href="108%2002%20Registro%20de%20Compras%20Mypecar%20Plus.html">
+        <span class="ico"><svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.5L21 8H6"/></svg></span>
+        <span class="txt"><span class="num">MÓDULO 02</span><h3>Registro de Compras</h3><p>Libro 8.1 · Compras y gastos</p></span>
+        <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+      <a class="mod m03" href="108%2003%20Libro%20de%20Caja%20y%20Bancos%20Mypecar%20Plus.html">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M3 10l9-6 9 6"/><path d="M5 10v8"/><path d="M10 10v8"/><path d="M14 10v8"/><path d="M19 10v8"/><path d="M3 20h18"/></svg></span>
+        <span class="txt"><span class="num">MÓDULO 03</span><h3>Caja y Bancos</h3><p>Libro 1.1 · Flujo de caja diario</p></span>
+        <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+      <a class="mod m04" href="108%2004%20Libro%20Diario%20Mypecar%20Plus.html">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg></span>
+        <span class="txt"><span class="num">MÓDULO 04</span><h3>Libro Diario</h3><p>Libro 5.1 · Asientos contables</p></span>
+        <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+      <a class="mod m05" href="108%2005%20Personal%20Mypecar%20Plus.html">
+        <span class="ico"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14.2A5 5 0 0 1 21 19"/></svg></span>
+        <span class="txt"><span class="num">MÓDULO 05</span><h3>Personal · PLAME</h3><p>T-Registro, PLAME, AFP Net</p></span>
+        <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+      <a class="mod m06" href="108%2006%20Activos%20Fijos%20Mypecar%20Plus.html">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16"/><path d="M14 9h5a1 1 0 0 1 1 1v11"/><path d="M2 21h20"/><path d="M8 8h2"/><path d="M8 12h2"/><path d="M8 16h2"/></svg></span>
+        <span class="txt"><span class="num">MÓDULO 06</span><h3>Activos Fijos</h3><p>Libro 7.1 · Depreciación</p></span>
+        <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+      <a class="mod m07" href="108%2007%20Reportes%20Mypecar%20Plus.html">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg></span>
+        <span class="txt"><span class="num">MÓDULO 07</span><h3>Reportes y EEFF</h3><p>Balance y Estado de Resultados</p></span>
+        <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+      <a class="mod m08" href="108%2008%20Auditoria%20Mypecar%20Plus.html">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z"/><path d="M8.5 12l2.4 2.4L15.5 10"/></svg></span>
+        <span class="txt"><span class="num">MÓDULO 08</span><h3>Auditoría</h3><p>Revisión SUNAT · Control interno</p></span>
+        <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+      <a class="mod m09" href="108%2009%20Inventario%20Mypecar%20Plus.html">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span>
+        <span class="txt"><span class="num">MÓDULO 09</span><h3>Inventario · Kardex</h3><p>Almacén y control de stock</p></span>
+        <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+
+    </nav>
+
+    <div class="note">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+      <span>Tus datos se guardan en este dispositivo y se sincronizan con la nube cuando hay internet. Al iniciar sesión verás la información de tu empresa.</span>
+    </div>
+  </section>
+</main>
+
+<footer>MYPECAR PLUS · Sistema contable en línea · <a href="legal.html#terminos">Términos</a> · <a href="legal.html#privacidad">Privacidad</a></footer>
+
+<script src="mypecar-login.js"></script>
+<script src="mypecar-sync.js"></script>
+</body>
+</html>
