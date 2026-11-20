@@ -5,3 +5,4 @@ rm -rf dist
 mkdir dist
 cp ./*.html ./*.js dist/
 cp -r fonts dist/fonts
+cp -r img dist/img
