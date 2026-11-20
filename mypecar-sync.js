@@ -657,7 +657,11 @@ var LZString = {
   function rawGet(key) { return rawGetFisica(claveFisica(key)); }
   function rawSet(key, val) { rawSetFisica(claveFisica(key), val); }
   function esClaveDeDatos(key) {
-    return CLAVES_INTERNAS.indexOf(key) === -1 && key.indexOf('_meta_') !== 0 && key.indexOf('mps_') !== 0 && key.indexOf('mypecar_') !== 0;
+    // (2026-11-20) 'sb-...' es la sesión de inicio de sesión de Supabase: NO es un dato de la app.
+    // Antes se trataba como dato (aislada por empresa y subida a la nube), lo que podía obligar a
+    // volver a iniciar sesión en cada módulo y dejaba una copia de la sesión en app_config.
+    // Ahora es una clave global: un solo inicio de sesión sirve para los 9 módulos.
+    return CLAVES_INTERNAS.indexOf(key) === -1 && key.indexOf('_meta_') !== 0 && key.indexOf('mps_') !== 0 && key.indexOf('mypecar_') !== 0 && key.indexOf('sb-') !== 0;
   }
   // =========================================================================
   // AISLAMIENTO POR EMPRESA (2026-09-24)
