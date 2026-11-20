@@ -1681,6 +1681,10 @@ var LZString = {
       const conflictos = [];
       (data || []).forEach(fila => {
         if (String(fila.clave).indexOf('snap_') === 0) return; // fotos de enlace entre módulos: no se copian al equipo
+        // (2026-11-20) 'sb-...' es la SESIÓN de inicio de sesión de Supabase. Filas viejas con esa clave quedaron en la nube
+        // (de cuando se trataba como dato) y, al bajarlas, pisaban la sesión vigente con una vencida: por eso algunos módulos
+        // pedían iniciar sesión de nuevo. Nunca se aplica una sesión que venga de la nube.
+        if (String(fila.clave).indexOf('sb-') === 0) return;
         const metaKey = '_meta_' + fila.clave;
         const metaLocal = lsGet(metaKey, null);
         // Si hay un cambio local sin sincronizar (en la cola) más nuevo que lo
