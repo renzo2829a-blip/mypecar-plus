@@ -54,6 +54,25 @@
       let ruta = location.pathname;
       try { ruta = decodeURIComponent(ruta); } catch (e) {}
       if (!/108\s*0\d/.test(ruta)) return;
+      // Encabezado uniforme (2026-11-20): mismo tamaño de letra, logo, recuadros y pestañas en
+      // los 9 módulos, y las pestañas se acomodan en filas (sin barra de desplazamiento
+      // horizontal). Solo escritorio; en celular manda mypecar-mobile.js.
+      const eu = document.createElement('style');
+      eu.id = 'mps-encabezado-uniforme';
+      eu.textContent = [
+        '@media (min-width:641px){',
+        'header{position:static !important}',
+        'header #header-logo-circulo{width:40px !important;height:40px !important;padding:4px !important;border-width:2px !important}',
+        'header h1{font-size:20px !important;line-height:1.15 !important;letter-spacing:0 !important}',
+        'header h1 span{font-size:11px !important}',
+        'header .px-3.py-1\\.5{padding:3px 10px !important}',
+        'header .px-3.py-1\\.5 p:first-child{font-size:9px !important}',
+        'header .px-3.py-1\\.5 p:last-child{font-size:12px !important}',
+        'header nav, header .mpm-tabs{display:flex !important;flex-wrap:wrap !important;overflow:visible !important;gap:2px !important;margin-top:6px !important;padding-top:4px !important;padding-bottom:4px !important}',
+        'header nav > *, header .mpm-tabs > *{flex:0 0 auto !important;white-space:nowrap !important;font-size:13px !important;padding:5px 9px !important;line-height:1.3 !important;border-radius:8px !important;margin-left:0 !important}',
+        '}'
+      ].join('\n');
+      (document.head || document.documentElement).appendChild(eu);
       const st = document.createElement('style');
       st.id = 'mps-anti-parpadeo';
       st.textContent = 'html.mps-esperando body{visibility:hidden!important}';
