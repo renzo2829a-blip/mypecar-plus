@@ -110,6 +110,7 @@
         background:linear-gradient(135deg,#04231f 0%,#0b5d52 55%,#0f8f7f 100%);
         display:flex; align-items:center; justify-content:center; padding:14px 16px; box-sizing:border-box;
         font-family: 'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
+      .mps-overlay input, .mps-overlay button, .mps-overlay select, .mps-overlay textarea, .mps-aviso-lic { font-family:inherit; }
       .mps-card { background:#fff; border-radius:20px; width:100%; max-width:390px; margin:auto;
         box-shadow:0 30px 80px rgba(2,8,23,.45); padding:22px 24px 20px; box-sizing:border-box; }
       .mps-marca { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
