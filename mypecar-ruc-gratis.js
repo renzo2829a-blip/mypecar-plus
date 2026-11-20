@@ -1,87 +1,111 @@
-// MYPECAR RUC GRATIS v3 - BLOQUEA SUNAT y autocompleta gratis
-(function(){
-  const _open = window.open;
-  // Bloquea la ventana de SUNAT
-  window.open = function(url, name, specs){
-    const _u = url ? url.toString() : '';
-    if (_u.includes('consultaruc') || _u.includes('jcrS00Alias') || _u.includes('sunat.gob.pe')) {
-      console.log('SUNAT bloqueado, usando API gratis');
-      let m = _u.match(/nroRuc=(\d{11})/) || _u.match(/(\d{11})/);
-      let ruc = m ? m[1] : (document.querySelector('input[placeholder*="RUC" i]')?.value || '').trim();
-      if (ruc) consultarRucGratisReal(ruc);
-      return { closed:false, focus:()=>{}, close:()=>{} }; // no abre nada
+// MYPECAR · Autocompletar datos por RUC (y DNI en clientes) — 2026-11-20
+// Al escribir los 11 dígitos del RUC (o los 8 del DNI) se consulta la función "consulta-documento"
+// de Supabase y se llenan solos la razón social y, en proveedores, el estado y la condición del
+// domicilio. No se envía el RUC a ningún servicio de terceros distinto de ese. Se usa en
+// 01 Ventas (Clientes) y 02 Compras (Proveedores). Si algo falla, se escribe a mano como siempre.
+(function () {
+  'use strict';
+  const CAMPOS = [
+    { ruc: 'prov-ruc', razon: 'prov-razon-social', estado: 'prov-estado-tributario', condicion: 'prov-condicion-domicilio', dni: false },
+    { ruc: 'cli-doc', razon: 'cli-razon-social', estado: null, condicion: null, dni: true }
+  ];
+  const cache = {};
+  const temporizadores = {};
+
+  function mensajeDe(cfg) {
+    const inp = document.getElementById(cfg.ruc);
+    if (!inp) return null;
+    let p = document.getElementById('mps-ruc-msg-' + cfg.ruc);
+    if (!p) {
+      p = document.createElement('p');
+      p.id = 'mps-ruc-msg-' + cfg.ruc;
+      p.style.cssText = 'font-size:11px;font-weight:600;margin-top:4px;min-height:14px';
+      const ref = inp.closest('div') && inp.closest('div').parentElement ? inp.closest('div').parentElement : inp.parentElement;
+      ref.appendChild(p);
     }
-    return _open.call(window, url, name, specs);
-  };
-
-  async function consultarRucGratisReal(ruc){
-    let btn = document.querySelector('button i.fa-search, button i.fa-solid.fa-magnifying-glass')?.closest('button') || document.querySelector('button:has(i)');
-    let orig = btn ? btn.innerHTML : '';
-    if(btn){ btn.innerHTML='⏳'; btn.disabled=true; }
-    try{
-      let url=`https://api.apis.net.pe/v2/ruc?numero=${ruc}`;
-      let proxy=`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      let res = await fetch(proxy);
-      if(!res.ok) throw new Error('apisnet fail');
-      let j = await res.json();
-      let razon = j.nombre || j.razonSocial || j.razon_social || '';
-      let direccion = j.direccion || j.direccionCompleta || '';
-      let estado = (j.estado || 'ACTIVO').toUpperCase();
-      let cond = (j.condicion || j.condicionDomicilio || 'HABIDO').toUpperCase();
-      if(!razon) throw new Error('sin razon');
-
-      // Llena los campos de Nuevo Proveedor
-      let inputs = document.querySelectorAll('input');
-      inputs.forEach(inp=>{
-        let id=(inp.id||'').toLowerCase(), name=(inp.name||'').toLowerCase(), ph=(inp.placeholder||'').toLowerCase();
-        if(id.includes('razon') || name.includes('razon') || ph.includes('razon') || (inp.closest('div')?.innerHTML||'').includes('Razón Social')){
-          // Solo si es el input de razon social vacio
-          if(inp.value.trim()==='' || inp===document.querySelectorAll('input')[1]){ /* heuristica */ }
-        }
-      });
-      // Intento directo por posicion: en tu pantalla, RUC es input 0, Razon es input 1
-      let todosInputs = document.querySelectorAll('input[type="text"], input:not([type])');
-      if(todosInputs.length >= 2){
-        // El segundo input suele ser Razon Social
-        for(let i=0;i<todosInputs.length;i++){
-          let label = todosInputs[i].closest('div')?.parentElement?.innerText || '';
-          if(label.includes('Razón Social') || todosInputs[i].previousElementSibling?.textContent?.includes('Razón')){
-             todosInputs[i].value = razon; todosInputs[i].dispatchEvent(new Event('input',{bubbles:true})); todosInputs[i].dispatchEvent(new Event('change',{bubbles:true}));
-          }
-          if(label.includes('Nombre Comercial') && !todosInputs[i].value) {
-             // no llenar
-          }
-        }
-      }
-      // Metodo mas seguro: busca por el texto "Razón Social" y llena el siguiente input
-      document.querySelectorAll('div').forEach(div=>{
-        if(div.textContent.trim()==='Razón Social'){
-          let inp = div.parentElement?.querySelector('input');
-          if(inp){ inp.value=razon; inp.dispatchEvent(new Event('input',{bubbles:true})); }
-        }
-        if(div.textContent.trim()==='Estado Tributario SUNAT'){
-          let sel = div.parentElement?.querySelector('select');
-          if(sel){ 
-            // intenta poner ACTIVO
-            for(let o of sel.options){ if(o.text.toUpperCase().includes(estado)) { sel.value=o.value; sel.dispatchEvent(new Event('change',{bubbles:true})); break; } }
-          }
-        }
-        if(div.textContent.trim()==='Condición del Domicilio'){
-          let sel = div.parentElement?.querySelector('select');
-          if(sel){ 
-            for(let o of sel.options){ if(o.text.toUpperCase().includes(cond) || o.text.toUpperCase().includes('HABIDO')) { sel.value=o.value; sel.dispatchEvent(new Event('change',{bubbles:true})); break; } }
-          }
-        }
-      });
-
-      alert('✅ RUC GRATIS encontrado:\n'+razon+'\n'+estado+' / '+cond);
-    }catch(e){
-      console.error(e);
-      // Si falla la API gratis, ahi si deja abrir SUNAT
-      alert('No se pudo gratis, se abre SUNAT como respaldo');
-      _open.call(window, `https://e-consultaruc.sunat.gob.pe/cl-ti-itmrconsruc/jcrS00Alias?accion=consPorRuc&nroRuc=${ruc}`, '_blank');
-    }finally{
-      if(btn){ btn.innerHTML=orig; btn.disabled=false; }
+    return p;
+  }
+  function decir(cfg, texto, tono) {
+    const p = mensajeDe(cfg); if (!p) return;
+    p.textContent = texto || '';
+    p.style.color = tono === 'ok' ? '#047857' : tono === 'error' ? '#be123c' : tono === 'aviso' ? '#b45309' : '#475569';
+  }
+  function ponerValor(el, valor) {
+    el.value = valor;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  function elegirOpcion(sel, texto) {
+    if (!sel || !texto) return;
+    const t = String(texto).toUpperCase().replace(/\s+/g, ' ').trim();
+    for (const o of sel.options) {
+      const ot = o.text.toUpperCase().replace(/\s+/g, ' ').trim();
+      if (ot === t || ot.startsWith(t) || t.startsWith(ot)) { sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); return; }
     }
   }
+
+  async function consultar(cfg, numero) {
+    const inp = document.getElementById(cfg.ruc);
+    if (!inp) return;
+    const esRuc = numero.length === 11;
+    if (esRuc && typeof validarDigitoVerificadorRuc === 'function' && !validarDigitoVerificadorRuc(numero)) {
+      decir(cfg, 'El RUC no es válido (revisa que esté bien digitado).', 'error');
+      return;
+    }
+    let res = cache[numero];
+    if (!res) {
+      const sync = window.MypecarSync;
+      const cliente = sync && sync.obtenerClienteSupabase ? sync.obtenerClienteSupabase() : null;
+      if (!cliente) { decir(cfg, 'Inicia sesión para completar los datos automáticamente.', 'aviso'); return; }
+      decir(cfg, 'Buscando en SUNAT…', 'info');
+      try {
+        const empresaId = sync.empresas && sync.empresas.activaId ? sync.empresas.activaId() : null;
+        const { data, error } = await cliente.functions.invoke('consulta-documento', {
+          body: { tipo: esRuc ? 'ruc' : 'dni', numero, empresa_id: empresaId }
+        });
+        res = data;
+        if (error) { try { res = await error.context.json(); } catch (e) { res = null; } }
+      } catch (e) { res = null; }
+      const nombre = res && (res.nombre || res.razon_social || res.business_name || res.full_name);
+      if (!nombre) {
+        decir(cfg, (res && res.error) ? String(res.error) : 'No se pudo consultar ahora. Escribe los datos a mano.', 'error');
+        return;
+      }
+      res.nombre = nombre;
+      cache[numero] = res;
+    }
+    if (inp.value.replace(/\D/g, '') !== numero) return; // el usuario ya cambió el número
+    const campo = document.getElementById(cfg.razon);
+    if (campo) {
+      if (campo.value.trim() === '' || campo.dataset.mpsAuto === '1') {
+        ponerValor(campo, res.nombre);
+        campo.dataset.mpsAuto = '1';
+      } else if (campo.value.trim().toUpperCase() !== String(res.nombre).toUpperCase()) {
+        decir(cfg, 'SUNAT dice: ' + res.nombre + ' (ya hay un nombre escrito; no se cambió).', 'aviso');
+        return;
+      }
+    }
+    if (esRuc) {
+      elegirOpcion(cfg.estado && document.getElementById(cfg.estado), res.estado);
+      elegirOpcion(cfg.condicion && document.getElementById(cfg.condicion), res.condicion);
+    }
+    decir(cfg, 'Datos completados desde SUNAT. Revísalos antes de guardar.', 'ok');
+  }
+
+  document.addEventListener('input', function (ev) {
+    const t = ev.target;
+    if (!t || !t.id) return;
+    // Si la persona escribe la razón social a mano, deja de considerarse "autocompletada".
+    const porRazon = CAMPOS.find(c => c.razon === t.id);
+    if (porRazon && ev.isTrusted) delete t.dataset.mpsAuto;
+    const cfg = CAMPOS.find(c => c.ruc === t.id);
+    if (!cfg) return;
+    clearTimeout(temporizadores[cfg.ruc]);
+    const v = (t.value || '').replace(/\D/g, '');
+    if (v.length === 11 || (cfg.dni && v.length === 8)) {
+      temporizadores[cfg.ruc] = setTimeout(() => consultar(cfg, v).catch(() => {}), 400);
+    } else {
+      const p = document.getElementById('mps-ruc-msg-' + cfg.ruc); if (p) p.textContent = '';
+    }
+  }, true);
 })();

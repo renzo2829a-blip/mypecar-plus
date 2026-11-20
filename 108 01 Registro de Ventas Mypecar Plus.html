@@ -2792,7 +2792,7 @@
                 });
                 let res = data;
                 if (error) { try { res = await error.context.json(); } catch (e) { res = null; } }
-                if (!res || !res.success || !res.nombre) {
+                if (!res || !res.nombre) {
                     msg.textContent = (res && res.error) ? res.error : 'No se pudo consultar. Puedes escribir los datos manualmente.';
                     msg.className = 'text-[10px] mt-1 text-rose-600';
                     return;
