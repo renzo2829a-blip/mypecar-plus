@@ -124,6 +124,12 @@
           ['Gestión', ['informe', 'puntoequilibrio', 'resumendia', 'dashventas', 'dashgastos', 'cxc', 'cxp', 'general']],
           ['Impuestos', ['impuestos', 'detracciones', 'djmensual', 'djanual']],
           'auditoria', 'seguridad', 'ajustes'];
+      } else if (/108\s*05/.test(ruta)) {
+        plan = ['dashboard',
+          ['Personal', ['ficha', 'contratos', 'locadores']],
+          ['Pagos', ['planilla', 'rxh', 'renta5ta', 'boletas']],
+          ['Beneficios', ['vacaciones', 'cts', 'gratificacion', 'liquidacion']],
+          'seguridad', 'alertas', 'settings'];
       } else if (/108\s*04/.test(ruta)) {
         plan = ['dashboard', 'shortcuts',
           ['Libros', ['diario', 'gastosreparados', 'mayor', 'balancecomp']],
