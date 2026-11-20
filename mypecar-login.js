@@ -44,7 +44,7 @@
   // login/bloqueo (que cubre todo). Seguro: pase lo que pase, a los 6 segundos
   // la página se muestra sola, para que nunca quede en blanco.
   // Solo se aplica en los módulos ("108 0X ... Mypecar Plus.html"), no en
-  // index.html ni legal.html.
+  // la landing (index.html), modulos.html ni legal.html.
   // ---------------------------------------------------------------------
   function liberarPagina() {
     try { document.documentElement.classList.remove('mps-esperando'); } catch (e) {}
@@ -717,7 +717,7 @@
       const volver = document.createElement('a');
       volver.id = 'mps-volver';
       volver.className = 'mps-volver';
-      volver.href = 'index.html';
+      volver.href = 'modulos.html';
       volver.textContent = '← Módulos';
       volver.setAttribute('aria-label', 'Volver a la pantalla de módulos');
       document.body.appendChild(volver);

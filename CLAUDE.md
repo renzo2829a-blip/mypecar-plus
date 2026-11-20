@@ -1,6 +1,6 @@
 # MYPECAR PLUS — instrucciones para Claude Code
 
-Sistema contable en línea para MYPEs peruanas. Son 9 apps HTML estáticas (01 Ventas, 02 Compras, 03 Caja y Bancos, 04 Libro Diario, 05 Personal, 06 Activos Fijos, 07 Reportes, 08 Auditoría, 09 Inventario) más `index.html`, `legal.html`, `mypecar-login.js`, `mypecar-sync.js`, `mypecar-mobile.js` y `mypecar-ruc-gratis.js`. Se publican en un Worker de Cloudflare en mypecar.net.pe. Los datos viven en Supabase (proyecto `byucdwgerwpoqicklycf`, plan Free, sin backups automáticos).
+Sistema contable en línea para MYPEs peruanas. Son 9 apps HTML estáticas (01 Ventas, 02 Compras, 03 Caja y Bancos, 04 Libro Diario, 05 Personal, 06 Activos Fijos, 07 Reportes, 08 Auditoría, 09 Inventario) más `index.html` (landing pública, es la página de inicio de mypecar.net.pe), `modulos.html` (pantalla de módulos de la aplicación, en mypecar.net.pe/modulos), `legal.html`, `mypecar-login.js`, `mypecar-sync.js`, `mypecar-mobile.js` y `mypecar-ruc-gratis.js`. Se publican en un Worker de Cloudflare en mypecar.net.pe. Los datos viven en Supabase (proyecto `byucdwgerwpoqicklycf`, plan Free, sin backups automáticos).
 
 El dueño no programa. Explica todo en español, en lenguaje sencillo, y haz el trabajo técnico tú mismo.
 
