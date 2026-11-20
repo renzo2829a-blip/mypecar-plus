@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Primeros pasos · MYPECAR PLUS</title>
+<meta name="description" content="Guía rápida para empezar a usar MYPECAR PLUS: crear tu cuenta, registrar tu empresa, elegir un módulo, cambiar de empresa y dar acceso a tu contador.">
+<style>
+@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('fonts/manrope-latin-wght-normal.woff2') format('woff2')}
+:root{--navy:#04231f;--navy2:#0b5d52;--teal:#0f8f7f;--teal-l:#e1f6f2;--ink:#0f172a;--muted:#475569;--line:#e2e8f0;--bg:#f5f8fa}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--navy2)}
+.top{background:linear-gradient(135deg,var(--navy),var(--navy2) 60%,var(--teal));color:#fff;padding:26px 0 70px}
+.wrap{max-width:860px;margin:0 auto;padding:0 20px}
+.top a.back{color:rgba(255,255,255,.85);text-decoration:none;font-weight:700;font-size:14px}
+.top h1{font-size:clamp(26px,4vw,38px);font-weight:800;margin:14px 0 6px;letter-spacing:-.3px}
+.top p{color:rgba(255,255,255,.85);font-size:17px;max-width:560px}
+main{margin-top:-44px;padding-bottom:50px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px 26px;margin-bottom:18px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+.card h2{font-size:21px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:12px}
+.n{flex:none;width:34px;height:34px;border-radius:10px;background:var(--navy2);color:#fff;display:grid;place-items:center;font-weight:800;font-size:16px}
+.card p,.card li{color:var(--muted);font-size:16px}
+.card ol,.card ul{margin:8px 0 0 22px;display:grid;gap:7px}
+.tip{margin-top:12px;background:var(--teal-l);border-radius:12px;padding:10px 14px;font-size:14.5px;color:#064e45}
+.tip b{color:var(--navy2)}
+.mods{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.mod{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-left:4px solid var(--c);border-radius:12px;padding:10px 12px;font-size:14.5px;color:var(--muted)}
+.mod b{display:block;color:var(--ink);font-size:15px}
+details{border:1px solid var(--line);border-radius:12px;padding:2px 16px;margin-top:8px;background:#fff}
+summary{cursor:pointer;font-weight:800;padding:12px 0;list-style:none;display:flex;justify-content:space-between}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--navy2);font-size:20px;line-height:1}
+details[open] summary::after{content:"–"}
+details p{padding:0 0 12px}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
+.btn{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:15.5px;padding:12px 22px;border-radius:12px;text-decoration:none}
+.btn-g{background:var(--navy2);color:#fff}
+.btn-w{background:#16a34a;color:#fff}
+footer{text-align:center;color:#94a3b8;font-size:13px;padding:0 20px 26px}
+@media (max-width:640px){.mods{grid-template-columns:1fr}.card{padding:20px 18px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="back" href="index.html">← Volver al inicio</a>
+    <h1>Primeros pasos en MYPECAR PLUS</h1>
+    <p>En 5 minutos tienes tu empresa lista para registrar ventas, compras, caja y más.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card">
+    <h2><span class="n">1</span> Entra y crea tu cuenta</h2>
+    <ol>
+      <li>Abre <b>mypecar.net.pe</b> y pulsa <b>Ingresar a la aplicación</b>.</li>
+      <li>Elige un módulo, por ejemplo <b>Registro de Ventas</b>.</li>
+      <li>Entra con <b>Google</b> o con tu <b>correo</b>. Si usas correo, te llega un enlace de acceso: no necesitas recordar una contraseña.</li>
+      <li>Marca la casilla de Términos y política de privacidad.</li>
+    </ol>
+    <p class="tip"><b>Celular prestado:</b> si entras desde un equipo que no es tuyo, al terminar usa <b>Cerrar sesión</b>.</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">2</span> Registra tu empresa</h2>
+    <ol>
+      <li>La primera vez, escribe tu <b>RUC</b>, la <b>razón social</b> y el <b>nombre comercial</b>, y pulsa <b>Guardar empresa</b>.</li>
+      <li>Tu empresa queda <b>pendiente de activación</b>. Escríbenos por WhatsApp con tu RUC para activarla.</li>
+      <li>Cuando esté activa, vuelve a abrir la página y entra normalmente.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">3</span> Elige un módulo</h2>
+    <p>Desde la pantalla de módulos entras al que necesites. Todos comparten la misma empresa.</p>
+    <div class="mods">
+      <div class="mod" style="--c:#16a34a"><div><b>01 Ventas</b>Comprobantes emitidos e IGV.</div></div>
+      <div class="mod" style="--c:#2563eb"><div><b>02 Compras</b>Compras, gastos y crédito fiscal.</div></div>
+      <div class="mod" style="--c:#ea7a0c"><div><b>03 Caja y Bancos</b>Entradas y salidas de dinero.</div></div>
+      <div class="mod" style="--c:#7c3aed"><div><b>04 Libro Diario</b>Asientos contables y libro mayor.</div></div>
+      <div class="mod" style="--c:#db2777"><div><b>05 Personal</b>Planilla, AFP, gratificaciones y CTS.</div></div>
+      <div class="mod" style="--c:#4338ca"><div><b>06 Activos Fijos</b>Equipos y su depreciación.</div></div>
+      <div class="mod" style="--c:#0d9488"><div><b>07 Reportes</b>Balance y estado de resultados.</div></div>
+      <div class="mod" style="--c:#dc2626"><div><b>08 Auditoría</b>Revisión de tus cifras.</div></div>
+      <div class="mod" style="--c:#57534e"><div><b>09 Inventario</b>Entradas, salidas y kardex.</div></div>
+    </div>
+    <p class="tip"><b>Para volver a la lista de módulos</b> usa el botón <b>← Módulos</b>, junto a <b>Ajustes</b> en la barra de pestañas.</p>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">4</span> Cambia de empresa</h2>
+    <ol>
+      <li>Pulsa el recuadro <b>Sede contable</b> del encabezado (en Reportes y Auditoría, la pestaña con el nombre de tu empresa).</li>
+      <li>Elige la empresa de la lista. La página se recarga con sus datos.</li>
+      <li>Para agregar otra, usa <b>+ Registrar otra empresa</b> en ese mismo menú.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2><span class="n">5</span> Da acceso a tu contador o tu equipo</h2>
+    <ol>
+      <li>En el mismo menú de empresa, pulsa <b>Gestionar accesos</b> (solo lo ve el dueño).</li>
+      <li>Escribe el correo de la persona y pulsa <b>Agregar</b>.</li>
+      <li>Marca los módulos que puede usar y pulsa <b>Guardar</b>.</li>
+    </ol>
+    <p class="tip">Cada empresa ve solo sus propios datos. Quien no tenga permiso para un módulo, no podrá entrar a él.</p>
+  </section>
+
+  <section class="card">
+    <h2>Preguntas rápidas</h2>
+    <details><summary>¿Qué pasa si se va el internet?</summary><p>Tus datos se siguen guardando en tu dispositivo y se sincronizan con la nube cuando vuelve la conexión.</p></details>
+    <details><summary>Veo todo en cero, ¿se perdió mi información?</summary><p>Revisa el <b>Periodo activo</b> en el encabezado. Cada mes guarda sus propios datos; cambia al mes en el que registraste.</p></details>
+    <details><summary>Mi empresa dice "pendiente de aprobación"</summary><p>Aún no fue activada. Escríbenos por WhatsApp con tu RUC.</p></details>
+    <details><summary>Dice "licencia vencida"</summary><p>Tus datos siguen guardados. Escríbenos para renovar y, apenas se registre el pago, vuelves a entrar como lo dejaste.</p></details>
+  </section>
+
+  <section class="card">
+    <h2>¿Necesitas ayuda?</h2>
+    <p>Te respondemos por WhatsApp.</p>
+    <div class="cta" style="margin-top:12px">
+      <a class="btn btn-w" href="https://wa.me/51996378921?text=Hola%2C%20necesito%20ayuda%20con%20MYPECAR%20PLUS" target="_blank" rel="noopener">Escribir por WhatsApp</a>
+      <a class="btn btn-g" href="modulos.html">Ir a la aplicación →</a>
+    </div>
+  </section>
+</main>
+<footer>MYPECAR PLUS · <a href="legal.html#terminos">Términos</a> · <a href="legal.html#privacidad">Privacidad</a></footer>
+</body>
+</html>
