@@ -811,15 +811,15 @@
     liberarPagina();
     document.body.appendChild(overlayEl);
     overlayEl.innerHTML = `
-      <div class="mps-card" style="max-width:480px;">
+      <div class="mps-card" style="max-width:470px;">
         <p class="mps-titulo">Gestionar accesos</p>
-        <p class="mps-subtitulo">Marca qué apps puede usar cada persona de tu equipo. El dueño (tú) siempre tiene acceso a todas.</p>
-        <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;background:#f8fafc;">
-          <label class="mps-label" style="margin-top:0;">Agregar persona por correo</label>
-          <p style="font-size:12px;color:#64748b;margin:0 0 8px;">Puedes escribir su correo aunque esa persona todavía no haya creado su cuenta: quedará como invitación pendiente y, en cuanto ella cree su cuenta (correo + contraseña) con ese mismo correo desde "Crear cuenta", quedará vinculada sola, con las apps que le marques abajo.</p>
+        <p class="mps-subtitulo">Elige qué módulos puede usar cada persona. Tú, como dueño, entras a todos.</p>
+        <div style="border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;margin-bottom:10px;background:#f8fafc;">
+          <label class="mps-label" style="margin-top:0;">Agregar persona</label>
+          <details style="margin:0 0 6px;"><summary style="font-size:12px;color:#0f766e;cursor:pointer;">¿Cómo funciona?</summary><p style="font-size:12px;color:#64748b;margin:4px 0 0;line-height:1.4;">Escribe su correo y pulsa Agregar. Si todavía no tiene cuenta, queda como invitación pendiente y se vincula sola cuando cree su cuenta con ese mismo correo.</p></details>
           <div style="display:flex;gap:8px;">
-            <input class="mps-input" id="mps-agregar-correo" placeholder="correo@ejemplo.com" style="margin:0;flex:1 1 auto;min-width:0;width:auto;" />
-            <button class="mps-btn mps-btn-primario" id="mps-btn-agregar-correo" style="margin:0;white-space:nowrap;padding:0 16px;width:auto;flex:0 0 auto;">Agregar</button>
+            <input class="mps-input" id="mps-agregar-correo" placeholder="correo@ejemplo.com" style="margin:0;flex:1 1 auto;min-width:0;width:auto;min-height:40px;" />
+            <button class="mps-btn mps-btn-primario" id="mps-btn-agregar-correo" style="margin:0;white-space:nowrap;padding:0 14px;width:auto;flex:0 0 auto;min-height:40px;font-size:13px;">Agregar</button>
           </div>
           <div id="mps-zona-msg-agregar"></div>
         </div>
@@ -881,7 +881,7 @@
         const filas = invitaciones.map(inv => {
           const permitidas = new Set(inv.apps_permitidas || []);
           const casillas = APPS_MYPECAR.map(a => `
-            <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#334155;padding:3px 0;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#334155;padding:2px 0;">
               <input type="checkbox" data-app="${a.app}" ${permitidas.has(a.app) ? 'checked' : ''} />
               ${a.etiqueta}
             </label>
@@ -889,11 +889,11 @@
           return `
             <div class="mps-invitacion-card" data-invitacion-id="${escapeHtml(inv.id)}" style="border:1px dashed #cbd5e1;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fffbeb;">
               <div class="mps-empresa-nombre" style="font-size:13.5px;">${escapeHtml(inv.correo)}</div>
-              <div class="mps-empresa-ruc" style="margin-bottom:8px;">Invitación pendiente — todavía no crea su cuenta</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;">${casillas}</div>
+              <div class="mps-empresa-ruc" style="margin-bottom:6px;">Invitación pendiente — todavía no crea su cuenta</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 6px;">${casillas}</div>
               <div style="display:flex;gap:8px;margin-top:10px;">
-                <button class="mps-btn mps-btn-primario" style="padding:8px 12px;font-size:13px;" data-guardar-invitacion="${escapeHtml(inv.id)}">Guardar</button>
-                <button class="mps-btn mps-btn-secundario" style="padding:8px 12px;font-size:13px;" data-cancelar-invitacion="${escapeHtml(inv.id)}">Cancelar invitación</button>
+                <button class="mps-btn mps-btn-primario" style="padding:6px 10px;font-size:12px;min-height:32px;margin-top:0;" data-guardar-invitacion="${escapeHtml(inv.id)}">Guardar</button>
+                <button class="mps-btn mps-btn-secundario" style="padding:6px 10px;font-size:12px;min-height:32px;margin-top:0;" data-cancelar-invitacion="${escapeHtml(inv.id)}">Cancelar invitación</button>
               </div>
             </div>
           `;
@@ -948,12 +948,12 @@
         zona.innerHTML = '';
         miembros.forEach(m => {
           const card = document.createElement('div');
-          card.style.cssText = 'border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:10px;';
+          card.style.cssText = 'border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;margin-bottom:8px;';
           if (m.rol === 'owner') {
             card.innerHTML = `
               <div class="mps-empresa-nombre" style="font-size:13.5px;">${escapeHtml(m.email)}</div>
-              <div class="mps-empresa-ruc" style="margin-bottom:8px;">Dueño de la empresa — acceso a todas las apps</div>
-              <button class="mps-btn mps-btn-secundario" style="padding:8px 12px;font-size:13px;" data-quitar-dueno="${escapeHtml(m.user_id)}">Quitar como dueño(a)</button>
+              <div class="mps-empresa-ruc" style="margin-bottom:6px;">Dueño de la empresa — acceso a todas las apps</div>
+              <button class="mps-btn mps-btn-secundario" style="padding:6px 10px;font-size:12px;min-height:32px;margin-top:0;" data-quitar-dueno="${escapeHtml(m.user_id)}">Quitar como dueño(a)</button>
             `;
             card.querySelector('[data-quitar-dueno]').addEventListener('click', async () => {
               if (!confirm(`¿Quitarle el rol de dueño(a) a ${m.email}? Quedará como asistente, sin acceso a "Gestionar accesos", y tendrás que marcarle qué apps puede usar.`)) return;
@@ -985,18 +985,18 @@
           } else {
             const permitidas = new Set(m.apps_permitidas || []);
             const casillas = APPS_MYPECAR.map(a => `
-              <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#334155;padding:3px 0;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#334155;padding:2px 0;">
                 <input type="checkbox" data-app="${a.app}" ${permitidas.has(a.app) ? 'checked' : ''} />
                 ${a.etiqueta}
               </label>
             `).join('');
             card.innerHTML = `
               <div class="mps-empresa-nombre" style="font-size:13.5px;">${escapeHtml(m.email)}</div>
-              <div class="mps-empresa-ruc" style="margin-bottom:8px;">${escapeHtml(m.rol)}</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;">${casillas}</div>
+              <div class="mps-empresa-ruc" style="margin-bottom:6px;">${escapeHtml(m.rol)}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 6px;">${casillas}</div>
               <div style="display:flex;gap:8px;margin-top:10px;">
-                <button class="mps-btn mps-btn-primario" style="padding:8px 12px;font-size:13px;" data-guardar="${escapeHtml(m.user_id)}">Guardar</button>
-                <button class="mps-btn mps-btn-secundario" style="padding:8px 12px;font-size:13px;" data-hacer-dueno="${escapeHtml(m.user_id)}">Hacer también dueño(a)</button>
+                <button class="mps-btn mps-btn-primario" style="padding:6px 10px;font-size:12px;min-height:32px;margin-top:0;" data-guardar="${escapeHtml(m.user_id)}">Guardar</button>
+                <button class="mps-btn mps-btn-secundario" style="padding:6px 10px;font-size:12px;min-height:32px;margin-top:0;" data-hacer-dueno="${escapeHtml(m.user_id)}">Hacer también dueño(a)</button>
               </div>
             `;
             card.querySelector('[data-guardar]').addEventListener('click', async (ev) => {
