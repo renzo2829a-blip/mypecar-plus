@@ -180,6 +180,11 @@
         border:1px solid #e2e8f0; border-radius:999px; padding:6px 12px; font-size:12.5px;
         font-weight:600; color:#0f172a; box-shadow:0 2px 8px rgba(0,0,0,.08); cursor:pointer;
         font-family: 'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
+      .mps-volver { position:fixed; bottom:10px; left:10px; z-index:99998; background:#0b5d52; color:#fff;
+        border-radius:999px; padding:8px 14px; font-size:12.5px; font-weight:700; text-decoration:none;
+        box-shadow:0 4px 14px rgba(0,0,0,.25); font-family:'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
+      .mps-volver:hover { filter:brightness(1.12); }
+      @media print { .mps-volver, .mps-badge { display:none !important; } }
       .mps-badge-menu { position:fixed; bottom:44px; right:10px; z-index:99998; background:#fff;
         border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.15);
         font-family: 'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; overflow:hidden; min-width:170px; }
@@ -707,6 +712,16 @@
     badge.textContent = '🏢 ' + nombre + ' ▾';
     document.body.appendChild(badge);
     badge.addEventListener('click', () => toggleMenu(opciones));
+    // Botón para volver a la pantalla de módulos (solo en los módulos).
+    if (!document.getElementById('mps-volver')) {
+      const volver = document.createElement('a');
+      volver.id = 'mps-volver';
+      volver.className = 'mps-volver';
+      volver.href = 'index.html';
+      volver.textContent = '← Módulos';
+      volver.setAttribute('aria-label', 'Volver a la pantalla de módulos');
+      document.body.appendChild(volver);
+    }
   }
 
   async function toggleMenu(opciones) {
