@@ -106,6 +106,104 @@
     } catch (e) { liberarPagina(); }
   })();
 
+  // ---------------------------------------------------------------------
+  // Pestañas agrupadas en menús desplegables (2026-11-20). Reportes (29 pestañas) y Libro
+  // Diario (21) llenaban el encabezado con 3-4 filas de botones. Aquí se AGRUPAN en menús
+  // (Libros, Estados financieros, Gestión, ...). Son los MISMOS botones, con los mismos ids y
+  // la misma acción (switchTab): solo se mueven de lugar. Solo escritorio.
+  // ---------------------------------------------------------------------
+  (function agruparPestanas() {
+    try {
+      let ruta = location.pathname;
+      try { ruta = decodeURIComponent(ruta); } catch (e) {}
+      let plan = null;
+      if (/108\s*07/.test(ruta)) {
+        plan = ['importar',
+          ['Libros', ['diario', 'mayor', 'ventas', 'compras', 'analisis', 'balancecomp']],
+          ['Estados financieros', ['situacion', 'existencias', 'notaseeff', 'resultados', 'patrimonio', 'flujocaja', 'flujocajaproy']],
+          ['Gestión', ['informe', 'puntoequilibrio', 'resumendia', 'dashventas', 'dashgastos', 'cxc', 'cxp', 'general']],
+          ['Impuestos', ['impuestos', 'detracciones', 'djmensual', 'djanual']],
+          'auditoria', 'seguridad', 'ajustes'];
+      } else if (/108\s*04/.test(ruta)) {
+        plan = ['dashboard', 'shortcuts',
+          ['Libros', ['diario', 'gastosreparados', 'mayor', 'balancecomp']],
+          ['Estados financieros', ['situacion', 'notaseeff', 'resultados', 'patrimonio', 'flujoefectivo', 'flujocaja']],
+          ['Gestión', ['informe', 'puntoequilibrio', 'impuestos']],
+          ['Más', ['consultas', 'nicniif', 'almacen']],
+          'seguridad', 'alertas', 'settings'];
+      }
+      if (!plan) return;
+      const st = document.createElement('style');
+      st.id = 'mps-grupos-css';
+      st.textContent = [
+        '.mps-grupo{position:relative;display:inline-block;flex:none}',
+        '.mps-grupo-btn{display:inline-flex;align-items:center;gap:6px;color:#fff;font-weight:600;cursor:pointer;border:0;background:transparent;font-family:inherit;white-space:nowrap}',
+        '.mps-grupo-btn:hover,.mps-grupo.abierto .mps-grupo-btn,.mps-grupo.activo .mps-grupo-btn{background:rgba(255,255,255,.22) !important}',
+        '.mps-grupo-btn::after{content:"▾";font-size:11px;opacity:.85}',
+        '.mps-grupo-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:99990;min-width:210px;padding:6px;border-radius:12px;background:rgba(15,23,42,.97);box-shadow:0 14px 34px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.14)}',
+        '.mps-grupo.abierto .mps-grupo-menu{display:block}',
+        '.mps-grupo-menu > button{display:flex !important;width:100% !important;text-align:left !important;justify-content:flex-start !important;font-size:13px !important;padding:7px 10px !important;border-radius:8px !important;white-space:nowrap !important;margin:0 !important}',
+        'header nav > .mps-grupo,header .mpm-tabs > .mps-grupo{padding:0 !important}',
+        'header .mps-grupo-btn{font-size:13px !important;padding:5px 9px !important;line-height:1.3 !important;border-radius:8px !important}'
+      ].join('\n');
+      (document.head || document.documentElement).appendChild(st);
+
+      function armar() {
+        if (window.matchMedia && !window.matchMedia('(min-width:641px)').matches) return; // celular: sin cambios
+        const primero = document.getElementById('btn-tab-' + (typeof plan[0] === 'string' ? plan[0] : plan[1][1][0]));
+        const nav = primero && primero.parentElement;
+        if (!nav || nav.getAttribute('data-mps-agrupado')) return;
+        nav.setAttribute('data-mps-agrupado', '1');
+        const nuevos = [];
+        const grupos = [];
+        plan.forEach(item => {
+          if (typeof item === 'string') {
+            const b = document.getElementById('btn-tab-' + item);
+            if (b) nuevos.push(b);
+            return;
+          }
+          const botones = item[1].map(id => document.getElementById('btn-tab-' + id)).filter(Boolean);
+          if (!botones.length) return;
+          const g = document.createElement('div');
+          g.className = 'mps-grupo';
+          const t = document.createElement('button');
+          t.type = 'button';
+          t.className = 'mps-grupo-btn';
+          t.textContent = item[0];
+          const m = document.createElement('div');
+          m.className = 'mps-grupo-menu';
+          botones.forEach(b => m.appendChild(b));
+          g.appendChild(t); g.appendChild(m);
+          t.addEventListener('click', ev => {
+            ev.stopPropagation();
+            const abre = !g.classList.contains('abierto');
+            grupos.forEach(x => x.classList.remove('abierto'));
+            if (abre) {
+              g.classList.add('abierto');
+              m.style.left = '0'; m.style.right = 'auto';
+              const r = m.getBoundingClientRect();
+              if (r.right > window.innerWidth - 8) { m.style.left = 'auto'; m.style.right = '0'; }
+            }
+          });
+          m.addEventListener('click', () => g.classList.remove('abierto'));
+          // Resalta el grupo cuando una de sus pestañas es la activa.
+          const marcar = () => g.classList.toggle('activo', botones.some(b => b.classList.contains('bg-white') || !b.classList.contains('text-white')));
+          new MutationObserver(marcar).observe(m, { attributes: true, subtree: true, attributeFilter: ['class'] });
+          marcar();
+          grupos.push(g);
+          nuevos.push(g);
+        });
+        // Reordena: primero lo planificado y, después, lo que el módulo tuviera de más.
+        const resto = Array.from(nav.children).filter(c => nuevos.indexOf(c) === -1);
+        nuevos.forEach(n => nav.appendChild(n));
+        resto.forEach(r => nav.appendChild(r));
+        document.addEventListener('click', () => grupos.forEach(x => x.classList.remove('abierto')));
+        document.addEventListener('keydown', ev => { if (ev.key === 'Escape') grupos.forEach(x => x.classList.remove('abierto')); });
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', armar); else armar();
+    } catch (e) { /* el agrupado nunca debe impedir abrir el módulo */ }
+  })();
+
   const EMPRESA_NOMBRE_KEY = 'mypecar_empresa_activa_nombre';
   let estilosInyectados = false;
   let overlayEl = null;
