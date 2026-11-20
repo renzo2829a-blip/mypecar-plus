@@ -46,6 +46,43 @@
   // Solo se aplica en los módulos ("108 0X ... Mypecar Plus.html"), no en
   // la landing (index.html), modulos.html ni legal.html.
   // ---------------------------------------------------------------------
+  // ---------------------------------------------------------------------
+  // "¿Cuál es tu nombre?" (2026-11-20): cada módulo preguntaba el nombre del usuario al abrir, 9
+  // veces. El nombre sirve para la bitácora (quién hizo cada cosa). Ahora se toma solo de la
+  // cuenta con la que entraste (nombre de Google, o la parte inicial del correo), se guarda UNA
+  // vez en este equipo para todos los módulos, y la ventana ya no aparece. Si no hubiera sesión
+  // (modo sin nube), todo sigue como antes. El nombre se puede cambiar en Seguridad.
+  // ---------------------------------------------------------------------
+  const NOMBRE_USUARIO_KEY = 'mypecar_usuario_nombre';
+  (function envolverPromptDeNombre() {
+    try {
+      const original = window.prompt;
+      window.prompt = function (msg, def) {
+        if (typeof msg === 'string' && /^¿Cuál es tu nombre\?/.test(msg)) {
+          let n = null;
+          try { n = JSON.parse(localStorage.getItem(NOMBRE_USUARIO_KEY) || 'null'); } catch (e) {}
+          if (n && String(n).trim()) return String(n).trim();
+        }
+        return original.apply(window, arguments);
+      };
+    } catch (e) { /* si algo falla, la ventana sale como siempre */ }
+  })();
+  async function guardarNombreDeUsuario() {
+    try {
+      if (!global.MypecarSync || !global.MypecarSync.auth || !global.MypecarSync.auth.sesionActual) return;
+      const ses = await global.MypecarSync.auth.sesionActual();
+      const u = ses && ses.user;
+      if (!u) return;
+      const meta = u.user_metadata || {};
+      let nombre = meta.full_name || meta.name || '';
+      if (!nombre && u.email) {
+        nombre = String(u.email).split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      }
+      nombre = String(nombre || '').trim().slice(0, 60);
+      if (nombre) localStorage.setItem(NOMBRE_USUARIO_KEY, JSON.stringify(nombre));
+    } catch (e) { /* opcional */ }
+  }
+
   function liberarPagina() {
     try { document.documentElement.classList.remove('mps-esperando'); } catch (e) {}
   }
@@ -476,7 +513,7 @@
     injectStyles();
 
     return new Promise(async (resolveOriginal) => {
-      const resolve = (v) => { liberarPagina(); resolveOriginal(v); };
+      const resolve = async (v) => { await guardarNombreDeUsuario(); liberarPagina(); resolveOriginal(v); };
       const estado = global.MypecarSync ? global.MypecarSync.getEstado() : { conectadoASupabase: false };
 
       if (!estado.conectadoASupabase) {
