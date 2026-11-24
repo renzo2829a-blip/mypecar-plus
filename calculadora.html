@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calculadora de Gratificación y CTS 2026 (Perú) · MYPECAR PLUS</title>
+<meta name="description" content="Calcula gratis la gratificación de julio o diciembre y la CTS de mayo o noviembre de tus trabajadores, según su régimen: general, pequeña empresa o microempresa.">
+<style>
+@font-face{font-family:'Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('fonts/manrope-latin-wght-normal.woff2') format('woff2')}
+:root{--navy:#04231f;--navy2:#0b5d52;--teal:#0f8f7f;--teal-l:#e1f6f2;--ink:#0f172a;--muted:#475569;--line:#e2e8f0;--bg:#f5f8fa}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--navy2)}
+.top{background:linear-gradient(135deg,var(--navy),var(--navy2) 60%,var(--teal));color:#fff;padding:26px 0 70px}
+.wrap{max-width:860px;margin:0 auto;padding:0 20px}
+.top a.back{color:rgba(255,255,255,.85);text-decoration:none;font-weight:700;font-size:14px}
+.top h1{font-size:clamp(26px,4vw,38px);font-weight:800;margin:14px 0 6px;letter-spacing:-.3px}
+.top p{color:rgba(255,255,255,.85);font-size:17px;max-width:600px}
+main{margin-top:-44px;padding-bottom:50px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px 26px;margin-bottom:18px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
+.card h2{font-size:20px;font-weight:800;margin-bottom:12px}
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.tabs button{flex:1;min-width:140px;border:2px solid var(--line);background:#fff;border-radius:12px;padding:12px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;color:var(--muted)}
+.tabs button[aria-pressed=true]{border-color:var(--navy2);background:var(--teal-l);color:var(--navy2)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+label{display:block;font-weight:700;font-size:14px;margin-bottom:5px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:4px}
+input,select{width:100%;font:inherit;font-size:16px;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff}
+.check{display:flex;gap:8px;align-items:flex-start;font-weight:600;font-size:14.5px}
+.check input{width:20px;height:20px;margin-top:2px;flex:none}
+.res{margin-top:18px;background:var(--teal-l);border-radius:14px;padding:18px}
+.res .big{font-size:32px;font-weight:800;color:var(--navy2)}
+.res table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14.5px}
+.res td{padding:6px 0;border-top:1px solid rgba(11,93,82,.15)}
+.res td:last-child{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:10px}
+.aviso{margin-top:10px;font-size:13px;color:#7c2d12;background:#fff7ed;border-radius:10px;padding:10px 12px}
+.cta{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;border-radius:18px;padding:22px 24px;margin-bottom:18px}
+.cta h2{font-size:20px;font-weight:800;margin-bottom:6px}
+.cta p{color:rgba(255,255,255,.85);margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:15.5px;padding:12px 22px;border-radius:12px;text-decoration:none;background:#16a34a;color:#fff}
+.card p,.card li{color:var(--muted);font-size:15px}
+.card ul{margin:8px 0 0 20px;display:grid;gap:6px}
+footer{text-align:center;color:#94a3b8;font-size:13px;padding:0 20px 26px}
+footer a{color:#64748b;display:inline-block;padding:6px 3px}
+@media (max-width:640px){.grid{grid-template-columns:1fr}.card{padding:20px 18px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="back" href="index.html">← MYPECAR PLUS</a>
+    <h1>Calculadora de Gratificación y CTS</h1>
+    <p>Gratis y sin registrarte. Según el régimen laboral de tu empresa (general, pequeña empresa o microempresa).</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card" aria-labelledby="t-calc">
+    <h2 id="t-calc">¿Qué quieres calcular?</h2>
+    <div class="tabs" role="group" aria-label="Tipo de cálculo">
+      <button type="button" id="b-grati" aria-pressed="true">Gratificación</button>
+      <button type="button" id="b-cts" aria-pressed="false">CTS</button>
+    </div>
+
+    <div class="grid">
+      <div>
+        <label for="regimen">Régimen laboral de la empresa</label>
+        <select id="regimen">
+          <option value="general">Régimen general</option>
+          <option value="pequena">Pequeña empresa (REMYPE)</option>
+          <option value="micro">Microempresa (REMYPE)</option>
+        </select>
+      </div>
+      <div>
+        <label for="periodo" id="l-periodo">Gratificación de</label>
+        <select id="periodo"></select>
+      </div>
+      <div>
+        <label for="sueldo">Sueldo básico mensual (S/)</label>
+        <input id="sueldo" type="number" inputmode="decimal" min="0" step="0.01" value="1500">
+      </div>
+      <div>
+        <label for="extras">Promedio de otros ingresos fijos (S/)</label>
+        <input id="extras" type="number" inputmode="decimal" min="0" step="0.01" value="0">
+        <div class="hint">Horas extras o bonos que recibió 3 meses o más en el semestre. Si no hay, deja 0.</div>
+      </div>
+      <div>
+        <label for="meses">Meses completos trabajados en el semestre</label>
+        <select id="meses"></select>
+      </div>
+      <div id="caja-dias" hidden>
+        <label for="dias">Días adicionales trabajados</label>
+        <input id="dias" type="number" inputmode="numeric" min="0" max="29" step="1" value="0">
+      </div>
+      <div id="caja-seguro">
+        <label for="seguro">Seguro de salud</label>
+        <select id="seguro">
+          <option value="0.09">EsSalud (bonificación 9%)</option>
+          <option value="0.0675">EPS (bonificación 6.75%)</option>
+        </select>
+      </div>
+      <div>
+        <label class="check"><input type="checkbox" id="hijos"> Recibe asignación familiar (tiene hijos menores o estudiando)</label>
+        <div class="hint">10% de la remuneración mínima: S/ <span id="af"></span>.</div>
+      </div>
+    </div>
+
+    <div class="res" id="resultado" aria-live="polite"></div>
+  </section>
+
+  <section class="cta">
+    <h2>¿Tienes varios trabajadores?</h2>
+    <p>MYPECAR PLUS calcula la planilla, la gratificación, la CTS, AFP/ONP y EsSalud de todos tus trabajadores, y genera el asiento contable solo.</p>
+    <a class="btn" href="modulos.html?prueba=1">Probar 14 días gratis →</a>
+  </section>
+
+  <section class="card">
+    <h2>Cómo se calcula</h2>
+    <ul>
+      <li><b>Gratificación</b> (julio y diciembre): remuneración computable × meses completos del semestre ÷ 6. Régimen general: 100%; pequeña empresa: 50%; microempresa: no corresponde. Se suma la bonificación extraordinaria (9% EsSalud o 6.75% EPS, Ley 30334).</li>
+      <li><b>CTS</b> (mayo y noviembre): (remuneración + 1/6 de la última gratificación) ÷ 12 × meses + ÷ 360 × días. Régimen general: 100%; pequeña empresa: 50%; microempresa: no corresponde.</li>
+      <li>Semestres: gratificación de julio = enero a junio; de diciembre = julio a diciembre. CTS de mayo = noviembre a abril; de noviembre = mayo a octubre.</li>
+      <li>Resultado referencial. Casos especiales (faltas, licencias, cese, remuneración variable) pueden cambiar el monto.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>MYPECAR PLUS · <a href="ayuda.html">Primeros pasos</a> · <a href="legal.html#terminos">Términos</a> · <a href="legal.html#privacidad">Privacidad</a></footer>
+
+<script>
+(function () {
+  'use strict';
+  var RMV = 1130, ASIG = Math.round(RMV * 0.10 * 100) / 100;
+  var FACTOR = { general: 1, pequena: 0.5, micro: 0 };
+  var tipo = 'grati';
+  var $ = function (id) { return document.getElementById(id); };
+  var r2 = function (n) { return Math.round((n + Number.EPSILON) * 100) / 100; };
+  var soles = function (n) { return 'S/ ' + n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  $('af').textContent = ASIG.toFixed(2);
+  var anio = new Date().getFullYear();
+  function opcionesPeriodo() {
+    var p = $('periodo'); p.innerHTML = '';
+    var ops = tipo === 'grati'
+      ? [['julio', 'Julio ' + anio + ' (enero a junio)'], ['diciembre', 'Diciembre ' + anio + ' (julio a diciembre)']]
+      : [['mayo', 'Mayo ' + anio + ' (noviembre a abril)'], ['noviembre', 'Noviembre ' + anio + ' (mayo a octubre)']];
+    ops.forEach(function (o) { var e = document.createElement('option'); e.value = o[0]; e.textContent = o[1]; p.appendChild(e); });
+    $('l-periodo').textContent = tipo === 'grati' ? 'Gratificación de' : 'CTS de';
+    $('caja-dias').hidden = tipo !== 'cts';
+    $('caja-seguro').hidden = tipo !== 'grati';
+    $('b-grati').setAttribute('aria-pressed', tipo === 'grati'); $('b-cts').setAttribute('aria-pressed', tipo === 'cts');
+  }
+  var m = $('meses'); for (var i = 6; i >= 0; i--) { var e = document.createElement('option'); e.value = i; e.textContent = i === 6 ? '6 (semestre completo)' : String(i); m.appendChild(e); }
+  function num(id) { var v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : 0; }
+  function calcular() {
+    var reg = $('regimen').value, f = FACTOR[reg];
+    var rem = num('sueldo') + ($('hijos').checked ? ASIG : 0) + num('extras');
+    var meses = Math.min(6, parseInt($('meses').value, 10) || 0);
+    var out = $('resultado'), filas = [];
+    if (f === 0) { out.innerHTML = '<div class="big">No corresponde</div><p>En la <b>microempresa</b> (REMYPE) los trabajadores no tienen gratificación ni CTS.</p>'; return; }
+    if (tipo === 'grati') {
+      var monto = r2(rem * meses / 6 * f), tasa = parseFloat($('seguro').value), bonif = r2(monto * tasa);
+      filas = [['Remuneración computable', soles(r2(rem))], ['Meses completos', meses + ' de 6'], ['Régimen', f === 1 ? '100%' : '50% (pequeña empresa)'],
+        ['Gratificación', soles(monto)], ['Bonificación extraordinaria (' + (tasa * 100).toLocaleString('es-PE') + '%)', soles(bonif)]];
+      out.innerHTML = '<div>Total a pagar</div><div class="big">' + soles(r2(monto + bonif)) + '</div>' + tabla(filas) +
+        '<p class="hint">La gratificación no tiene descuentos de AFP/ONP; sí puede afectar al impuesto de 5ta categoría.</p>';
+    } else {
+      var dias = Math.min(29, Math.max(0, parseInt($('dias').value, 10) || 0));
+      var gratiPrevia = r2(rem * 6 / 6 * f), sexto = gratiPrevia / 6, rc = rem + sexto;
+      var cts = r2((rc / 12 * meses + rc / 360 * dias) * f);
+      filas = [['Remuneración', soles(r2(rem))], ['1/6 de la última gratificación', soles(r2(sexto))], ['Remuneración computable', soles(r2(rc))],
+        ['Tiempo', meses + ' meses y ' + dias + ' días'], ['Régimen', f === 1 ? '100%' : '50% (pequeña empresa)']];
+      out.innerHTML = '<div>CTS a depositar</div><div class="big">' + soles(cts) + '</div>' + tabla(filas) +
+        '<p class="hint">Se calcula con una gratificación previa completa con el mismo sueldo. Se deposita en la cuenta CTS del trabajador hasta el 15 del mes.</p>';
+    }
+    if (num('sueldo') > 0 && num('sueldo') < RMV) out.innerHTML += '<div class="aviso">El sueldo es menor a la remuneración mínima (S/ ' + RMV.toFixed(2) + ') para jornada completa.</div>';
+  }
+  function tabla(f) { return '<table>' + f.map(function (x) { return '<tr><td>' + x[0] + '</td><td>' + x[1] + '</td></tr>'; }).join('') + '</table>'; }
+  $('b-grati').onclick = function () { tipo = 'grati'; opcionesPeriodo(); calcular(); };
+  $('b-cts').onclick = function () { tipo = 'cts'; opcionesPeriodo(); calcular(); };
+  ['regimen', 'periodo', 'sueldo', 'extras', 'meses', 'dias', 'seguro', 'hijos'].forEach(function (id) { $(id).addEventListener('input', calcular); $(id).addEventListener('change', calcular); });
+  opcionesPeriodo(); calcular();
+})();
+</script>
+</body>
+</html>
