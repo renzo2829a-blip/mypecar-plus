@@ -88,6 +88,52 @@
     for (var i = 0; i < cs.length; i++) cs[i].classList.add('mpm-ancho');
   }
 
+  // (2026-11-24) Accesibilidad (en todas las pantallas): botones que son solo un ícono reciben nombre (tooltip y
+  // lector de pantalla), y los campos sin etiqueta toman el texto que tienen al lado. No cambia nada visual.
+  var NOMBRE_ICONO = [
+    ['fa-pen', 'Editar'], ['fa-pencil', 'Editar'], ['fa-trash', 'Eliminar'], ['fa-xmark', 'Cerrar'], ['fa-times', 'Cerrar'],
+    ['fa-whatsapp', 'Enviar por WhatsApp'], ['fa-envelope', 'Enviar por correo'], ['fa-eye', 'Ver'], ['fa-print', 'Imprimir'],
+    ['fa-download', 'Descargar'], ['fa-upload', 'Subir'], ['fa-paper-plane', 'Enviar'], ['fa-copy', 'Copiar'], ['fa-plus', 'Agregar'],
+    ['fa-check', 'Confirmar'], ['fa-rotate', 'Actualizar'], ['fa-arrows-rotate', 'Actualizar'], ['fa-magnifying-glass', 'Buscar'],
+    ['fa-search', 'Buscar'], ['fa-circle-info', 'Información'], ['fa-gear', 'Ajustes'], ['fa-file-pdf', 'Descargar PDF'],
+    ['fa-file-excel', 'Descargar Excel'], ['fa-rotate-left', 'Restaurar'], ['fa-ban', 'Anular'], ['fa-money-bill', 'Registrar cobro']
+  ];
+  function nombrarControles() {
+    var bs = document.querySelectorAll('button:not([aria-label]), a[onclick]:not([aria-label])');
+    for (var i = 0; i < bs.length; i++) {
+      var b = bs[i];
+      if ((b.textContent || '').trim() || b.getAttribute('title')) continue;
+      var ic = b.querySelector('i[class*="fa-"]'); if (!ic) continue;
+      for (var k = 0; k < NOMBRE_ICONO.length; k++) {
+        if (ic.classList.contains(NOMBRE_ICONO[k][0])) { b.setAttribute('aria-label', NOMBRE_ICONO[k][1]); b.setAttribute('title', NOMBRE_ICONO[k][1]); break; }
+      }
+    }
+    var cs = document.querySelectorAll('input:not([type=hidden]):not([type=file]):not([aria-label]), select:not([aria-label]), textarea:not([aria-label])');
+    for (var j = 0; j < cs.length; j++) {
+      var c = cs[j];
+      if (c.getAttribute('title') || c.closest('label') || (c.id && document.querySelector('label[for="' + c.id.replace(/"/g, '') + '"]'))) continue;
+      var t = '', prev = c.previousElementSibling;
+      if (prev && /^(LABEL|P|SPAN|DIV|H\d)$/.test(prev.tagName)) t = prev.textContent;
+      if (!t && c.parentElement) { var lab = c.parentElement.querySelector(':scope > label, :scope > p, :scope > span'); if (lab && lab !== c) t = lab.textContent; }
+      if (!t) { // dentro de una tabla: el encabezado de su columna
+        var td = c.closest('td');
+        if (td && td.parentElement) {
+          var tabla = td.closest('table'), col = Array.prototype.indexOf.call(td.parentElement.children, td);
+          var ths = tabla ? tabla.querySelectorAll('thead tr:last-child th') : [];
+          if (ths[col]) t = ths[col].textContent;
+        }
+      }
+      if (!t && c.previousElementSibling == null && c.parentElement && c.parentElement.previousElementSibling) {
+        var pe = c.parentElement.previousElementSibling; if (/^(LABEL|P|SPAN|H\d)$/.test(pe.tagName)) t = pe.textContent;
+      }
+      if (!t && c.placeholder) t = c.placeholder;
+      if (!t && c.id) { var ID = [['periodo', 'Periodo'], ['anio', 'Año'], ['semestre', 'Semestre'], ['mes', 'Mes'], ['filtro', 'Filtrar'], ['categoria', 'Categoría'], ['valor', 'Valor'], ['cuenta', 'Cuenta']];
+        for (var q = 0; q < ID.length; q++) if (c.id.toLowerCase().indexOf(ID[q][0]) !== -1) { t = ID[q][1]; break; } }
+      t = (t || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      if (t) c.setAttribute('aria-label', t);
+    }
+  }
+
   function marcarPestañas() {
     var btn = document.querySelector('[id^="btn-tab-"]');
     if (!btn) return;
@@ -136,13 +182,14 @@
     marcarPestañas();
     marcarCamposAnchos();
     marcarTablas();
+    nombrarControles();
 
     // Las tablas se dibujan con JavaScript: re-marcar cuando cambia el contenido.
     if (window.MutationObserver) {
       var pend = false;
       new MutationObserver(function () {
         if (pend) return; pend = true;
-        setTimeout(function () { pend = false; marcarTablas(); marcarCamposAnchos(); }, 200);
+        setTimeout(function () { pend = false; marcarTablas(); marcarCamposAnchos(); nombrarControles(); }, 200);
       }).observe(document.body, { childList: true, subtree: true });
     }
 

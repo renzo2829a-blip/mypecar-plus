@@ -40,6 +40,17 @@ grupoB (provisional a prueba de abuso) · prueba_gratis_14_dias · prueba_gratis
   la usa para mantener activo el proyecto Free.
 - Prueba con CLIENTE DEMO DOS (dueño con sesión): ve sus propios datos, lee la versión mínima y no puede escribirla.
 
+## Auditoría de seguridad y usabilidad (24-nov-2026, segunda parte)
+- `consulta-documento` (v27): estaba ABIERTA a cualquiera sin sesión (verify_jwt=false) y consultaba DNI/RUC con la clave de
+  Decolecta. Ahora es el mismo código que `ruc-dni`: exige sesión, ser miembro de la empresa, número válido y límite de uso.
+  Copia en `supabase/functions/consulta-documento/index.ts`.
+- Datos leídos (mypecar-sync.js `neutralizarHtml`): además de < y >, las comillas " y ' dentro de los textos pasan a ” y ’.
+  Cierra la inyección de atributos (p. ej. un nombre de producto con `" onmouseover="…`), comprobada en prueba antes del arreglo.
+- `_headers`: Content-Security-Policy con object-src 'none', base-uri 'self', frame-ancestors 'self', form-action 'self'.
+- `yape-webhook` exige la clave secreta (rechaza si no está configurada); `avisar` exige sesión y membresía.
+- Accesibilidad (mypecar-mobile.js): todo botón de solo ícono recibe nombre y tooltip; los campos sin etiqueta toman la de su
+  costado o la de su columna (de ~300 sin etiqueta a 13).
+
 ## Pendientes conocidos
 - "Leaked password protection": no disponible en el plan Free (el panel pide plan Pro). Se activa en Auth → Sign In / Providers → Email si
   algún día se pasa a Pro.

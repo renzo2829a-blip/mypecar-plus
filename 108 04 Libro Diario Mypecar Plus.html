@@ -9908,8 +9908,8 @@ function renderBandejaAsientos() {
     cont.innerHTML = '<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-left text-slate-500"><th class="p-1.5">Periodo</th><th class="p-1.5">Módulo</th><th class="p-1.5">Asiento</th><th class="p-1.5 text-right">Total S/</th><th class="p-1.5">Estado</th><th class="p-1.5"></th></tr></thead><tbody>' +
         filas.map(x => {
             const it = x.it, e = x.e;
-            const btn = e.estado === 'nuevo' ? `<button type="button" onclick="cargarDesdeBandeja('${encodeURIComponent(x.k)}')" class="bg-violet-600 hover:bg-violet-700 text-white font-bold px-3 py-1.5 rounded-lg">Cargar</button>`
-                : e.estado === 'cambio' ? `<button type="button" onclick="cargarDesdeBandeja('${encodeURIComponent(x.k)}')" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-lg">Actualizar</button>`
+            const btn = e.estado === 'nuevo' ? `<button type="button" onclick="cargarDesdeBandeja('${encodeURIComponent(x.k).replace(/'/g, '%27')}')" class="bg-violet-600 hover:bg-violet-700 text-white font-bold px-3 py-1.5 rounded-lg">Cargar</button>`
+                : e.estado === 'cambio' ? `<button type="button" onclick="cargarDesdeBandeja('${encodeURIComponent(x.k).replace(/'/g, '%27')}')" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-lg">Actualizar</button>`
                 : e.asiento ? `<span class="text-slate-400">N° ${esc(e.asiento.numero)}</span>` : '';
             const nota = e.estado === 'sin_montos' ? `<div class="text-[10px] text-rose-700">Revisa el asiento N° ${esc(e.asiento.numero)}: en el módulo de origen ya no hay montos para este mes.</div>`
                 : e.estado === 'duplicado' ? `<div class="text-[10px] text-rose-700">Hay ${e.n} asientos de este origen en el mes: revisa si sobra alguno.</div>` : '';
