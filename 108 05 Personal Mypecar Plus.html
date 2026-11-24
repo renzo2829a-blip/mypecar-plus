@@ -5363,7 +5363,8 @@
             try { resultadoPull = await MypecarSync.pullAll(); } catch (e) { console.error('No se pudo sincronizar con la nube al iniciar (se sigue con los datos locales):', e); resultadoPull = { aplicadas: 0, motivo: 'excepcion-en-llamada', error: e }; }
             // (2026-09-24b) Empresa limpiada desde la nube (script 127.01): debe arrancar
             // VACÍA, sin los datos de ejemplo que se siembran para una empresa recién creada.
-            if (typeof MypecarSync.empresaFueReiniciada === 'function' && MypecarSync.empresaFueReiniciada()) { demoTrabajadores.length = 0; demoContratos.length = 0; }
+            // (2026-11-24) Una empresa nueva empieza VACÍA: ya no se cargan ni se suben a la nube datos de ejemplo de una pollería.
+            demoTrabajadores.length = 0; demoContratos.length = 0;
             // ARREGLO CRÍTICO (2026-09-18): ver el mismo arreglo en 01 Ventas, 02 Compras,
             // 03 Caja y Bancos y 04 Libro Diario. Se usa más abajo para decidir si es
             // seguro sembrar datos de ejemplo y subirlos a la nube, o si hay que esperar.
@@ -5372,6 +5373,7 @@
                 || (resultadoPull && !resultadoPull.motivo);
 
             const cfgGuardado = localStorage.getItem('personal_config');
+            if (!cfgGuardado && cloudConfirmadaComoVacia && typeof mesPeru === 'function') config.periodoActivo = mesPeru(); // empresa nueva: mes actual
             if (cfgGuardado) {
                 // Blindaje: si lo guardado (nube o local) quedó literalmente como null
                 // —por ejemplo, al sincronizar una fila de app_config cuyo "valor" es

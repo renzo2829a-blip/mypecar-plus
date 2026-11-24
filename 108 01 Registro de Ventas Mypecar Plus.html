@@ -1804,7 +1804,8 @@
             try { resultadoPull = await MypecarSync.pullAll(); } catch (e) { console.error('No se pudo sincronizar con la nube al iniciar (se sigue con los datos locales):', e); resultadoPull = { aplicadas: 0, motivo: 'excepcion-en-llamada', error: e }; }
             // (2026-09-24b) Empresa limpiada desde la nube (script 127.01): debe arrancar
             // VACÍA, sin los datos de ejemplo que se siembran para una empresa recién creada.
-            if (typeof MypecarSync.empresaFueReiniciada === 'function' && MypecarSync.empresaFueReiniciada()) { demoSales.length = 0; }
+            // (2026-11-24) Una empresa nueva empieza VACÍA: ya no se cargan ni se suben a la nube datos de ejemplo de una pollería.
+            demoSales.length = 0;
             // Blindaje (2026-09-18): ¿se pudo confirmar de verdad, hablando con la
             // nube, que no hay NADA guardado todavía para esta empresa? Solo en ese
             // caso es seguro sembrar el periodo de demostración y subirlo — ver el
@@ -1926,6 +1927,7 @@
                 // guardarlo ni subirlo a ningún lado, para no arriesgar pisar un dato real
                 // que todavía no se pudo verificar.
                 if (cloudConfirmadaComoVacia) {
+                    if (typeof mesPeru === 'function') config.periodoActivo = mesPeru(); // empresa nueva: arranca en el mes actual
                     periodsData = {};
                     periodsData[config.periodoActivo] = { sales: demoSales.map(s => { const b = Math.round(s.total / (1 + config.igvRate) * 100) / 100; return { ...s, baseGravada: b, igv: Math.round((s.total - b) * 100) / 100 }; }) };
                     sembrarDemo = true;

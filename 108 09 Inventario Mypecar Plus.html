@@ -892,7 +892,9 @@
             // había guardado en este dispositivo (ver mypecar-sync.js).
             try { await MypecarSync.pullAll(); } catch (e) { console.error('No se pudo sincronizar con la nube al iniciar (se sigue con los datos locales):', e); }
 
-            config = await storageGet('inventario_config', config);
+            const _cfgInvGuardado = await storageGet('inventario_config', null);
+            config = _cfgInvGuardado || config;
+            if (!_cfgInvGuardado && typeof mesPeru === 'function') config.periodoActivo = mesPeru(); // empresa nueva: mes actual
             if (!config.puntosVenta || config.puntosVenta.length === 0) config.puntosVenta = [{ codigo: 'PV1', nombre: 'Principal' }];
             if (!config.productos) config.productos = [];
             if (!config.metodoValorizacion) config.metodoValorizacion = 'PROMEDIO';

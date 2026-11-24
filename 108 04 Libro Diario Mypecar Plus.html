@@ -3165,7 +3165,8 @@ const MypecarPEVista = (function () {
             try { resultadoPull = await MypecarSync.pullAll(); } catch (e) { console.error('No se pudo sincronizar con la nube al iniciar (se sigue con los datos locales):', e); resultadoPull = { aplicadas: 0, motivo: 'excepcion-en-llamada', error: e }; }
             // (2026-09-24b) Empresa limpiada desde la nube (script 127.01): debe arrancar
             // VACÍA, sin los datos de ejemplo que se siembran para una empresa recién creada.
-            if (typeof MypecarSync.empresaFueReiniciada === 'function' && MypecarSync.empresaFueReiniciada()) { demoAsientos.length = 0; }
+            // (2026-11-24) Una empresa nueva empieza VACÍA: ya no se cargan ni se suben a la nube datos de ejemplo de una pollería.
+            demoAsientos.length = 0;
             // ARREGLO CRÍTICO (2026-09-18): antes, si periodsData salía vacío (por
             // ejemplo porque pullAll() no pudo conectarse justo en ese momento), la app
             // sembraba datos de demostración y los SUBÍA de inmediato a la nube — sin
@@ -3281,6 +3282,7 @@ const MypecarPEVista = (function () {
             let periodoVacioSinConfirmarConNube = false;
             if (!periodsData) {
                 if (cloudConfirmadaComoVacia) {
+                    if (typeof mesPeru === 'function') config.periodoActivo = mesPeru(); // empresa nueva: arranca en el mes actual
                     periodsData = {};
                     periodsData[config.periodoActivo] = { asientos: demoAsientos.map(a => ({ ...a, lineas: a.lineas.map(l => ({ ...l })) })) };
                     sembrarDemo = true;
