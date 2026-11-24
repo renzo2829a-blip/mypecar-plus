@@ -788,7 +788,7 @@
   // Datos para que el cliente te escriba cuando su empresa está pendiente, por vencer o vencida.
   // COMPLÉTALOS: whatsapp = número con código de país y sin signos (ej. '51999999999');
   // correo = el que quieras mostrar. Si los dejas vacíos, los avisos dicen "tu proveedor".
-  const CONTACTO = { whatsapp: '51996378921', correo: 'carlosfloresf2030@gmail.com' };
+  const CONTACTO = { whatsapp: '51996378921', correo: '' };
   // Yape del negocio (pago automático): el cliente yapea a este número y la empresa se activa sola.
   const YAPE = { numero: '996378921', mensual: 59, anual: 590 };
 
