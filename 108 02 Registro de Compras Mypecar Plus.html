@@ -8050,6 +8050,23 @@
             </div>
         </div>
     </div>
+<script>
+/* (2026-11-24) Primeros pasos para empresas nuevas (ver mypecar-primeros-pasos.js). */
+window.MYPECAR_PRIMEROS_PASOS = {
+    app: 'compras', titulo: 'Primeros pasos en Registro de Compras',
+    pasos: [
+        { texto: 'Revisa los datos de tu empresa', ayuda: 'RUC, razón social y régimen tributario.', boton: 'Revisar',
+          hecho: () => !!(config.ruc && config.razonSocial), ir: () => switchTab('settings') },
+        { texto: 'Agrega tu primer proveedor', ayuda: 'Escribe su RUC y la razón social se llena sola.', boton: 'Agregar proveedor',
+          hecho: () => proveedores.length > 0 || hayComprasGuia(), ir: () => switchTab('proveedores') },
+        { texto: 'Registra tu primera compra', ayuda: 'Facturas de mercadería, servicios y gastos: suman a tu crédito fiscal.', boton: 'Registrar compra',
+          hecho: () => hayComprasGuia(), ir: () => { switchTab('shortcuts'); const f = document.getElementById('form-compra'); if (f) { f.scrollIntoView({ behavior: 'smooth' }); const i = f.querySelector('input,select'); if (i) setTimeout(() => i.focus(), 400); } } }
+    ],
+    final: 'Con tus ventas (01) y compras registradas, 07 Reportes te muestra el IGV del mes y tu balance.'
+};
+function hayComprasGuia() { return (purchases && purchases.length > 0) || Object.values(periodsData || {}).some(p => p && Array.isArray(p.purchases) && p.purchases.length > 0); }
+</script>
+<script src="mypecar-primeros-pasos.js"></script>
 <script src="mypecar-ruc-gratis.js"></script>
 
 <script>

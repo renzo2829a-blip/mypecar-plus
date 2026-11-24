@@ -6518,6 +6518,23 @@
             <canvas id="qr-canvas-oculto" class="hidden"></canvas>
         </div>
     </div>
+<script>
+/* (2026-11-24) Primeros pasos para empresas nuevas (ver mypecar-primeros-pasos.js). */
+window.MYPECAR_PRIMEROS_PASOS = {
+    app: 'ventas', titulo: 'Primeros pasos en Registro de Ventas',
+    pasos: [
+        { texto: 'Revisa los datos de tu empresa', ayuda: 'RUC, razón social y régimen tributario (se llenan solos al registrar tu empresa).', boton: 'Revisar',
+          hecho: () => !!(config.ruc && config.razonSocial), ir: () => switchTab('settings') },
+        { texto: 'Agrega tu primer cliente', ayuda: 'Para facturas. Para boletas puedes usar "Público en general".', boton: 'Agregar cliente',
+          hecho: () => clientes.length > 0 || hayVentasGuia(), ir: () => switchTab('clientes') },
+        { texto: 'Registra tu primera venta', ayuda: 'El IGV y el asiento contable se calculan solos.', boton: 'Registrar venta',
+          hecho: () => hayVentasGuia(), ir: () => { switchTab('shortcuts'); const f = document.getElementById('form-venta'); if (f) { f.scrollIntoView({ behavior: 'smooth' }); const i = f.querySelector('input,select'); if (i) setTimeout(() => i.focus(), 400); } } }
+    ],
+    final: 'Después registra tus compras en 02 Compras: con ambas verás tu IGV a pagar del mes en 07 Reportes.'
+};
+function hayVentasGuia() { return (sales && sales.length > 0) || Object.values(periodsData || {}).some(p => p && Array.isArray(p.sales) && p.sales.length > 0); }
+</script>
+<script src="mypecar-primeros-pasos.js"></script>
 <script src="mypecar-ruc-gratis.js"></script>
 
 <script>
