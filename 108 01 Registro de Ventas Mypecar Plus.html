@@ -1539,6 +1539,30 @@
 
         // Referencia activa (apunta a periodsData[config.periodoActivo].sales)
         let sales = [];
+        // (2026-11-24) Compara lo que se vende con el stock que Inventario publicó (foto 'stock'). Si no hay foto o no hay
+        // conexión, devuelve [] y la venta sigue normal. Descuenta lo ya pedido en otras líneas del mismo producto.
+        async function productosSinStockSuficiente(items, puntoVenta) {
+            try {
+                if (!window.MypecarSync || !MypecarSync.enlace) return [];
+                const r = await MypecarSync.enlace.leer('inventario', 'stock');
+                if (!r || !r.payload || !Array.isArray(r.payload.items)) return [];
+                const pedido = {};
+                items.forEach(it => {
+                    const p = (config.productos || []).find(x => x.codigo === it.productoCodigo);
+                    if (p && p.controlaStock === false) return;
+                    pedido[it.productoCodigo] = pedido[it.productoCodigo] || { nombre: it.productoNombre || it.productoCodigo, unidad: it.unidad || '', cant: 0 };
+                    pedido[it.productoCodigo].cant += it.cantidad;
+                });
+                const salida = [];
+                Object.keys(pedido).forEach(cod => {
+                    const fila = r.payload.items.find(x => x.productoCodigo === cod && x.puntoVenta === puntoVenta);
+                    const hay = fila ? Number(fila.cantidad) || 0 : 0;
+                    if (pedido[cod].cant > hay + 0.0000001) salida.push('• ' + pedido[cod].nombre + ': vendes ' + pedido[cod].cant + ' ' + pedido[cod].unidad + ' y hay ' + hay);
+                });
+                return salida;
+            } catch (e) { return []; }
+        }
+
         let ventaEnEdicionId = null; // null = registrando una venta nueva; si tiene un id, el submit del formulario ACTUALIZA esa venta en vez de crear una nueva.
 
         // Movimientos de inventario (salidas) generados automáticamente al registrar una
@@ -3913,6 +3937,13 @@
                 showToast(`Ya existe un comprobante ${tipoDoc} ${serie}-${numero} registrado en este periodo. No se puede duplicar.`, 'error'); return;
             }
             if (!cuenta) { showToast('Selecciona una cuenta contable de ingreso válida del catálogo.', 'error'); return; }
+
+            // (2026-11-24) Aviso de stock: si Inventario (09) publicó su stock y esta venta saca más de lo que hay, se pregunta
+            // antes de guardar. Solo avisa (nunca bloquea). No se revisa al editar una venta ni en Notas de Crédito.
+            if (detalleItems.length > 0 && !ventaEnEdicionId && !esModificatorio) {
+                const faltantes = await productosSinStockSuficiente(detalleItems, puntoVenta);
+                if (faltantes.length > 0 && !confirm('Según Inventario no hay stock suficiente:\n\n' + faltantes.join('\n') + '\n\n¿Registrar la venta de todas formas? (el stock quedará en negativo hasta que registres la compra)')) return;
+            }
 
             // Todo lo que ingresa el usuario está en la moneda seleccionada; lo que se GUARDA y se usa
             // en el resto del sistema (SIRE, asientos, reportes) siempre va en soles, según la NIC 21.
