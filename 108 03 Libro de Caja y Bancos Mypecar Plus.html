@@ -2449,8 +2449,14 @@
                 if (tcConfigurado != null) {
                     document.getElementById('mov-tipo-cambio').value = tcConfigurado;
                     origenEl.innerText = `Tomado de Ajustes para ${formatPeriodoLabel(config.periodoActivo)}. Edítalo si el comprobante trae un T.C. distinto.`;
+                    origenEl.className = 'text-[9px] text-slate-400 mt-0.5';
                 } else {
-                    origenEl.innerText = `No hay un T.C. configurado para este mes en Ajustes — verifica el valor antes de guardar.`;
+                    // (2026-11-24) Sin T.C. configurado ya NO se usa 3.75 en silencio: el campo queda vacío y hay que digitar el T.C. real
+                    // (o configurarlo en Ajustes). Si ya se digitó otro valor, se respeta.
+                    const tcEl = document.getElementById('mov-tipo-cambio');
+                    if (tcEl && (tcEl.value === '' || tcEl.value === '3.75')) tcEl.value = '';
+                    origenEl.innerText = `⚠ No hay un T.C. configurado para ${formatPeriodoLabel(config.periodoActivo)} en Ajustes: escribe el tipo de cambio del comprobante (o configúralo en Ajustes → Tipo de cambio).`;
+                    origenEl.className = 'text-[10px] text-rose-600 font-bold mt-0.5';
                 }
             }
         }
