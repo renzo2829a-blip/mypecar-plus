@@ -2067,7 +2067,10 @@ const MypecarPEVista = (function () {
                 // durante el mes normalmente acumula saldo deudor antes de netearse en el PDT 621).
                 const CUENTAS_NATURALEZA_ESPECIAL = ['391', '392', '393', '40112', '1911'];
                 if (CUENTAS_NATURALEZA_ESPECIAL.includes(cta)) return;
-                const esperaDeudora = ['activo_corriente', 'activo_no_corriente', 'gasto'].includes(grupo);
+                // (2026-11-24) La Clase 9 (gasto por función: 90, 94, 95, 97) tiene saldo DEUDOR, igual que los gastos; antes se
+                // esperaba acreedor y cada mes salían hallazgos falsos. La 791 (enlace) es acreedora por diseño y se omite.
+                if (grupo === 'cuenta_enlace') return;
+                const esperaDeudora = ['activo_corriente', 'activo_no_corriente', 'gasto', 'gasto_por_funcion'].includes(grupo);
                 if (esperaDeudora && neto < -0.5) cuentasContrarias.push({ cta, nombre: getAccountName(cta), neto, esperado: 'deudora (Debe > Haber)' });
                 if (!esperaDeudora && neto > 0.5) cuentasContrarias.push({ cta, nombre: getAccountName(cta), neto, esperado: 'acreedora (Haber > Debe)' });
             });
