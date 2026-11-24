@@ -2641,12 +2641,43 @@ var LZString = {
     // Todas las filas de la empresa en la nube (las 9 apps).
     async leerFilasEmpresa(empresaId) {
       requiereSupabase();
-      const { data, error } = await supabaseClient.from('app_config')
-        .select('app, clave, valor, actualizado_en')
-        .eq('empresa_id', empresaId).range(0, 9999);
-      if (error) throw error;
-      return (data || []).filter(f => String(f.clave).indexOf('snap_') !== 0); // las fotos de enlace son derivadas: no entran al respaldo
+      // (2026-11-24) Se lee por PÁGINAS de 1000: Supabase devuelve como máximo 1000 filas por consulta, y pedir "0 a 9999"
+      // en una sola llamada dejaba el respaldo incompleto en silencio cuando la empresa tenía más datos. Se ordena por
+      // (app, clave) para que las páginas sean estables.
+      const TAM = 1000, todas = [];
+      for (let desde = 0; desde < 200000; desde += TAM) {
+        const { data, error } = await supabaseClient.from('app_config')
+          .select('app, clave, valor, actualizado_en')
+          .eq('empresa_id', empresaId).order('app').order('clave').range(desde, desde + TAM - 1);
+        if (error) throw error;
+        (data || []).forEach(f => todas.push(f));
+        if (!data || data.length < TAM) break;
+      }
+      return todas.filter(f => String(f.clave).indexOf('snap_') !== 0); // las fotos de enlace son derivadas: no entran al respaldo
     },
+    // Respaldo completo de la empresa activa a un archivo .json en el equipo (lo usa el menú de la empresa).
+    // Devuelve { nombre, registros, apps } y recuerda la fecha para el aviso de "hace X días sin respaldar".
+    async respaldoCompleto() {
+      requiereSupabase();
+      const empresaId = requiereEmpresaActiva();
+      if (!navigator.onLine) throw new Error('Sin internet: el respaldo se descarga desde la nube.');
+      const datos = await empresas.obtenerDatos(empresaId);
+      const filas = await seguridad.leerFilasEmpresa(empresaId);
+      if (!filas.length) throw new Error('Esta empresa aún no tiene datos guardados en la nube.');
+      const nombre = seguridad.descargarRespaldo(empresaId, datos, filas);
+      lsSet('mypecar_respaldo_' + empresaId, { fecha: new Date().toISOString(), registros: filas.length });
+      return { nombre, registros: filas.length, apps: Object.keys(seguridad.resumirFilas(filas).porApp).length };
+    },
+    // Días desde el último respaldo descargado de esta empresa (null si nunca) y cuándo se vio por primera vez.
+    estadoRespaldo(empresaId) {
+      const r = lsGet('mypecar_respaldo_' + empresaId, null);
+      let visto = lsGet('mypecar_respaldo_visto_' + empresaId, null);
+      if (!visto) { visto = new Date().toISOString(); lsSet('mypecar_respaldo_visto_' + empresaId, visto); }
+      const dias = f => Math.floor((Date.now() - Date.parse(f)) / 86400000);
+      return { ultimo: r && r.fecha || null, diasDesdeUltimo: r && r.fecha ? dias(r.fecha) : null, diasDesdeVisto: dias(visto),
+               aplazadoHasta: lsGet('mypecar_respaldo_aplazado_' + empresaId, null) };
+    },
+    aplazarAvisoRespaldo(empresaId, dias) { lsSet('mypecar_respaldo_aplazado_' + empresaId, new Date(Date.now() + dias * 86400000).toISOString()); },
     resumirFilas(filas) {
       const porApp = {};
       let conDatos = 0;

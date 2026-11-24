@@ -531,7 +531,7 @@
     injectStyles();
 
     return new Promise(async (resolveOriginal) => {
-      const resolve = async (v) => { await guardarNombreDeUsuario(); liberarPagina(); resolveOriginal(v); };
+      const resolve = async (v) => { await guardarNombreDeUsuario(); liberarPagina(); resolveOriginal(v); if (v && v.modo !== 'local') setTimeout(() => { try { avisarRespaldoPendiente(); } catch (e) {} }, 8000); };
       const estado = global.MypecarSync ? global.MypecarSync.getEstado() : { conectadoASupabase: false };
 
       if (!estado.conectadoASupabase) {
@@ -1214,6 +1214,7 @@
     menu.innerHTML = `
       ${lista.length ? '<div class="mps-menu-titulo">Cambiar de empresa</div>' + filas + '<hr class="mps-menu-sep">' : ''}
       ${esOwner ? '<div id="mps-menu-accesos" class="mps-menu-item">Gestionar accesos</div>' : ''}
+      ${esOwner ? '<div id="mps-menu-respaldo" class="mps-menu-item">Descargar respaldo de la empresa</div>' : ''}
       <div id="mps-menu-nueva" class="mps-menu-item">+ Registrar otra empresa</div>
       <div id="mps-menu-salir" class="mps-menu-item">Cerrar sesión</div>
     `;
@@ -1233,6 +1234,11 @@
     if (acc) acc.addEventListener('click', () => {
       menu.parentNode.removeChild(menu);
       renderGestionarAccesos(opciones, empresaId);
+    });
+    const resp = menu.querySelector('#mps-menu-respaldo');
+    if (resp) resp.addEventListener('click', () => {
+      menu.parentNode.removeChild(menu);
+      descargarRespaldoEmpresa();
     });
     menu.querySelector('#mps-menu-nueva').addEventListener('click', () => {
       menu.parentNode.removeChild(menu);
@@ -1255,6 +1261,56 @@
       document.addEventListener('click', cerrar);
       document.addEventListener('keydown', cerrar);
     }, 0);
+  }
+
+  // ---------------------------------------------------------------------
+  // Respaldo de la empresa (2026-11-24). El plan gratuito de Supabase NO hace copias de seguridad: este botón (menú de la
+  // empresa, solo dueño) descarga TODO lo guardado en la nube de la empresa activa a un archivo .json, y un aviso
+  // recuerda hacerlo cada 30 días (o a la semana si nunca se ha hecho).
+  // ---------------------------------------------------------------------
+  function avisoRespaldo(texto, tipo) {
+    let el = document.getElementById('mps-aviso-respaldo-msg');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mps-aviso-respaldo-msg';
+      el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:2147482000;max-width:92vw;padding:12px 18px;border-radius:12px;font:700 14px Manrope,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.3)';
+      document.body.appendChild(el);
+    }
+    el.style.background = tipo === 'error' ? '#b91c1c' : '#0b5d52'; el.style.color = '#fff';
+    el.textContent = texto;
+    clearTimeout(el._t); el._t = setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 9000);
+  }
+  async function descargarRespaldoEmpresa() {
+    try {
+      avisoRespaldo('Preparando el respaldo… no cierres esta pantalla.');
+      const r = await global.MypecarSync.seguridad.respaldoCompleto();
+      avisoRespaldo('✔ Respaldo descargado: ' + r.nombre + ' (' + r.registros + ' registros de ' + r.apps + ' módulo(s)). Guárdalo en un lugar seguro, fuera de este equipo.');
+      const b = document.getElementById('mps-banner-respaldo'); if (b && b.parentNode) b.parentNode.removeChild(b);
+    } catch (e) {
+      avisoRespaldo('No se pudo descargar el respaldo: ' + ((e && e.message) || e), 'error');
+    }
+  }
+  async function avisarRespaldoPendiente() {
+    try {
+      if (!global.MypecarSync || !global.MypecarSync.seguridad || !navigator.onLine) return;
+      const empresaId = global.MypecarSync.empresas.activaId();
+      if (!empresaId || document.getElementById('mps-banner-respaldo')) return;
+      if (!(await global.MypecarSync.empresas.esOwner(empresaId))) return;
+      const st = global.MypecarSync.seguridad.estadoRespaldo(empresaId);
+      if (st.aplazadoHasta && Date.parse(st.aplazadoHasta) > Date.now()) return;
+      const toca = st.diasDesdeUltimo === null ? st.diasDesdeVisto >= 7 : st.diasDesdeUltimo >= 30;
+      if (!toca) return;
+      const msg = st.diasDesdeUltimo === null ? 'Aún no has descargado un respaldo de tu empresa.' : 'Hace ' + st.diasDesdeUltimo + ' días que no descargas un respaldo de tu empresa.';
+      const b = document.createElement('div');
+      b.id = 'mps-banner-respaldo';
+      b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:2147481000;display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;max-width:760px;margin:0 auto;background:#fef3c7;color:#78350f;border:1px solid #f59e0b;border-radius:14px;padding:11px 14px;font:700 14px Manrope,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)';
+      b.innerHTML = '<span>🛟 ' + msg + ' Tus datos están en la nube, pero esa copia no es un respaldo.</span>' +
+        '<span style="display:flex;gap:8px"><button id="mps-resp-ahora" style="border:0;background:#0b5d52;color:#fff;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer">Descargar respaldo</button>' +
+        '<button id="mps-resp-luego" style="border:1px solid #b45309;background:transparent;color:#78350f;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer">Más tarde</button></span>';
+      document.body.appendChild(b);
+      b.querySelector('#mps-resp-ahora').onclick = descargarRespaldoEmpresa;
+      b.querySelector('#mps-resp-luego').onclick = () => { global.MypecarSync.seguridad.aplazarAvisoRespaldo(empresaId, 3); if (b.parentNode) b.parentNode.removeChild(b); };
+    } catch (e) { /* el aviso es opcional */ }
   }
 
   // ---------------------------------------------------------------------
