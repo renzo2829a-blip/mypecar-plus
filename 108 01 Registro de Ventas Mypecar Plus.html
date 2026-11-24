@@ -3840,6 +3840,8 @@
             e.preventDefault();
 
             const fechaEmision = document.getElementById('venta-fecha-emision').value;
+            // (2026-11-24) La fecha debe pertenecer al periodo activo: si no, el comprobante quedaría en el registro y asiento de OTRO mes.
+            if (String(fechaEmision).slice(0, 7) !== config.periodoActivo) { showToast(`La fecha (${formatFechaPeru(fechaEmision)}) no pertenece al periodo activo (${formatPeriodoLabel(config.periodoActivo)}). Cambia de periodo arriba o corrige la fecha.`, 'error'); return; }
             const fechaVencimiento = document.getElementById('venta-fecha-vencimiento').value || fechaEmision;
             const tipoDoc = document.getElementById('venta-tipo-doc').value;
             const serie = document.getElementById('venta-serie').value.trim();

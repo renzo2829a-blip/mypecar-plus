@@ -5209,6 +5209,8 @@ function mensajeCuentaNoImputable(codigo, origen) {
             const origen = document.getElementById('asiento-origen').value;
 
             if (!fecha || !glosa) { showToast('Completa la fecha y la glosa del asiento.', 'error'); return; }
+            // (2026-11-24) La fecha debe pertenecer al periodo activo: si no, el asiento quedaría en el registro de OTRO mes.
+            if (String(fecha).slice(0, 7) !== config.periodoActivo) { showToast(`La fecha (${formatFechaPeru(fecha)}) no pertenece al periodo activo (${formatPeriodoLabel(config.periodoActivo)}). Cambia de periodo arriba o corrige la fecha.`, 'error'); return; }
 
             const lineas = [];
             let sumaDebe = 0, sumaHaber = 0, valido = true;
