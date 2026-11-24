@@ -1820,6 +1820,8 @@
             // no cambiarle la tasa a una empresa existente que se abre por primera vez en un equipo nuevo.
             if (!_configGuardado && !cloudConfirmadaComoVacia) config.igvRate = 0.105;
             if (!config.tipoCambioPorPeriodo) config.tipoCambioPorPeriodo = {}; // migración: archivos guardados antes de esta función
+            // (2026-11-24) T.C. automático de SUNAT: encendido solo en empresas nuevas de verdad; las existentes lo activan en Ajustes.
+            if (config.tcAutomaticoSunat === undefined) config.tcAutomaticoSunat = !_configGuardado && cloudConfirmadaComoVacia;
             if (config.igvRate == null || isNaN(config.igvRate)) config.igvRate = 0.105; // migración: archivos guardados antes de que la tasa de IGV fuera configurable
             if (!config.tiposVenta || config.tiposVenta.length === 0) config.tiposVenta = [{ codigo: 'SALON', nombre: 'Salón' }, { codigo: 'DELIVERY', nombre: 'Delivery' }]; // migración: archivos guardados antes de esta función
             if (!config.puntosVenta || config.puntosVenta.length === 0) config.puntosVenta = [{ codigo: 'PV1', nombre: 'Principal' }]; // migración: archivos guardados antes del Control de Inventario
@@ -6567,6 +6569,13 @@ window.mypecarConstruirSnapshots = function () {
         };
     } catch (e) { console.warn('Enlace: no se pudo armar la foto de Ventas:', e); return {}; }
 };
+</script>
+<script>
+/* (2026-11-24) T.C. automático de SUNAT (ver tcSunat en mypecar-sync.js). */
+window.addEventListener('load', function () {
+    if (window.MypecarSync && MypecarSync.tcSunat) MypecarSync.tcSunat.conectar({ moneda: 'venta-moneda', fecha: 'venta-fecha-emision', tc: 'venta-tipo-cambio', origen: 'venta-tc-origen',
+        config: function () { return typeof config !== 'undefined' ? config : null; }, guardar: function () { return storageSet('vendepollo_config', config); }, alCambiar: function () { actualizarTotalVenta(); } });
+});
 </script>
 </body>
 </html>

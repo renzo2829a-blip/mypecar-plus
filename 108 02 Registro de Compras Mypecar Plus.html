@@ -2139,8 +2139,11 @@
                 const configGuardado = JSON.parse(localStorage.getItem('comprapollo_config'));
                 if (configGuardado && typeof configGuardado === 'object') config = configGuardado;
             } else {
+                // (2026-11-24) T.C. automático de SUNAT: encendido solo en empresas nuevas de verdad (se guarda ya con la marca).
+                config.tcAutomaticoSunat = !!cloudConfirmadaComoVacia;
                 localStorage.setItem('comprapollo_config', JSON.stringify(config));
             }
+            if (config.tcAutomaticoSunat === undefined) config.tcAutomaticoSunat = false; // empresas existentes: lo activan en Ajustes
             if (!config.tipoCambioPorPeriodo) config.tipoCambioPorPeriodo = {}; // migración: archivos guardados antes de esta función
             if (!config.destinosPorCuenta) config.destinosPorCuenta = { ...DESTINOS_POR_CUENTA_DEFAULT }; // migración: archivos guardados antes de esta función
             if (!config.puntosVenta || config.puntosVenta.length === 0) config.puntosVenta = [{ codigo: 'PV1', nombre: 'Principal' }]; // migración: archivos guardados antes del Control de Inventario
@@ -8115,6 +8118,13 @@ window.mypecarConstruirSnapshots = function () {
         };
     } catch (e) { console.warn('Enlace: no se pudo armar la foto de Compras:', e); return {}; }
 };
+</script>
+<script>
+/* (2026-11-24) T.C. automático de SUNAT (ver tcSunat en mypecar-sync.js). */
+window.addEventListener('load', function () {
+    if (window.MypecarSync && MypecarSync.tcSunat) MypecarSync.tcSunat.conectar({ moneda: 'compra-moneda', fecha: 'compra-fecha-emision', tc: 'compra-tipo-cambio', origen: 'compra-tc-origen',
+        config: function () { return typeof config !== 'undefined' ? config : null; }, guardar: function () { try { localStorage.setItem('comprapollo_config', JSON.stringify(config)); } catch (e) {} }, alCambiar: function () { actualizarTotalCompra(); } });
+});
 </script>
 </body>
 </html>

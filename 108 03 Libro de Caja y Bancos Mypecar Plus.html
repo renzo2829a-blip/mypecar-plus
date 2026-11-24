@@ -1649,8 +1649,11 @@
             const cloudConfirmadaComoVacia = !estadoSyncInicial.conectadoASupabase
                 || (resultadoPull && !resultadoPull.motivo);
 
-            config = await storageGet('cajabancos_config', config);
-            if (!config.tipoCambioPorPeriodo) config.tipoCambioPorPeriodo = {}; // migración: archivos guardados antes de esta función
+            const _cfgCajaGuardado = await storageGet('cajabancos_config', null);
+            config = _cfgCajaGuardado || config;
+            if (!config.tipoCambioPorPeriodo) config.tipoCambioPorPeriodo = {};
+            // (2026-11-24) T.C. automático de SUNAT: encendido solo en empresas nuevas de verdad; las existentes lo activan en Ajustes.
+            if (config.tcAutomaticoSunat === undefined) config.tcAutomaticoSunat = !_cfgCajaGuardado && cloudConfirmadaComoVacia; // migración: archivos guardados antes de esta función
             if (!config.destinosPorCuenta) config.destinosPorCuenta = { ...DESTINOS_POR_CUENTA_DEFAULT }; // migración: archivos guardados antes de esta función
 
             // AUTO-POBLAR datos legales de la empresa (razón social, nombre comercial, RUC) --
@@ -4619,6 +4622,13 @@ window.mypecarConstruirSnapshots = function () {
     }
     window.addEventListener('load', () => setTimeout(iniciar, 2000));
 })();
+</script>
+<script>
+/* (2026-11-24) T.C. automático de SUNAT (ver tcSunat en mypecar-sync.js). */
+window.addEventListener('load', function () {
+    if (window.MypecarSync && MypecarSync.tcSunat) MypecarSync.tcSunat.conectar({ moneda: 'mov-moneda', fecha: 'mov-fecha', tc: 'mov-tipo-cambio', origen: 'mov-tc-origen',
+        config: function () { return typeof config !== 'undefined' ? config : null; }, guardar: function () { return storageSet('cajabancos_config', config); }, alCambiar: null });
+});
 </script>
 </body>
 </html>

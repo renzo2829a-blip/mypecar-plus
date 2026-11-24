@@ -57,6 +57,14 @@ grupoB (provisional a prueba de abuso) · prueba_gratis_14_dias · prueba_gratis
   `es_admin()`; `anon` sin permiso. `admin.html` las usa y, si fallan, vuelve a `admin_listar_empresas()`.
 - Versión mínima: `VERSION_SYNC` y `MYPECAR_APP_VERSION` = 2026-11-24; `app_version_minima` se sube a 2026-11-24 después de publicar.
 
+## Tipo de cambio SUNAT automático (24-nov-2026)
+- Tabla `tipo_cambio_sunat` (caché del T.C. publicado por SUNAT; dato público). RLS activo, sin políticas, sin permisos para
+  anon/authenticated: solo la usa la Edge Function `tipo-cambio` (verify_jwt, exige sesión, límite 60/min por usuario).
+- Fuentes: Decolecta (DECOLECTA_TOKEN) y, para el día de hoy, https://www.sunat.gob.pe/a/txt/tipoCambio.txt. Si ese día no hubo
+  publicación, usa el último publicado (hasta 4 días antes). Cada fecha se consulta a la fuente una sola vez.
+- En 01/02/03 `config.tcAutomaticoSunat` (encendido en empresas nuevas confirmadas con la nube; las existentes, en Ajustes).
+- Portal admin: Google pide elegir cuenta y, si la cuenta no es administradora, lo dice y permite cambiarla.
+
 ## Pendientes conocidos
 - "Leaked password protection": no disponible en el plan Free (el panel pide plan Pro). Se activa en Auth → Sign In / Providers → Email si
   algún día se pasa a Pro.

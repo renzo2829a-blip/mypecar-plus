@@ -58,17 +58,24 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 function fecha(d){if(!d)return '—';const [y,m,dd]=String(d).slice(0,10).split('-');return dd+'/'+m+'/'+y}
 function dias(d){if(!d)return null;return Math.round((new Date(String(d).slice(0,10)+'T00:00:00')-new Date(new Date().toDateString()))/86400000)}
 
+// Google siempre pregunta con qué cuenta entrar (en una laptop con varias cuentas no elige sola).
+function entrarConGoogle(){return sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname,queryParams:{prompt:'select_account'}}})}
 async function iniciar(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session){
     app.innerHTML='<div class="caja"><h2>Acceso privado</h2><p>Entra con tu cuenta de Google para administrar empresas.</p><button class="btn btn-g" id="g">Continuar con Google</button></div>';
-    document.getElementById('g').onclick=()=>sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
+    document.getElementById('g').onclick=entrarConGoogle;
     return;
   }
   document.getElementById('quien').textContent=session.user.email;
   const s=document.getElementById('btn-salir');s.hidden=false;s.onclick=async()=>{await sb.auth.signOut();location.reload()};
   const {data:ok,error}=await sb.rpc('es_admin');
-  if(error||!ok){app.innerHTML='<div class="caja"><h2>No autorizado</h2><p>Esta cuenta no tiene permiso de administración.</p></div>';return}
+  if(error||!ok){
+    // (2026-11-24) En otra laptop Google puede entrar solo con OTRA cuenta (p. ej. la de un familiar): se muestra cuál y se ofrece cambiarla.
+    app.innerHTML='<div class="caja"><h2>Esta cuenta no es administradora</h2><p>Entraste como <b>'+esc(session.user.email)+'</b>, que no tiene permiso de administración.</p>'
+      +'<button class="btn btn-g" id="otra">Entrar con otra cuenta de Google</button></div>';
+    document.getElementById('otra').onclick=async()=>{await sb.auth.signOut();entrarConGoogle()};
+    return}
   cargar();
 }
 
