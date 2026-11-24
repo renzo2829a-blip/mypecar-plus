@@ -1941,7 +1941,7 @@
         function renderContratos() {
             const tbody = document.getElementById('contratos-body');
             if (contratos.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Sin contratos registrados.</td></tr>`; return; }
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = hoyPeru();
             tbody.innerHTML = contratos.slice().sort((a, b) => new Date(b.fechaInicio) - new Date(a.fechaInicio)).map(c => {
                 const t = trabajadores.find(x => x.id === c.trabajadorId);
                 const est = estadoContrato(c, hoy);
@@ -1964,7 +1964,7 @@
         // los de trabajadores ya cesados (no tiene sentido alertar sobre su contrato). Pinta un
         // banner detallado en la pestaña Contratos, y uno resumido en el Dashboard.
         function renderAlertaContratos() {
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = hoyPeru();
             const criticos = contratos.map(c => ({ c, t: trabajadores.find(x => x.id === c.trabajadorId), est: estadoContrato(c, hoy) }))
                 .filter(x => x.t && x.t.estado === 'activo' && (x.est.estado === 'vencido' || x.est.estado === 'por_vencer'))
                 .sort((a, b) => a.est.dias - b.est.dias);
@@ -2042,7 +2042,7 @@
         // ==================================================================
         async function exportarContratosExcel() {
             if (contratos.length === 0) { showToast('No hay contratos registrados.', 'error'); return; }
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = hoyPeru();
             const wb = new ExcelJS.Workbook();
             const ws = wb.addWorksheet('Contratos');
             ws.columns = [{ width: 28 }, { width: 30 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 20 }];
@@ -2076,7 +2076,7 @@
         }
 
         function imprimirContratos() {
-            document.getElementById('contratos-print-subtitulo').innerText = `${config.nombreComercial || ''} — RUC ${config.ruc || ''} — al ${new Date().toISOString().split('T')[0]}`;
+            document.getElementById('contratos-print-subtitulo').innerText = `${config.nombreComercial || ''} — RUC ${config.ruc || ''} — al ${hoyPeru()}`;
             document.body.classList.add('imprimiendo-contratos');
             window.print();
             setTimeout(() => document.body.classList.remove('imprimiendo-contratos'), 500);
@@ -2086,7 +2086,7 @@
         // hacerlo por seguridad del navegador) — abre WhatsApp/Correo con un resumen ya escrito,
         // listo para adjuntar manualmente el Excel o PDF ya exportado.
         function resumenContratosParaCompartir() {
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = hoyPeru();
             const criticos = contratos.map(c => ({ c, t: trabajadores.find(x => x.id === c.trabajadorId), est: estadoContrato(c, hoy) }))
                 .filter(x => x.t && x.t.estado === 'activo' && (x.est.estado === 'vencido' || x.est.estado === 'por_vencer'));
             const vencidos = criticos.filter(x => x.est.estado === 'vencido').length;
@@ -4018,7 +4018,7 @@
         function calcularDiasVacacionesAcumulados(trabajador, fechaCorte) {
             const diasPorAnio = DIAS_VACACIONES_POR_REGIMEN[trabajador.regimenLaboral] || 30;
             const ingreso = new Date(trabajador.fechaIngreso + 'T00:00:00');
-            const corte = new Date((fechaCorte || new Date().toISOString().split('T')[0]) + 'T00:00:00');
+            const corte = new Date((fechaCorte || hoyPeru()) + 'T00:00:00');
             let meses = (corte.getFullYear() - ingreso.getFullYear()) * 12 + (corte.getMonth() - ingreso.getMonth());
             if (corte.getDate() < ingreso.getDate()) meses -= 1;
             meses = Math.max(0, meses);
@@ -4053,7 +4053,7 @@
         async function abrirRegistrarGoce(trabajadorId) {
             const dias = parseFloat(prompt('¿Cuántos días de vacaciones va a gozar?'));
             if (!dias || dias <= 0) return;
-            const fechaInicio = prompt('Fecha de inicio del descanso (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+            const fechaInicio = prompt('Fecha de inicio del descanso (YYYY-MM-DD):', hoyPeru());
             if (!fechaInicio) return;
             vacacionesGozadas.push({ id: Date.now(), trabajadorId, fechaInicio, dias });
             await persistAll();
@@ -4693,7 +4693,7 @@
         async function vaciarDatosPrueba() {
             if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { if (!(await MypecarSync.seguridad.confirmarBorrado({ accion: 'Vaciar Datos de Prueba' }))) return; } // 2026-10-15b: respaldo + confirmación por RUC antes de borrar
             if (!confirm(`⚠ Esto borrará PERMANENTEMENTE todos los trabajadores, contratos, planillas, vacaciones, la papelera y la bitácora de seguridad registrados para "${config.nombreComercial}" (RUC ${config.ruc}), y creará un periodo de Enero vacío.\n\nEl RUC y los datos de la empresa NO cambian.\n\n¿Continuar?`)) return;
-            const anio = (config.periodoActivo || '').split('-')[0] || String(new Date().getFullYear());
+            const anio = (config.periodoActivo || '').split('-')[0] || String(Number(hoyPeru().slice(0, 4)));
             const periodoEnero = `${anio}-01`;
             trabajadores = []; contratos = []; vacacionesGozadas = []; locadores = [];
             papeleraPersonal = []; bitacora = [];
@@ -4743,8 +4743,8 @@
 
             if (!confirm(`Última confirmación: se borrará TODO y se creará "${razonSocial.trim()}" desde cero. ¿Confirmas?`)) return;
 
-            const hoy = new Date();
-            const periodoNuevo = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+            const periodoNuevo = mesPeru(); // hora de Perú
+
             config.razonSocial = razonSocial.trim().toUpperCase();
             config.nombreComercial = nombreComercial.trim().toUpperCase();
             config.ruc = ruc.trim();
@@ -4804,7 +4804,7 @@
             const tbody = document.getElementById('dash-trabajadores-body');
             if (activos.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Sin trabajadores activos. Ve a "Ficha del Personal" para agregar el primero.</td></tr>`; return; }
             const contratoVigenteLabel = (trabId) => {
-                const hoy = new Date().toISOString().split('T')[0];
+                const hoy = hoyPeru();
                 const vig = contratos.find(c => c.trabajadorId === trabId && (!c.fechaFin || c.fechaFin >= hoy));
                 return vig ? TIPOS_CONTRATO_LABEL[vig.tipoContrato] : '—';
             };
@@ -4907,7 +4907,7 @@
                 key: 'contrato_vencido_por_vencer',
                 evaluar: function () {
                     const resultado = [];
-                    const hoy = new Date().toISOString().split('T')[0];
+                    const hoy = hoyPeru();
                     contratos.forEach(c => {
                         const t = trabajadores.find(x => x.id === c.trabajadorId);
                         if (!t || t.estado !== 'activo') return;

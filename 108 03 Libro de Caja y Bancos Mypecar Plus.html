@@ -1698,7 +1698,7 @@
             try { aplicarLogoCliente(); } catch (e) { console.error('Error al aplicar el logo del cliente:', e); }
             try {
                 const pieEl = document.getElementById('footer-copyright');
-                if (pieEl) pieEl.innerText = `© ${new Date().getFullYear()} CajaBancos - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
+                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} CajaBancos - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
             } catch (e) { console.error('Error al actualizar el pie de página:', e); }
             // El <title> de la pestaña también debe reflejar la empresa activa — antes
             // quedaba fijo en el nombre de la empresa de ejemplo con la que se armó el
@@ -1753,7 +1753,7 @@
             // la nube se reintenta sola más adelante desde la cola.
             try { await persistAll(); } catch (e) { console.error('No se pudo sincronizar con la nube (los datos igual quedaron guardados en este dispositivo):', e); }
 
-            document.getElementById('mov-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('mov-fecha').value = hoyPeru();
             addLinea(); addLinea();
 
             // Blindaje (2026-09-12): cada paso en su propio try/catch — un fallo
@@ -2235,8 +2235,8 @@
 
             if (!confirm(`Última confirmación: se borrará TODO el historial actual y se creará "${razonSocial.trim()}" (RUC ${ruc.trim()}) desde cero. ¿Confirmas?`)) { showToast('Operación cancelada, no se borró nada.', 'error'); return; }
 
-            const hoy = new Date();
-            const periodoNuevo = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+            const periodoNuevo = mesPeru(); // hora de Perú
+
 
             config.razonSocial = razonSocial.trim().toUpperCase();
             config.nombreComercial = nombreComercial.trim().toUpperCase();
@@ -2291,7 +2291,7 @@
             if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { if (!(await MypecarSync.seguridad.confirmarBorrado({ accion: 'Vaciar Datos de Prueba' }))) return; } // 2026-10-15b: respaldo + confirmación por RUC antes de borrar
             if (!confirm(`⚠ Esto borrará PERMANENTEMENTE todos los periodos, movimientos, conciliaciones bancarias, cuentas personalizadas, atajos, la papelera y la bitácora de seguridad guardados para "${config.nombreComercial}" (RUC ${config.ruc}), y creará un periodo de Enero vacío.\n\nEl RUC y los datos de la empresa NO cambian.\n\n¿Continuar?`)) return;
 
-            const anio = (config.periodoActivo || '').split('-')[0] || String(new Date().getFullYear());
+            const anio = (config.periodoActivo || '').split('-')[0] || String(Number(hoyPeru().slice(0, 4)));
             const periodoEnero = `${anio}-01`;
 
             await borrarTodosLosPeriodosGuardados([claveDePeriodo(periodoEnero)]);
@@ -3164,7 +3164,7 @@
         function poblarSelectorAnios() {
             const sel = document.getElementById('new-periodo-anio-sel');
             if (!sel || sel.options.length > 0) return;
-            const anioBase = new Date().getFullYear();
+            const anioBase = Number(hoyPeru().slice(0, 4));
             const anioActivo = parseInt((config.periodoActivo || '').split('-')[0], 10) || anioBase;
             const anioMax = Math.max(anioBase, anioActivo) + 15;
             const anioMin = Math.min(anioBase, anioActivo) - 10;
@@ -3237,7 +3237,7 @@
             showToast('Periodo eliminado.');
         }
         function loadShortcut(type) {
-            const today = new Date().toISOString().split('T')[0];
+            const today = hoyPeru();
             document.getElementById('mov-fecha').value = today;
             document.getElementById('mov-tipo').value = 'Egreso';
             document.getElementById('lineas-container').innerHTML = '';
@@ -3355,7 +3355,7 @@
             const cs = customShortcuts.find(x => x.id === id);
             if (!cs) return;
             const c = cs.campos;
-            document.getElementById('mov-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('mov-fecha').value = hoyPeru();
             document.getElementById('mov-tipo').value = c.tipo;
             document.getElementById('mov-categoria').value = c.categoria;
             document.getElementById('mov-concepto').value = c.concepto;
@@ -3547,7 +3547,7 @@
             await persistActivePeriod();
 
             document.getElementById('form-movimiento').reset();
-            document.getElementById('mov-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('mov-fecha').value = hoyPeru();
             document.getElementById('lineas-container').innerHTML = '';
             addLinea(); addLinea();
             toggleTipoCambio();
@@ -3633,7 +3633,7 @@
         function cancelarEdicionMovimiento() {
             movimientoEnEdicionId = null;
             document.getElementById('form-movimiento').reset();
-            document.getElementById('mov-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('mov-fecha').value = hoyPeru();
             document.getElementById('lineas-container').innerHTML = '';
             addLinea(); addLinea();
             toggleTipoCambio();
@@ -4181,7 +4181,7 @@
 
         function agregarFilaExtracto() {
             const extracto = getExtractoState();
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = hoyPeru();
             extracto.push({ id: 'ext_' + Date.now(), fecha: hoy, detalle: '', monto: 0 });
             persistAll();
             renderExtracto();

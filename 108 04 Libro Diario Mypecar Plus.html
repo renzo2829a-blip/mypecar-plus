@@ -3232,7 +3232,7 @@ const MypecarPEVista = (function () {
             try { aplicarLogoCliente(); } catch (e) { console.error('Error al aplicar el logo del cliente:', e); }
             try {
                 const pieEl = document.getElementById('footer-copyright');
-                if (pieEl) pieEl.innerText = `© ${new Date().getFullYear()} LibroDiario - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
+                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} LibroDiario - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
             } catch (e) { console.error('Error al actualizar el pie de página:', e); }
             // El <title> de la pestaña también debe reflejar la empresa activa — antes
             // quedaba fijo en el nombre de la empresa de ejemplo con la que se armó el
@@ -3308,7 +3308,7 @@ const MypecarPEVista = (function () {
             // termine de pintarse (los datos ya quedaron guardados en local).
             try { await persistAll(); } catch (e) { console.error('No se pudo sincronizar con la nube (los datos igual quedaron guardados en este dispositivo):', e); }
 
-            document.getElementById('asiento-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('asiento-fecha').value = hoyPeru();
 
             populateCuentaDatalist();
             renderCatalogoList();
@@ -3905,8 +3905,8 @@ const MypecarPEVista = (function () {
 
             if (!confirm(`Última confirmación: se borrará TODO el historial actual y se creará "${razonSocial.trim()}" (RUC ${ruc.trim()}) desde cero. ¿Confirmas?`)) { showToast('Operación cancelada, no se borró nada.', 'error'); return; }
 
-            const hoy = new Date();
-            const periodoNuevo = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+            const periodoNuevo = mesPeru(); // hora de Perú
+
 
             // Se actualizan solo los campos propios de la empresa — el resto de config
             // (régimen tributario, destinos por cuenta, licencia, etc.) se conserva tal cual.
@@ -3965,7 +3965,7 @@ const MypecarPEVista = (function () {
             if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { if (!(await MypecarSync.seguridad.confirmarBorrado({ accion: 'Vaciar Datos de Prueba' }))) return; } // 2026-10-15b: respaldo + confirmación por RUC antes de borrar
             if (!confirm(`⚠ Esto borrará PERMANENTEMENTE todos los periodos, asientos, cuentas personalizadas, la papelera, la bitácora de seguridad, el Control de Cierre de Mes, los saldos de Almacén y el detalle de facturas importado desde Compras guardados para "${config.nombreComercial}" (RUC ${config.ruc}), y creará un periodo de Enero vacío.\n\nEl RUC y los datos de la empresa NO cambian.\n\n¿Continuar?`)) return;
 
-            const anio = (config.periodoActivo || '').split('-')[0] || String(new Date().getFullYear());
+            const anio = (config.periodoActivo || '').split('-')[0] || String(Number(hoyPeru().slice(0, 4)));
             const periodoEnero = `${anio}-01`;
 
             await borrarTodosLosPeriodosGuardados([claveDePeriodo(periodoEnero)]);
@@ -4264,7 +4264,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
         function poblarSelectorAnios() {
             const sel = document.getElementById('new-periodo-anio-sel');
             if (!sel || sel.options.length > 0) return; // ya poblado
-            const anioBase = new Date().getFullYear();
+            const anioBase = Number(hoyPeru().slice(0, 4));
             const anioActivo = parseInt((config.periodoActivo || '').split('-')[0], 10) || anioBase;
             const anioMax = Math.max(anioBase, anioActivo) + 15;
             const anioMin = Math.min(anioBase, anioActivo) - 10;
@@ -4723,7 +4723,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 datosImportacionPendiente = { preparadoPor: data.preparadoPor || null, fechaExportacion: data.fechaExportacion || null, origen: data.origen || null };
 
                 document.getElementById('lineas-container').innerHTML = '';
-                document.getElementById('asiento-fecha').value = data.fecha || new Date().toISOString().split('T')[0];
+                document.getElementById('asiento-fecha').value = data.fecha || hoyPeru();
                 document.getElementById('asiento-glosa').value = data.glosa || `Asiento importado (${data.origen || 'origen desconocido'})`;
                 const origenSelect = document.getElementById('asiento-origen');
                 const origenValido = Array.from(origenSelect.options).some(o => o.value === data.origen);
@@ -4755,7 +4755,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
         function loadTemplate(type) {
             document.getElementById('lineas-container').innerHTML = '';
             try { limpiarObligacionForm(); } catch (e) { }
-            const today = new Date().toISOString().split('T')[0];
+            const today = hoyPeru();
             document.getElementById('asiento-fecha').value = today;
             datosImportacionPendiente = null; // el usuario decidió empezar de cero, ya no aplica ninguna importación pendiente
 
@@ -5373,7 +5373,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             await persistActivePeriod();
 
             document.getElementById('form-asiento').reset();
-            document.getElementById('asiento-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('asiento-fecha').value = hoyPeru();
             loadTemplate('vacio');
 
             renderAll();
@@ -5466,7 +5466,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             document.getElementById('form-asiento-modo-edicion').classList.add('hidden');
             document.getElementById('btn-guardar-asiento').innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Registrar Asiento en el Libro Diario';
             document.getElementById('form-asiento').reset();
-            document.getElementById('asiento-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('asiento-fecha').value = hoyPeru();
             loadTemplate('vacio');
             showToast('Edición cancelada.');
         }
@@ -5873,7 +5873,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
 
         function limpiarFormularioGastoReparado() {
             const periodo = config.periodoActivo;
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = hoyPeru();
             document.getElementById('gr-fecha').value = hoy.startsWith(periodo) ? hoy : ultimoDiaMes(periodo);
             ['gr-concepto', 'gr-beneficiario', 'gr-doc-identidad', 'gr-monto', 'gr-documento', 'gr-numero-doc', 'gr-num-operacion'].forEach(id => { document.getElementById(id).value = ''; });
             document.getElementById('gr-cuenta-pago').value = `${CUENTA_PAGO_GR_DEFAULT} - ${getAccountName(CUENTA_PAGO_GR_DEFAULT)}`;

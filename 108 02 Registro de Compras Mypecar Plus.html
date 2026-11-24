@@ -2198,7 +2198,7 @@
             try { aplicarLogoCliente(); } catch (e) { console.error('Error al aplicar el logo del cliente:', e); }
             try {
                 const pieEl = document.getElementById('footer-copyright');
-                if (pieEl) pieEl.innerText = `© ${new Date().getFullYear()} CompraPollo - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
+                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} CompraPollo - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
             } catch (e) { console.error('Error al actualizar el pie de página:', e); }
             // El <title> de la pestaña también debe reflejar la empresa activa — antes
             // quedaba fijo en el nombre de la empresa de ejemplo con la que se armó el
@@ -2419,7 +2419,7 @@
 
             try { persistAll(); } catch (e) { console.error('No se pudo sincronizar con la nube (los datos igual quedaron guardados en este dispositivo):', e); }
 
-            document.getElementById('compra-fecha-emision').value = new Date().toISOString().split('T')[0];
+            document.getElementById('compra-fecha-emision').value = hoyPeru();
             addCuentaCompraLinea();
 
             // Blindaje (2026-09-12): cada paso en su propio try/catch — un fallo
@@ -2833,8 +2833,8 @@
 
             if (!confirm(`Última confirmación: se borrará TODO el historial actual y se creará "${razonSocial.trim()}" (RUC ${ruc.trim()}) desde cero. ¿Confirmas?`)) { showToast('Operación cancelada, no se borró nada.', 'error'); return; }
 
-            const hoy = new Date();
-            const periodoNuevo = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+            const periodoNuevo = mesPeru(); // hora de Perú
+
 
             // Se actualizan solo los campos propios de la empresa — el resto de config
             // (licencia, tipo de cambio por periodo, destinos por cuenta, etc.) se conserva tal cual.
@@ -2901,7 +2901,7 @@
             if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { if (!(await MypecarSync.seguridad.confirmarBorrado({ accion: 'Vaciar Datos de Prueba' }))) return; } // 2026-10-15b: respaldo + confirmación por RUC antes de borrar
             if (!confirm(`⚠ Esto borrará PERMANENTEMENTE todos los periodos, compras, proveedores, cuentas personalizadas, atajos, la papelera y la bitácora de seguridad guardados para "${config.nombreComercial}" (RUC ${config.ruc}), y creará un periodo de Enero vacío.\n\nEl RUC y los datos de la empresa NO cambian.\n\n¿Continuar?`)) return;
 
-            const anio = (config.periodoActivo || '').split('-')[0] || String(new Date().getFullYear());
+            const anio = (config.periodoActivo || '').split('-')[0] || String(Number(hoyPeru().slice(0, 4)));
             const periodoEnero = `${anio}-01`;
 
             await borrarTodosLosPeriodosGuardados([claveDePeriodo(periodoEnero)]);
@@ -4105,7 +4105,7 @@
         function poblarSelectorAnios() {
             const sel = document.getElementById('new-periodo-anio-sel');
             if (!sel || sel.options.length > 0) return; // ya poblado
-            const anioBase = new Date().getFullYear();
+            const anioBase = Number(hoyPeru().slice(0, 4));
             const anioActivo = parseInt((config.periodoActivo || '').split('-')[0], 10) || anioBase;
             const anioMax = Math.max(anioBase, anioActivo) + 15;
             const anioMin = Math.min(anioBase, anioActivo) - 10;
@@ -4344,7 +4344,7 @@
             if (!compra) return;
             const constancia = prompt('N° de Constancia de Depósito:');
             if (!constancia || !constancia.trim()) return;
-            const fecha = prompt('Fecha del depósito (AAAA-MM-DD):', new Date().toISOString().split('T')[0]);
+            const fecha = prompt('Fecha del depósito (AAAA-MM-DD):', hoyPeru());
             if (!fecha) return;
             compra.constanciaDetraccion = constancia.trim();
             compra.fechaDepositoDetraccion = fecha;
@@ -4460,7 +4460,7 @@
             const cs = customShortcuts.find(x => x.id === id);
             if (!cs) return;
             const c = cs.campos;
-            document.getElementById('compra-fecha-emision').value = new Date().toISOString().split('T')[0];
+            document.getElementById('compra-fecha-emision').value = hoyPeru();
             document.getElementById('compra-tipo-doc').value = c.tipoDoc;
             toggleReferenciaModificatorio();
             document.getElementById('compra-concepto').value = c.concepto;
@@ -4915,7 +4915,7 @@
 
             document.getElementById('form-compra').reset();
             document.getElementById('bloque-detraccion').classList.add('hidden');
-            document.getElementById('compra-fecha-emision').value = new Date().toISOString().split('T')[0];
+            document.getElementById('compra-fecha-emision').value = hoyPeru();
             document.getElementById('compra-total').value = 'S/ 0.00';
             document.getElementById('compra-proveedor-preview').innerText = 'Escribe para buscar en el maestro de proveedores.';
             document.getElementById('compra-proveedor-preview').className = 'text-[10px] mt-1 text-slate-500';
@@ -5048,7 +5048,7 @@
             document.getElementById('form-compra-modo-edicion').classList.add('hidden');
             document.getElementById('form-compra').reset();
             document.getElementById('bloque-detraccion').classList.add('hidden');
-            document.getElementById('compra-fecha-emision').value = new Date().toISOString().split('T')[0];
+            document.getElementById('compra-fecha-emision').value = hoyPeru();
             document.getElementById('compra-proveedor-preview').innerText = 'Escribe para buscar en el maestro de proveedores.';
             document.getElementById('compra-proveedor-preview').className = 'text-[10px] mt-1 text-slate-500';
             document.getElementById('cuentas-compra-container').innerHTML = '';
@@ -6360,7 +6360,7 @@
             if (!c) return;
             cancelarEdicionCompra();
             switchTab('shortcuts');
-            document.getElementById('compra-fecha-emision').value = c.fecha || new Date().toISOString().split('T')[0];
+            document.getElementById('compra-fecha-emision').value = c.fecha || hoyPeru();
             document.getElementById('compra-tipo-doc').value = ['01', '03', '07', '08'].includes(c.tipoDoc) ? c.tipoDoc : '01';
             toggleReferenciaModificatorio(); // asignar .value no dispara 'change'; sin esto el recuadro de Nota de Crédito/Débito quedaba oculto al precargar desde la propuesta SUNAT
             document.getElementById('compra-serie').value = c.serie;

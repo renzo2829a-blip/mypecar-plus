@@ -607,7 +607,7 @@
             const valorDepreciable = Math.max(0, activo.costo - activo.valorResidual);
             const depreMensual = activo.tasaDepreciacion > 0 ? (valorDepreciable * (activo.tasaDepreciacion / 100)) / 12 : 0;
             const inicioUso = new Date(activo.fechaInicioUso + 'T00:00:00');
-            const corte = new Date((fechaCorte || new Date().toISOString().split('T')[0]) + 'T00:00:00');
+            const corte = new Date((fechaCorte || hoyPeru()) + 'T00:00:00');
             let meses = (corte.getFullYear() - inicioUso.getFullYear()) * 12 + (corte.getMonth() - inicioUso.getMonth()) + 1;
             meses = Math.max(0, meses);
             let depreAcumulada = depreMensual * meses;
@@ -682,7 +682,7 @@
             const search = (document.getElementById('registro-search').value || '').toLowerCase();
             const filtrados = activos.filter(a => `${a.nombre} ${a.marca} ${a.serie}`.toLowerCase().includes(search));
             if (filtrados.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Sin activos registrados.</td></tr>`; return; }
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = hoyPeru();
             tbody.innerHTML = filtrados.map(a => {
                 const cat = getCategoria(a.categoria);
                 const d = calcularDepreciacionActivo(a, a.estado === 'uso' ? hoy : a.fechaBaja);
@@ -769,7 +769,7 @@
             ws.columns = [{ width: 30 }, { width: 26 }, { width: 14 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 10 }];
             ws.getRow(1).values = ['Nombre', 'Categoría', 'Marca/Modelo', 'F. Inicio Uso', 'Costo', 'Val. Residual', 'Tasa %', 'Depre. Acum.', 'Valor Neto', 'Ubicación', 'Estado'];
             ws.getRow(1).font = { bold: true };
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = hoyPeru();
             let r = 2;
             activos.forEach(a => {
                 const cat = getCategoria(a.categoria);
@@ -950,7 +950,7 @@
 
             let totCosto = 0, totDepreAcum = 0, totValorNeto = 0;
             const porCategoria = {};
-            const hoy = new Date().toISOString().split('T')[0];
+            const hoy = hoyPeru();
             enUso.forEach(a => {
                 const d = calcularDepreciacionActivo(a, hoy);
                 totCosto += a.costo; totDepreAcum += d.depreAcumulada; totValorNeto += d.valorNeto;
@@ -987,7 +987,7 @@
         // ==================================================================
         function poblarSelectorPeriodo() {
             const sel = document.getElementById('periodo-selector');
-            const anioActual = new Date().getFullYear();
+            const anioActual = Number(hoyPeru().slice(0, 4));
             const opciones = [];
             for (let anio = anioActual - 2; anio <= anioActual + 1; anio++) {
                 for (let mes = 1; mes <= 12; mes++) {
@@ -1059,7 +1059,7 @@
             if (!confirm(`⚠ Esto borrará PERMANENTEMENTE todos los activos, bajas, la papelera y la bitácora de seguridad registrados para "${config.nombreComercial}" (RUC ${config.ruc}).\n\nEl RUC y los datos de la empresa NO cambian.\n\n¿Continuar?`)) return;
             activos = []; bajas = [];
             papeleraActivos = []; bitacora = [];
-            config.periodoActivo = `${new Date().getFullYear()}-01`;
+            config.periodoActivo = `${Number(hoyPeru().slice(0, 4))}-01`;
             await persistAll();
             poblarSelectorPeriodo();
             switchTab('dashboard');
@@ -1118,7 +1118,7 @@
                 }
             }
             config.logoBase64 = '';
-            config.periodoActivo = `${new Date().getFullYear()}-01`;
+            config.periodoActivo = `${Number(hoyPeru().slice(0, 4))}-01`;
             activos = []; bajas = [];
             papeleraActivos = []; bitacora = [];
             await persistAll();
@@ -1381,7 +1381,7 @@
                 key: 'activo_depreciado_en_uso',
                 evaluar: function () {
                     const resultado = [];
-                    const hoy = new Date().toISOString().split('T')[0];
+                    const hoy = hoyPeru();
                     activos.forEach(a => {
                         if (a.estado !== 'uso') return;
                         const d = calcularDepreciacionActivo(a, hoy);
