@@ -4204,7 +4204,8 @@
         // ==================================================================
         function recalcularCompra() {
             const base = parseFloat(document.getElementById('compra-base-gravada').value) || 0;
-            document.getElementById('compra-igv').value = (base * IGV_RATE).toFixed(2);
+            // (2026-11-24) Redondeo comercial a 2 decimales (la media centésima sube): 100.25 x 18% = 18.05, no 18.04.
+            document.getElementById('compra-igv').value = (Math.round(parseFloat((base * IGV_RATE * 100).toPrecision(12))) / 100).toFixed(2);
             actualizarTotalCompra();
         }
 
