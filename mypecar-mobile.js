@@ -56,6 +56,19 @@
     '  .mpm-scroll.mpm-l { box-shadow: inset 16px 0 12px -12px rgba(15,23,42,.35); }',
     '  .mpm-scroll.mpm-l.mpm-r { box-shadow: inset 16px 0 12px -12px rgba(15,23,42,.35), inset -16px 0 12px -12px rgba(15,23,42,.35); }',
 
+    /* 4b. (2026-11-24) Encabezado compacto: antes ocupaba casi un cuarto de la pantalla */
+    '  header > div { padding-top: 8px !important; padding-bottom: 6px !important; gap: 8px !important; }',
+    '  header #header-logo-circulo { width: 40px !important; height: 40px !important; padding: 4px !important; }',
+    '  header h1 { font-size: 1.05rem !important; line-height: 1.2 !important; }',
+    '  header h1 + p { display: -webkit-box !important; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }',
+    '  header .no-print.flex { flex-wrap: wrap !important; gap: 6px !important; }',
+    '  header .no-print.flex > div { padding: 3px 8px !important; }',
+    '  header select { min-height: 34px; font-size: 14px !important; }',
+    /* 4c. Campos de filtro con ancho fijo: que usen todo el ancho disponible */
+    '  .mpm-ancho, div:has(> .mpm-ancho) { width: 100% !important; max-width: 100% !important; }',
+    /* 4d. Enlaces sueltos (pie de página): zona de toque más grande */
+    '  footer a { display: inline-block; padding: 8px 4px; }',
+
     /* 5. Aviso flotante de la nube: que no tape los botones de abajo */
     '  #mypecar-badge, .mypecar-badge { max-width: 70vw; }',
     '}'
@@ -67,6 +80,12 @@
     st.id = 'mypecar-mobile-css';
     st.textContent = CSS;
     (document.head || document.documentElement).appendChild(st);
+  }
+
+  // Campos de filtro con ancho fijo de Tailwind (w-40 … w-64): en celular ocupan todo el ancho.
+  function marcarCamposAnchos() {
+    var cs = document.querySelectorAll('input.w-40, input.w-44, input.w-48, input.w-52, input.w-56, input.w-60, input.w-64');
+    for (var i = 0; i < cs.length; i++) cs[i].classList.add('mpm-ancho');
   }
 
   function marcarPestañas() {
@@ -115,6 +134,7 @@
   function init() {
     inject();
     marcarPestañas();
+    marcarCamposAnchos();
     marcarTablas();
 
     // Las tablas se dibujan con JavaScript: re-marcar cuando cambia el contenido.
@@ -122,7 +142,7 @@
       var pend = false;
       new MutationObserver(function () {
         if (pend) return; pend = true;
-        setTimeout(function () { pend = false; marcarTablas(); }, 200);
+        setTimeout(function () { pend = false; marcarTablas(); marcarCamposAnchos(); }, 200);
       }).observe(document.body, { childList: true, subtree: true });
     }
 
