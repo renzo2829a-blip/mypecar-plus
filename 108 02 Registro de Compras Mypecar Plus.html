@@ -4804,12 +4804,28 @@
 
             // Todo lo que ingresa el usuario está en la moneda seleccionada; lo que se GUARDA y se usa
             // en el resto del sistema (SIRE, asientos, reportes) siempre va en soles, según la NIC 21.
-            const baseGravada = round2(baseGravadaIngresada * tipoCambio);
+            let baseGravada = round2(baseGravadaIngresada * tipoCambio);
             const igv = round2(igvIngresado * tipoCambio);
             const baseNoGravada = round2(baseNoGravadaIngresada * tipoCambio);
             const isc = round2(iscIngresado * tipoCambio);
             const otros = round2(otrosIngresado * tipoCambio);
             const cuentas = cuentasIngresadas.map(c => ({ cuenta: c.cuenta, monto: round2(c.monto * tipoCambio), sujetoInventario: c.sujetoInventario, cantidad: c.cantidad, unidad: c.unidad, productoCodigo: c.productoCodigo, productoNombre: c.productoNombre }));
+            // (2026-11-24) En dólares, convertir cada parte y sumarlas podía dar 1 centavo distinto de convertir el total del
+            // comprobante (US$ 0.15 + 0.03 a T.C. 3.751: por partes S/ 0.67, el total convertido S/ 0.68). El total del comprobante
+            // manda: la diferencia de centavos se absorbe en la base gravada (y en su cuenta contable más grande).
+            if (tipoCambio !== 1 && baseGravada > 0) {
+                const totalConvertido = round2((baseGravadaIngresada + igvIngresado + baseNoGravadaIngresada + iscIngresado + otrosIngresado) * tipoCambio);
+                const difCentavos = round2(totalConvertido - (baseGravada + igv + baseNoGravada + isc + otros));
+                if (difCentavos !== 0 && Math.abs(difCentavos) <= 0.05) {
+                    const sumaCuentasAntes = round2(cuentas.reduce((s, c) => s + c.monto, 0));
+                    const baseAntes = baseGravada;
+                    baseGravada = round2(baseGravada + difCentavos);
+                    if (cuentas.length && Math.abs(sumaCuentasAntes - round2(baseAntes + baseNoGravada + isc + otros)) < 0.005) {
+                        const mayor = cuentas.reduce((a, b) => (b.monto > a.monto ? b : a));
+                        mayor.monto = round2(mayor.monto + difCentavos);
+                    }
+                }
+            }
             const total = baseGravada + igv + baseNoGravada + isc + otros;
             if(total <= 0) { showToast('El total del comprobante debe ser mayor a cero.', 'error'); return; }
 
