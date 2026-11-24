@@ -14,7 +14,7 @@ header{background:linear-gradient(135deg,#04231f,#0b5d52);color:#fff;padding:14p
 header h1{font-size:17px;font-weight:800}
 header small{display:block;font-size:11.5px;opacity:.8;font-weight:500}
 button{font-family:inherit;cursor:pointer}
-.wrap{max-width:720px;margin:0 auto;padding:14px}
+.wrap{max-width:760px;margin:0 auto;padding:14px}
 .caja{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px;text-align:center;margin-top:30px}
 .caja h2{font-size:19px;margin-bottom:6px}
 .caja p{color:#475569;font-size:14.5px;margin-bottom:14px}
@@ -33,6 +33,15 @@ h3.sec{font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:#64748b
 .msg{margin:12px 0;padding:10px 14px;border-radius:12px;font-size:14px}
 .ok{background:#dcfce7;color:#166534}.er{background:#fee2e2;color:#991b1b}
 .vacio{color:#64748b;font-size:14.5px;padding:10px 2px}
+.res{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+.res button{background:#fff;border:2px solid #e2e8f0;border-radius:14px;padding:10px 8px;text-align:left}
+.res button[aria-pressed=true]{border-color:#0b5d52;background:#e1f6f2}
+.res b{display:block;font-size:22px;font-weight:800}
+.res span{font-size:12px;color:#475569;font-weight:700}
+.bus{width:100%;font:inherit;font-size:16px;padding:11px 12px;border:1px solid #cbd5e1;border-radius:12px;margin-top:10px}
+.pago{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:13.5px;color:#334155}
+.pago b{color:#0f172a}
+@media (max-width:480px){.res{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -63,33 +72,68 @@ async function iniciar(){
   cargar();
 }
 
+let EMPRESAS=[], PAGOS=[], FILTRO='todas', BUSCA='', AVISO=null;
 async function cargar(aviso){
-  const {data,error}=await sb.rpc('admin_listar_empresas');
-  if(error){app.innerHTML='<div class="msg er">No se pudo cargar: '+esc(error.message)+'</div>';return}
-  const pend=data.filter(e=>e.estado==='pendiente'), otras=data.filter(e=>e.estado!=='pendiente');
-  let h=aviso?'<div class="msg '+(aviso.ok?'ok':'er')+'">'+esc(aviso.t)+'</div>':'';
-  h+='<h3 class="sec">Pendientes de activar ('+pend.length+')</h3>';
-  h+=pend.length?pend.map(card).join(''):'<p class="vacio">No hay empresas pendientes.</p>';
-  h+='<h3 class="sec">Todas las empresas ('+otras.length+')</h3>'+otras.map(card).join('');
+  AVISO=aviso||null;
+  // (2026-11-24) Resumen con prueba gratis, miembros y último pago reportado. Si la función nueva no existe, usa la anterior.
+  let r=await sb.rpc('admin_resumen_empresas');
+  if(r.error) r=await sb.rpc('admin_listar_empresas');
+  if(r.error){app.innerHTML='<div class="msg er">No se pudo cargar: '+esc(r.error.message)+'</div>';return}
+  EMPRESAS=r.data||[];
+  const p=await sb.rpc('admin_listar_pagos',{p_dias:30});
+  PAGOS=p.error?null:(p.data||[]);
+  pintar();
+}
+const esPrueba=e=>e.plan_nombre==='prueba';
+function grupo(e){
+  const d=dias(e.vence_en);
+  if(e.estado==='pendiente')return 'pendientes';
+  if(e.estado==='suspendida')return 'suspendidas';
+  if(esPrueba(e))return 'prueba';
+  if(e.estado==='autorizada'&&d!=null&&d<=7)return 'vencen';
+  return 'pagando';
+}
+function pintar(){
+  const cuenta=k=>EMPRESAS.filter(e=>k==='todas'||grupo(e)===k).length;
+  const CH=[['todas','Todas'],['pendientes','Pendientes'],['prueba','En prueba gratis'],['pagando','Pagando'],['vencen','Vencen ≤ 7 días'],['suspendidas','Suspendidas']];
+  let h=AVISO?'<div class="msg '+(AVISO.ok?'ok':'er')+'">'+esc(AVISO.t)+'</div>':'';
+  h+='<div class="res" role="group" aria-label="Filtrar empresas">'+CH.map(c=>'<button type="button" data-f="'+c[0]+'" aria-pressed="'+(FILTRO===c[0])+'"><b>'+cuenta(c[0])+'</b><span>'+c[1]+'</span></button>').join('')+'</div>';
+  h+='<input class="bus" id="bus" type="search" placeholder="Buscar por nombre o RUC" aria-label="Buscar empresa por nombre o RUC" value="'+esc(BUSCA)+'">';
+  const q=BUSCA.trim().toLowerCase();
+  const lista=EMPRESAS.filter(e=>(FILTRO==='todas'||grupo(e)===FILTRO)&&(!q||[e.ruc,e.razon_social,e.nombre_comercial].some(v=>String(v||'').toLowerCase().includes(q))));
+  h+='<h3 class="sec">Empresas ('+lista.length+')</h3>'+(lista.length?lista.map(card).join(''):'<p class="vacio">No hay empresas con ese filtro.</p>');
+  h+='<h3 class="sec">Pagos de los últimos 30 días</h3>';
+  if(PAGOS===null)h+='<p class="vacio">No se pudo leer los pagos.</p>';
+  else if(!PAGOS.length)h+='<p class="vacio">Todavía no hay pagos reportados ni recibidos por Yape.</p>';
+  else h+=PAGOS.map(x=>'<div class="pago"><b>'+(x.tipo==='reportado'?'Reportado por el cliente':'Recibido en Yape')+'</b> · '+fechaHora(x.fecha)+'<br>'
+     +(x.empresa?esc(x.empresa)+' (RUC '+esc(x.ruc||'—')+') · ':'')+(x.plan?'plan '+esc(x.plan)+' · ':'')+(x.monto!=null?'S/ '+Number(x.monto).toFixed(2)+' · ':'')
+     +(x.nombre?'a nombre de '+esc(x.nombre)+' · ':'')+'estado: <b>'+esc(x.estado||'—')+'</b>'+(x.provisional?' · acceso provisional 48 h':'')+'</div>').join('');
   app.innerHTML=h;
+  app.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{FILTRO=b.dataset.f;pintar()});
+  const bus=document.getElementById('bus');bus.oninput=()=>{BUSCA=bus.value;const pos=bus.selectionStart;pintar();const n=document.getElementById('bus');n.focus();n.setSelectionRange(pos,pos)};
   app.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>accion(b.dataset.a,b.dataset.id,b.dataset.n));
 }
+function fechaHora(t){if(!t)return '—';const d=new Date(t);return d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}
 
 function card(e){
-  const d=dias(e.vence_en);
+  const d=dias(e.vence_en), g=grupo(e);
   let c='#94a3b8',bg='#e2e8f0',t='#334155',et=e.estado;
-  if(e.estado==='autorizada'){c='#16a34a';bg='#dcfce7';t='#166534'}
-  if(e.estado==='pendiente'){c='#f59e0b';bg='#fef3c7';t='#92400e'}
-  if(e.estado==='suspendida'){c='#dc2626';bg='#fee2e2';t='#991b1b'}
+  if(g==='pagando'){c='#16a34a';bg='#dcfce7';t='#166534';et='pagando'+(e.periodo_pago?' '+e.periodo_pago:'')}
+  if(g==='prueba'){c='#0ea5e9';bg='#e0f2fe';t='#075985';et='prueba gratis'}
+  if(g==='vencen'){c='#f97316';bg='#ffedd5';t='#9a3412';et='vence pronto'}
+  if(g==='pendientes'){c='#f59e0b';bg='#fef3c7';t='#92400e';et='pendiente'}
+  if(g==='suspendidas'){c='#dc2626';bg='#fee2e2';t='#991b1b';et='suspendida'}
   let venc='Sin vencimiento';
-  if(e.vence_en){venc='Vence '+fecha(e.vence_en)+(d!=null?(d<0?' (vencida hace '+(-d)+' d)':' (en '+d+' d)'):'')+(e.periodo_pago?' · '+e.periodo_pago:'')}
+  if(e.vence_en){venc=(esPrueba(e)?'Prueba termina ':'Vence ')+fecha(e.vence_en)+(d!=null?(d<0?' (hace '+(-d)+' d)':d===0?' (hoy)':' (en '+d+' d)'):'')+(e.periodo_pago&&!esPrueba(e)?' · '+e.periodo_pago:'')}
   const nom=e.nombre_comercial||e.razon_social||'Empresa';
+  const sol=e.ultima_solicitud;
   return '<div class="emp" style="--c:'+c+';--bg:'+bg+';--t:'+t+'"><b>'+esc(nom)+'</b><span class="tag">'+esc(et)+'</span>'
    +'<div class="det">RUC '+esc(e.ruc||'—')+' · '+esc(e.razon_social||'')+'</div>'
-   +'<div class="det">'+esc(venc)+' · registrada '+fecha(e.creado_en)+'</div>'
+   +'<div class="det">'+esc(venc)+' · registrada '+fecha(e.creado_en)+(e.miembros!=null?' · '+e.miembros+' usuario(s)':'')+'</div>'
+   +(sol?'<div class="det">Último pago reportado: '+fecha(sol.creado_en)+' · plan '+esc(sol.plan||'—')+(sol.monto!=null?' · S/ '+Number(sol.monto).toFixed(2):'')+' · '+esc(sol.estado||'')+'</div>':'')
    +'<div class="acc">'
-   +'<button class="btn btn-g btn-s" data-a="mensual" data-id="'+e.id+'" data-n="'+esc(nom)+'">'+(e.estado==='pendiente'?'Activar mensual':'Renovar mensual')+'</button>'
-   +'<button class="btn btn-o btn-s" data-a="anual" data-id="'+e.id+'" data-n="'+esc(nom)+'">'+(e.estado==='pendiente'?'Activar anual':'Renovar anual')+'</button>'
+   +'<button class="btn btn-g btn-s" data-a="mensual" data-id="'+e.id+'" data-n="'+esc(nom)+'">'+(e.estado==='pendiente'||esPrueba(e)?'Activar mensual':'Renovar mensual')+'</button>'
+   +'<button class="btn btn-o btn-s" data-a="anual" data-id="'+e.id+'" data-n="'+esc(nom)+'">'+(e.estado==='pendiente'||esPrueba(e)?'Activar anual':'Renovar anual')+'</button>'
    +(e.estado!=='suspendida'?'<button class="btn btn-r btn-s" data-a="suspender" data-id="'+e.id+'" data-n="'+esc(nom)+'">Suspender</button>':'')
    +'</div></div>';
 }

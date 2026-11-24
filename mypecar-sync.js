@@ -62,7 +62,7 @@
     };
     global.mesPeru = function (instante) { return global.hoyPeru(instante).slice(0, 7); };
   }
-  const VERSION_SYNC = '2026-11-13c';
+  const VERSION_SYNC = '2026-11-24';
   const OUTBOX_KEY = 'mypecar_sync_outbox';
   const OUTBOX_BORRADOS_KEY = 'mypecar_sync_outbox_borrados';
   const EMPRESA_KEY = 'mypecar_empresa_activa';
@@ -2972,9 +2972,15 @@ var LZString = {
         '<p style="color:#334155;line-height:1.5;margin:0 0 14px">Esta copia del sistema está <b>desactualizada</b> y no incluye las protecciones de seguridad de los datos. Por eso no puede usarse.</p>' +
         '<p style="color:#475569;font-size:14px;margin:0 0 14px">Versión instalada: <b>' + String(versionApp).replace(/</g, '&lt;') + '</b> (sync: ' + String(versionSync).replace(/</g, '&lt;') + ')<br>Versión mínima requerida: <b>' + String(minima).replace(/</g, '&lt;') + '</b></p>' +
         (mensaje ? '<p style="color:#334155;font-size:14px;margin:0 0 14px">' + String(mensaje).replace(/</g, '&lt;') + '</p>' : '') +
-        '<p style="color:#334155;font-size:14px;margin:0">Pida al proveedor la <b>última versión de los archivos</b>, reemplace su carpeta de apps y vuelva a abrir. Sus datos en la nube están a salvo.</p>' +
+        '<p style="color:#334155;font-size:14px;margin:0 0 16px">Tu navegador guardó una versión anterior. <b>Recarga la página</b> para recibir la nueva. Tus datos en la nube están a salvo.</p>' +
+        '<button type="button" id="mypecar-bloqueo-recargar" style="background:#0b5d52;color:#fff;border:0;border-radius:12px;padding:12px 22px;font-weight:800;font-size:15px;cursor:pointer">Recargar ahora</button>' +
+        '<p style="color:#64748b;font-size:12px;margin:12px 0 0">Si sigue apareciendo, cierra el navegador y vuelve a abrir mypecar.net.pe.</p>' +
         '</div>';
       document.body.appendChild(caja);
+      const btn = document.getElementById('mypecar-bloqueo-recargar');
+      if (btn) btn.onclick = function () {
+        try { const u = new URL(location.href); u.searchParams.set('v', String(Date.now())); location.replace(u.toString()); } catch (e) { location.reload(); }
+      };
     }
   };
 
