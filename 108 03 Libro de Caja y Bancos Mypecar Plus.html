@@ -3393,6 +3393,8 @@
             const concepto = document.getElementById('mov-concepto').value.trim();
 
             if (!fecha || !concepto) { showToast('Completa la fecha y el concepto.', 'error'); return; }
+            // (2026-11-24) La fecha debe pertenecer al periodo activo: si no, el movimiento quedaría en el registro y asiento de OTRO mes.
+            if (String(fecha).slice(0, 7) !== config.periodoActivo) { showToast(`La fecha (${formatFechaPeru(fecha)}) no pertenece al periodo activo (${formatPeriodoLabel(config.periodoActivo)}). Cambia de periodo arriba o corrige la fecha.`, 'error'); return; }
 
             const moneda = document.getElementById('mov-moneda').value;
             const tipoCambio = moneda === 'USD' ? (parseFloat(document.getElementById('mov-tipo-cambio').value) || 0) : 1;
