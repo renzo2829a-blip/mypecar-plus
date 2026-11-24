@@ -1118,6 +1118,7 @@ const MypecarPEVista = (function () {
                     <div class="text-xs text-orange-900 space-y-1.5">
                         <h4 class="font-bold text-sm">Gastos reales sin comprobante de pago válido</h4>
                         <p>Registra aquí los gastos menores que la empresa sí realizó, pero que no tienen un comprobante de pago aceptado por SUNAT (recibo simple, vale de caja, declaración jurada, ticket no válido, etc.). Todos se contabilizan en la <b>cuenta única 65999 – Gastos reparados</b>, para que los estados financieros muestren la realidad de la empresa.</p>
+                        <p id="gr-caja-estado" class="font-semibold"></p>
                         <p>El sistema genera y mantiene actualizado <b>un solo asiento por mes</b> en el Libro Diario (65999 al Debe contra la cuenta de pago, más su destino a la Clase 9 vía la 79). Al cierre del ejercicio, el <b>acumulado anual</b> se adiciona en la Declaración Jurada Anual del Impuesto a la Renta (rubro de adiciones para determinar la renta neta), porque estos gastos no son deducibles (Art. 44° de la Ley del Impuesto a la Renta).</p>
                     </div>
                 </div>
@@ -3573,7 +3574,7 @@ const MypecarPEVista = (function () {
             else if (tabId === 'almacen') { renderAlmacen(); }
             else if (tabId === 'seguridad') { renderSeguridad(); }
             else if (tabId === 'alertas') { renderAlertas(); }
-            else if (tabId === 'gastosreparados') { renderGastosReparados(); }
+            else if (tabId === 'gastosreparados') { renderGastosReparados(); try { if (window.sincronizarGRDesdeCajaAhora) window.sincronizarGRDesdeCajaAhora(); } catch (e) {} }
         }
 
         // ==================================================================
@@ -5685,16 +5686,19 @@ function mensajeCuentaNoImputable(codigo, origen) {
 
         // Crea / actualiza / quita el asiento automático del mes según el detalle actual.
         // NO guarda — quien lo llama hace persistActivePeriod() + persistAll().
-        function sincronizarAsientoGastosReparados() {
+        function sincronizarAsientoGastosReparados(periodoObjetivo) {
             asegurarCuentaGastosReparados();
-            const periodo = config.periodoActivo;
+            const periodo = periodoObjetivo || config.periodoActivo;
+            // (2026-11-24) Puede regenerar el asiento de CUALQUIER periodo (lo usa la carga automática desde Caja y Bancos).
+            if (!periodsData[periodo]) return null; // la carga automática solo trabaja sobre periodos que ya existen
+            const arr = (periodo === config.periodoActivo) ? asientos : (periodsData[periodo].asientos = Array.isArray(periodsData[periodo].asientos) ? periodsData[periodo].asientos : []);
             const lista = getGastosReparados(periodo);
-            const idx = asientos.findIndex(a => a.gastosReparadosAuto);
+            const idx = arr.findIndex(a => a.gastosReparadosAuto);
 
             if (lista.length === 0) {
                 if (idx >= 0) {
-                    const num = asientos[idx].numero;
-                    asientos.splice(idx, 1);
+                    const num = arr[idx].numero;
+                    arr.splice(idx, 1);
                     registrarBitacora('eliminar', 'asiento', `Asiento N° ${num} (Gastos Reparados) — se quitó porque ya no quedan gastos reparados en ${formatPeriodoLabel(periodo)}`);
                 }
                 return null;
@@ -5721,17 +5725,17 @@ function mensajeCuentaNoImputable(codigo, origen) {
             const usuario = config.usuarioActivo || 'Sin identificar';
 
             if (idx >= 0) {
-                asientos[idx] = { ...asientos[idx], fecha, glosa, origen: 'Gastos Reparados', lineas, gastosReparadosAuto: true, editadoPor: usuario, fechaEdicion: new Date().toISOString() };
-                return asientos[idx];
+                arr[idx] = { ...arr[idx], fecha, glosa, origen: 'Gastos Reparados', lineas, gastosReparadosAuto: true, editadoPor: usuario, fechaEdicion: new Date().toISOString() };
+                return arr[idx];
             }
-            const nextId = asientos.length > 0 ? Math.max(...asientos.map(a => a.id)) + 1 : 1;
-            const nextNumero = asientos.length > 0 ? Math.max(...asientos.map(a => a.numero)) + 1 : 1;
+            const nextId = arr.length > 0 ? Math.max(...arr.map(a => a.id)) + 1 : 1;
+            const nextNumero = arr.length > 0 ? Math.max(...arr.map(a => a.numero)) + 1 : 1;
             const nuevo = {
                 id: nextId, numero: nextNumero, fecha, glosa, origen: 'Gastos Reparados', lineas,
                 gastosReparadosAuto: true, registradoPor: usuario, fechaRegistro: new Date().toISOString(),
                 preparadoPor: null, fechaExportacion: null
             };
-            asientos.push(nuevo);
+            arr.push(nuevo);
             registrarBitacora('crear', 'asiento', `Asiento N° ${nextNumero} (Gastos Reparados) — ${formatPeriodoLabel(periodo)}`);
             return nuevo;
         }
@@ -5782,6 +5786,89 @@ function mensajeCuentaNoImputable(codigo, origen) {
             try { updateChart(); } catch (e) { /* el gráfico es opcional */ }
             renderGastosReparados();
             if (mensaje) showToast(mensaje);
+        }
+
+
+        // ------------------------------------------------------------------------------------------------
+        // CARGA AUTOMÁTICA DESDE CAJA Y BANCOS (2026-11-24)
+        // Si en 03 Caja y Bancos (Ajustes) está activada la opción "Enviar los gastos sin comprobante (65999) a Gastos Reparados",
+        // cada egreso "puro" (Debe 65999 / Haber caja o bancos) llega aquí solo, marcado origenCarga:'caja'. Esto:
+        //  - SOLO agrega, actualiza o quita las filas marcadas 'caja' (nunca toca las manuales ni las del Excel);
+        //  - regenera el asiento mensual de cada mes afectado con la misma función de siempre;
+        //  - si la opción se apaga en 03, quita las filas 'caja' y Caja vuelve a contarlas en su propio asiento resumen.
+        // Solo trabaja sobre meses que ya existen en este Libro Diario (no crea periodos).
+        // ------------------------------------------------------------------------------------------------
+        function movimientoEsGastoReparadoPuroCaja(m) {
+            const L = (m && m.lineas) || [];
+            if (L.length < 2 || m.tipo !== 'Egreso') return null;
+            const d = L.filter(l => (l.debe || 0) > 0), h = L.filter(l => (l.haber || 0) > 0);
+            if (!d.length || !h.length) return null;
+            if (!d.every(l => String(l.cuenta) === CUENTA_GASTOS_REPARADOS)) return null;
+            if (!h.every(l => /^(10|14)/.test(String(l.cuenta)))) return null;
+            const sd = round2(d.reduce((s, l) => s + (l.debe || 0), 0)), sh = round2(h.reduce((s, l) => s + (l.haber || 0), 0));
+            if (Math.abs(sd - sh) >= 0.01 || !(sd > 0)) return null;
+            const principal = h.slice().sort((a, b) => (b.haber || 0) - (a.haber || 0))[0];
+            return { monto: sd, cuentaPago: String(principal.cuenta) };
+        }
+        async function sincronizarGastosReparadosDesdeCaja(payload) {
+            if (!payload || payload.tipo !== 'cajabancos' || !payload.periodsData || !periodsData || !Object.keys(periodsData).length) return { cambios: 0 };
+            const activo = !!(payload.config && payload.config.gastosReparadosAlDiario);
+            config.gastosReparadosDesdeCaja = activo; // solo informativo (se muestra en la pestaña)
+            let cambios = 0; const afectados = new Set(); const omitidos = [];
+            // 1) Lo que debería existir según Caja (solo si la opción está activa)
+            const deseados = {}; // periodo -> { origenId -> datos }
+            if (activo) {
+                Object.keys(payload.periodsData).forEach(per => {
+                    (payload.periodsData[per].movimientos || []).forEach(m => {
+                        const r = movimientoEsGastoReparadoPuroCaja(m);
+                        if (!r) return;
+                        if (!periodsData[per]) { if (omitidos.indexOf(per) === -1) omitidos.push(per); return; }
+                        (deseados[per] = deseados[per] || {})[per + '|' + m.id] = {
+                            fecha: String(m.fecha || '').startsWith(per) ? m.fecha : ultimoDiaMes(per),
+                            concepto: String(m.concepto || 'Gasto sin comprobante'), monto: r.monto, cuentaPago: r.cuentaPago
+                        };
+                    });
+                });
+            }
+            // 2) Aplicar sobre cada periodo que existe aquí
+            Object.keys(periodsData).forEach(per => {
+                const lista = getGastosReparados(per);
+                const quer = deseados[per] || {};
+                const previas = lista.filter(g => g.origenCarga === 'caja');
+                if (!previas.length && !Object.keys(quer).length) return;
+                // quitar las que ya no corresponden
+                previas.forEach(g => { if (!quer[g.origenId]) { lista.splice(lista.indexOf(g), 1); cambios++; afectados.add(per); } });
+                // agregar o actualizar
+                Object.keys(quer).forEach(oid => {
+                    const q = quer[oid];
+                    const medio = `${q.cuentaPago} - ${getAccountName(q.cuentaPago)}`;
+                    const ex = lista.find(g => g.origenCarga === 'caja' && g.origenId === oid);
+                    if (ex) {
+                        if (ex.fecha !== q.fecha || ex.concepto !== q.concepto || round2(ex.monto) !== round2(q.monto) || ex.cuentaPago !== q.cuentaPago) {
+                            Object.assign(ex, { fecha: q.fecha, concepto: q.concepto, monto: q.monto, cuentaPago: q.cuentaPago, medioPago: medio });
+                            cambios++; afectados.add(per);
+                        }
+                    } else {
+                        const nextId = lista.length > 0 ? Math.max(...lista.map(g => g.id || 0)) + 1 : 1;
+                        lista.push({ id: nextId, fecha: q.fecha, concepto: q.concepto, beneficiario: '', docIdentidad: '', documento: '', numeroDoc: '',
+                            numeroOperacion: '', medioPago: medio, motivo: MOTIVO_GR_DEFAULT, monto: q.monto, cuentaPago: q.cuentaPago,
+                            origenCarga: 'caja', origenId: oid, registradoPor: 'Caja y Bancos (automático)', fechaRegistro: new Date().toISOString() });
+                        cambios++; afectados.add(per);
+                    }
+                });
+            });
+            config.gastosReparadosMesesSinPeriodo = omitidos.sort();
+            if (cambios === 0) { try { renderGastosReparados(); } catch (e) {} return { cambios: 0, omitidos }; }
+            // 3) Regenerar el asiento de cada mes afectado y guardar
+            for (const per of afectados) {
+                try { sincronizarAsientoGastosReparados(per); }
+                catch (e) { console.error('Gastos reparados desde Caja:', e); showToast('No se pudo generar el asiento de ' + formatPeriodoLabel(per) + ': ' + e.message + '. Revisa Ajustes → Destinos por Cuenta.', 'error'); }
+                if (per === config.periodoActivo) await persistActivePeriod();
+                else await storageSet(claveDePeriodo(per), periodsData[per]);
+            }
+            try { await persistAll(); } catch (e) { console.error('No se pudo sincronizar con la nube (los datos igual quedaron guardados en este dispositivo):', e); }
+            try { renderAll(); renderGastosReparados(); } catch (e) {}
+            return { cambios, omitidos, meses: Array.from(afectados) };
         }
 
         function limpiarFormularioGastoReparado() {
@@ -5835,6 +5922,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
         function editarGastoReparado(id) {
             const g = getGastosReparados().find(x => x.id === id);
             if (!g) return;
+            if (g.origenCarga === 'caja') { showToast('Este gasto llega solo desde Caja y Bancos (03). Corrígelo allá y aquí se actualiza solo.', 'error'); return; }
             gastoReparadoEnEdicionId = id;
             document.getElementById('gr-fecha').value = g.fecha;
             document.getElementById('gr-concepto').value = g.concepto || '';
@@ -5863,6 +5951,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             const lista = getGastosReparados();
             const g = lista.find(x => x.id === id);
             if (!g) return;
+            if (g.origenCarga === 'caja') { showToast('Este gasto llega solo desde Caja y Bancos (03). Corrígelo o elimínalo allá y aquí se actualiza solo.', 'error'); return; }
             if (!confirm(`¿Eliminar este gasto reparado?\n\n${g.concepto} — S/ ${Number(g.monto).toFixed(2)}\n\nEl asiento del mes en el Libro Diario se actualizará solo.`)) return;
             periodsData[config.periodoActivo].gastosReparados = lista.filter(x => x.id !== id);
             if (gastoReparadoEnEdicionId === id) cancelarEdicionGastoReparado();
@@ -5935,8 +6024,8 @@ function mensajeCuentaNoImputable(codigo, origen) {
                         <td class="p-2 text-center font-mono" title="${escHtmlGR(getAccountName(g.cuentaPago))}">${escHtmlGR(g.cuentaPago)}${g.medioPago && extractCode(g.medioPago) !== g.cuentaPago ? `<span class="block text-[10px] text-slate-400 font-sans">${escHtmlGR(g.medioPago)}</span>` : ''}${g.numeroOperacion ? `<span class="block text-[10px] text-slate-400">Op. ${escHtmlGR(g.numeroOperacion)}</span>` : ''}</td>
                         <td class="p-2 text-right font-mono font-semibold">${Number(g.monto).toFixed(2)}</td>
                         <td class="p-2 text-center no-print whitespace-nowrap">
-                            <button onclick="editarGastoReparado(${g.id})" title="Editar" class="text-indigo-500 hover:text-indigo-700 p-1 rounded-lg hover:bg-indigo-50"><i class="fa-solid fa-pen"></i></button>
-                            <button onclick="eliminarGastoReparado(${g.id})" title="Eliminar" class="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50"><i class="fa-solid fa-trash"></i></button>
+                            ${g.origenCarga === 'caja' ? '<span class="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5" title="Se edita en 03 Caja y Bancos">desde Caja</span>' : `                            <button onclick="editarGastoReparado(${g.id})" title="Editar" class="text-indigo-500 hover:text-indigo-700 p-1 rounded-lg hover:bg-indigo-50"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="eliminarGastoReparado(${g.id})" title="Eliminar" class="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50"><i class="fa-solid fa-trash"></i></button>`}
                         </td>
                     </tr>`).join('');
             }
@@ -5947,6 +6036,14 @@ function mensajeCuentaNoImputable(codigo, origen) {
             document.getElementById('gr-total-mes').innerText = `S/ ${totalMes.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             document.getElementById('gr-cantidad-mes').innerText = `${lista.length} gasto(s) registrado(s) — ${formatPeriodoLabel(periodo)}`;
 
+            const estadoCaja = document.getElementById('gr-caja-estado');
+            if (estadoCaja) {
+                const omit = (config.gastosReparadosMesesSinPeriodo || []);
+                estadoCaja.innerHTML = config.gastosReparadosDesdeCaja
+                    ? '🔗 <b>Automático desde Caja y Bancos: ACTIVADO.</b> Los egresos de 03 con Debe a la 65999 llegan solos (marcados "desde Caja"); lo que cargues a mano o por Excel no se toca.' +
+                      (omit.length ? ' <span class="text-rose-700">Hay gastos en meses que aún no existen en este Libro Diario: ' + omit.map(formatPeriodoLabel).join(', ') + '. Crea esos periodos y se cargarán solos.</span>' : '')
+                    : 'Origen de los gastos: <b>manual o Excel</b>. (Para recibirlos solos desde Caja y Bancos, se activa en 03 → Ajustes.)';
+            }
             const asientoAuto = asientos.find(a => a.gastosReparadosAuto);
             document.getElementById('gr-asiento-info').innerText = asientoAuto
                 ? `Asiento N° ${String(asientoAuto.numero).padStart(4, '0')} del ${formatFechaPeru(asientoAuto.fecha)}`
@@ -9695,10 +9792,20 @@ window.mypecarConstruirSnapshots = function () {
 /* Enlace automático (2026-11-20): las facturas de Compras llegan solas desde la nube (sirven para verificar
    las facturas provisionadas; el mismo contenido que "Datos_Reportes_Compras.json"). */
 (function () {
-    const FUENTES = [{ app: 'compras', tipo: 'reportes', nombre: 'compras' }];
-    async function alRecibir(app, tipo, archivo) { await importarFacturasProvisionadas([archivo], true); }
+    const FUENTES = [{ app: 'compras', tipo: 'reportes', nombre: 'compras' }, { app: 'caja', tipo: 'reportes', nombre: 'cajabancos' }];
+    async function alRecibir(app, tipo, archivo) {
+        if (app === 'caja') {
+            // Gastos Reparados automáticos desde Caja y Bancos (solo actúa si la opción está activa en 03).
+            let payload = null; try { payload = JSON.parse(await archivo.text()); } catch (e) { return; }
+            const r = await sincronizarGastosReparadosDesdeCaja(payload);
+            if (r && r.cambios && typeof showToast === 'function') showToast('Gastos Reparados actualizados desde Caja y Bancos (' + r.cambios + ' cambio(s)).');
+            return;
+        }
+        await importarFacturasProvisionadas([archivo], true);
+    }
     function iniciar() {
         if (!window.MypecarSync || !window.MypecarSync.enlace) return setTimeout(iniciar, 1500);
+        window.sincronizarGRDesdeCajaAhora = () => window.MypecarSync.enlace.sincronizar(FUENTES.filter(f => f.app === 'caja'), alRecibir, null, true);
         window.MypecarSync.enlace.automatico(FUENTES, alRecibir, null);
     }
     window.addEventListener('load', () => setTimeout(iniciar, 2000));

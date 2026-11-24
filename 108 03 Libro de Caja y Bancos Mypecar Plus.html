@@ -502,6 +502,7 @@
                         <button onclick="loadShortcut('cuota_prestamo')" class="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 font-semibold py-2.5 px-3 rounded-xl text-left transition-all"><i class="fa-solid fa-money-check-dollar mr-2"></i> Cuota de Préstamo (capital + interés)</button>
                         <button onclick="loadShortcut('aporte_capital')" class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-semibold py-2.5 px-3 rounded-xl text-left transition-all"><i class="fa-solid fa-sack-dollar mr-2"></i> Aporte de Capital de Socios</button>
                         <button onclick="loadShortcut('comision_bancaria')" class="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 font-semibold py-2.5 px-3 rounded-xl text-left transition-all"><i class="fa-solid fa-building-columns mr-2"></i> Comisión / Mantenimiento Bancario</button>
+                        <button onclick="loadShortcut('gasto_reparado')" class="bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 font-semibold py-2.5 px-3 rounded-xl text-left transition-all"><i class="fa-solid fa-receipt mr-2"></i> Gasto sin comprobante (reparado)</button>
                         <button onclick="loadShortcut('transferencia')" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 font-semibold py-2.5 px-3 rounded-xl text-left transition-all"><i class="fa-solid fa-right-left mr-2"></i> Transferencia entre Cuentas</button>
                         <button onclick="loadShortcut('vacio')" class="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-semibold py-2.5 px-3 rounded-xl text-left transition-all"><i class="fa-solid fa-file mr-2"></i> Asiento en Blanco (2 líneas)</button>
                         <!-- Los atajos personalizados que crees aparecerán aquí automáticamente -->
@@ -832,6 +833,14 @@
                             </div>
                         </div>
                         <p class="text-[10px] text-slate-400 mt-1">Los pagos en efectivo por encima de este monto no dan derecho a sustentar gasto/costo tributario ni crédito fiscal de IGV. Este límite lo fija la ley peruana y puede cambiar con el tiempo — verifícalo periódicamente.</p>
+                    </div>
+
+                    <div class="border-t pt-4">
+                        <label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+                            <input type="checkbox" id="set-gr-al-diario" class="mt-0.5 rounded border-slate-300 text-amber-600">
+                            <span><b><i class="fa-solid fa-receipt text-amber-600"></i> Enviar los gastos sin comprobante (cuenta 65999) a Gastos Reparados del Libro Diario, en automático.</b><br>
+                            <span class="text-[10px] text-slate-500">Si la activas, los egresos con Debe a la 65999 y Haber a caja/bancos llegan solos a la pestaña "Gastos Reparados" del 04 (que arma su asiento mensual) y ya no se cuentan en el asiento resumen de Caja y Bancos, para no duplicarlos. Si prefieres cargar tus gastos reparados desde un Excel en el 04, déjala apagada. Usa el atajo "Gasto sin comprobante (reparado)" al registrar.</span></span>
+                        </label>
                     </div>
 
                     <div class="border-t pt-4">
@@ -1962,6 +1971,7 @@
             document.getElementById('nav-empresa-name').innerText = config.nombreComercial;
             document.getElementById('nav-empresa-ruc').innerText = config.ruc;
             document.getElementById('set-razon-social').value = config.razonSocial;
+            { const grEl = document.getElementById('set-gr-al-diario'); if (grEl) grEl.checked = !!config.gastosReparadosAlDiario; }
             document.getElementById('set-nombre-comercial').value = config.nombreComercial;
             document.getElementById('set-ruc').value = config.ruc;
             aplicarLogoCliente();
@@ -2138,9 +2148,12 @@
             if (limiteUSDInput) config.limiteBancarizacionUSD = parseFloat(limiteUSDInput.value) || 500;
             const licInput = document.getElementById('set-licenciado-a');
             if (licInput) config.licenciadoA = licInput.value.trim();
+            const grInput = document.getElementById('set-gr-al-diario');
+            if (grInput) { config.gastosReparadosAlDiario = !!grInput.checked; if (grInput.checked) asegurarCuentaGastoReparado(); }
             await storageSet('cajabancos_config', config);
             syncConfigUI();
             aplicarMarcaDeAgua();
+            try { generateAsientoResumen(); renderRegistro(); } catch (e) {}
             showToast("Configuración guardada correctamente.");
             switchTab('dashboard');
         }
@@ -3224,6 +3237,12 @@
                     document.getElementById('mov-concepto').value = 'Comisión de mantenimiento de cuenta bancaria';
                     addLinea('6391', '97', '', ''); addLinea('1041', '', '', '');
                     break;
+                case 'gasto_reparado':
+                    asegurarCuentaGastoReparado();
+                    document.getElementById('mov-categoria').value = 'Otros Egresos';
+                    document.getElementById('mov-concepto').value = 'Gasto sin comprobante de pago válido — ';
+                    addLinea('65999', '', '', ''); addLinea('101', '', '', '');
+                    break;
                 case 'transferencia':
                     document.getElementById('mov-tipo').value = 'Transferencia';
                     document.getElementById('mov-categoria').value = 'Transferencia Interna';
@@ -3633,7 +3652,7 @@
                 tr.innerHTML = `
                     <td class="p-3">${formatFechaPeru(m.fecha)}</td>
                     <td class="p-3 font-bold ${colorTipo}">${m.tipo}</td>
-                    <td class="p-3 max-w-[220px] truncate">${m.concepto}</td>
+                    <td class="p-3 max-w-[220px] truncate">${m.concepto}${etiquetaGastoReparado(m)}</td>
                     <td class="p-3 font-mono">${primerCuenta}${m.lineas.length > 1 ? ` (+${m.lineas.length - 1})` : ''}</td>
                     <td class="p-3 text-right font-semibold">S/ ${montoTotalMovimiento(m).toFixed(2)}</td>
                 `;
@@ -3685,7 +3704,7 @@
                             <td class="p-2.5 text-center border-r border-slate-200">${idx === 0 ? formatFechaPeru(m.fecha) : ''}</td>
                             <td class="p-2.5 text-center border-r border-slate-200">${idx === 0 ? `<span class="px-2 py-0.5 rounded text-[9px] font-bold ${colorTipo}">${m.tipo.toUpperCase()}</span>` : ''}</td>
                             <td class="p-2.5 border-r border-slate-200 font-sans">${idx === 0 ? m.categoria : ''}</td>
-                            <td class="p-2.5 border-r border-slate-200 font-sans">${idx === 0 ? m.concepto + (m.moneda === 'USD' ? ` <span title="Original: US$ ${(m.totalMonedaOriginal || 0).toFixed(2)} al T.C. ${m.tipoCambio}" class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-700 cursor-help">US$</span>` : '') : ''}</td>
+                            <td class="p-2.5 border-r border-slate-200 font-sans">${idx === 0 ? m.concepto + etiquetaGastoReparado(m) + (m.moneda === 'USD' ? ` <span title="Original: US$ ${(m.totalMonedaOriginal || 0).toFixed(2)} al T.C. ${m.tipoCambio}" class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-700 cursor-help">US$</span>` : '') : ''}</td>
                             <td class="p-2.5 text-center border-r border-slate-200 font-semibold">${l.cuenta}</td>
                             <td class="p-2.5 text-center border-r border-slate-200 text-slate-500">${l.cc || ''}</td>
                             <td class="p-2.5 text-right border-r border-slate-200 font-bold text-indigo-900">${l.debe > 0 ? l.debe.toFixed(2) : ''}</td>
@@ -4174,12 +4193,42 @@
             showToast(`Conciliación automática completada: ${emparejados} emparejados.`);
         }
 
+        // ==================================================================
+        // GASTOS REPARADOS (2026-11-24) — egresos pagados SIN comprobante de pago válido (cuenta 65999).
+        // Un movimiento "puro" (Debe solo a la 65999, Haber solo a caja/bancos/rendir, y cuadra) puede enviarse AUTOMÁTICAMENTE
+        // a la pestaña "Gastos Reparados" del Libro Diario (04), que ya genera su propio asiento mensual. Para no contarlo dos
+        // veces, cuando la opción está activa (Ajustes) ese movimiento NO entra al asiento resumen de Caja y Bancos.
+        // Con la opción apagada (por defecto) todo funciona exactamente como antes.
+        // ==================================================================
+        function esGastoReparadoPuro(m) {
+            const L = (m && m.lineas) || [];
+            if (L.length < 2 || m.tipo !== 'Egreso') return false;
+            const d = L.filter(l => (l.debe || 0) > 0), h = L.filter(l => (l.haber || 0) > 0);
+            if (!d.length || !h.length) return false;
+            if (!d.every(l => String(l.cuenta) === '65999')) return false;
+            if (!h.every(l => /^(10|14)/.test(String(l.cuenta)))) return false;
+            const sd = d.reduce((s, l) => s + (l.debe || 0), 0), sh = h.reduce((s, l) => s + (l.haber || 0), 0);
+            return Math.abs(sd - sh) < 0.01;
+        }
+        function gastoReparadoVaAlDiario(m) { return !!config.gastosReparadosAlDiario && esGastoReparadoPuro(m); }
+        function asegurarCuentaGastoReparado() {
+            if (getAllAccounts().some(c => c.codigo === '65999')) return false;
+            customAccounts.push({ codigo: '65999', nombre: 'Gastos reparados (sin comprobante de pago válido)' });
+            try { storageSet('cajabancos_custom_accounts', customAccounts); } catch (e) {}
+            try { populateCuentaDatalist(); } catch (e) {}
+            return true;
+        }
+        function etiquetaGastoReparado(m) {
+            return gastoReparadoVaAlDiario(m) ? ' <span class="inline-block text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 rounded px-1.5 py-0.5 align-middle">→ Gastos Reparados (04)</span>' : '';
+        }
+
         function generateAsientoResumen() {
             const tbody = document.getElementById('asiento-resumen-body');
             const resumen = {};
             const ensure = (cta) => { if (!resumen[cta]) resumen[cta] = { debe: 0, haber: 0 }; };
 
             movimientos.forEach(m => {
+                if (gastoReparadoVaAlDiario(m)) return; // va por Gastos Reparados del 04 (no se cuenta dos veces)
                 m.lineas.forEach(l => {
                     ensure(l.cuenta);
                     resumen[l.cuenta].debe += l.debe;
