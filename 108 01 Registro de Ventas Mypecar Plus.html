@@ -1388,6 +1388,52 @@
         // etc.), así que guardar un mes nunca puede pisar los datos de otro.
         const PREFIJO_CLAVE_PERIODO = 'vendepollo_periods__';
         function claveDePeriodo(periodo) { return PREFIJO_CLAVE_PERIODO + periodo; }
+
+        // (2026-11-24) Cada periodo numera sus ventas desde 1, así que "ventaId" solo NO identifica una venta: la venta
+        // N.° 3 de junio y la N.° 3 de julio tienen el mismo ventaId. Antes, eliminar o editar una borraba también los
+        // movimientos de inventario de la otra. Ahora cada movimiento guarda también su periodo (ventaPeriodo); los
+        // movimientos antiguos, sin periodo, se reconocen por su comprobante.
+        function movEsDeVenta(m, v, periodo) {
+            if (!m || !v || m.ventaId !== v.id) return false;
+            if (m.ventaPeriodo) return m.ventaPeriodo === periodo;
+            return !m.comprobante || m.comprobante === `${v.tipoDoc} ${v.serie}-${v.numero}`;
+        }
+        function movimientosDeItemsVenta(v, periodo) {
+            const items = Array.isArray(v.detalleItems) ? v.detalleItems : [];
+            return items.filter(it => { const p = (config.productos || []).find(x => x.codigo === it.productoCodigo); return !(p && p.controlaStock === false); }).map(it => ({
+                fecha: v.fechaEmision, tipo: 'salida', origen: 'venta', ventaId: v.id, ventaPeriodo: periodo,
+                comprobante: `${v.tipoDoc} ${v.serie}-${v.numero}`, puntoVenta: v.puntoVenta,
+                productoCodigo: it.productoCodigo, productoNombre: it.productoNombre, unidad: it.unidad, cantidad: it.cantidad,
+                registradoPor: v.registradoPor || config.usuarioActivo || 'Sin identificar', fechaRegistro: new Date().toISOString()
+            }));
+        }
+        // Reparación automática: si un guardado se cortó a la mitad (se cerró la pestaña, se fue el internet, etc.) y una
+        // venta con detalle de productos quedó SIN sus movimientos de salida, se regeneran desde la propia venta. Nunca borra.
+        async function reconciliarMovimientosVentas() {
+            try {
+                if (!periodsData || !Object.keys(periodsData).length || !Array.isArray(stockMovimientos)) return 0;
+                let reparadas = 0, etiquetadas = 0;
+                Object.keys(periodsData).forEach(per => {
+                    const lista = (per === config.periodoActivo ? sales : (periodsData[per] && periodsData[per].sales)) || [];
+                    lista.forEach(v => {
+                        const esperados = movimientosDeItemsVenta(v, per);
+                        if (!esperados.length) return;
+                        const existentes = stockMovimientos.filter(m => movEsDeVenta(m, v, per));
+                        existentes.forEach(m => { if (!m.ventaPeriodo) { m.ventaPeriodo = per; etiquetadas++; } });
+                        if (existentes.length >= esperados.length) return;
+                        stockMovimientos = stockMovimientos.filter(m => !movEsDeVenta(m, v, per));
+                        esperados.forEach(e => { e.id = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1; stockMovimientos.push(e); });
+                        reparadas++;
+                    });
+                });
+                if (reparadas || etiquetadas) {
+                    await storageSet('vendepollo_stock_movimientos', stockMovimientos);
+                    if (reparadas) console.warn(`Se repararon los movimientos de inventario de ${reparadas} venta(s) que habían quedado sin ellos.`);
+                }
+                return reparadas;
+            } catch (e) { console.warn('No se pudo revisar la coherencia ventas / inventario:', e); return 0; }
+        }
+        window.addEventListener('load', () => setTimeout(reconciliarMovimientosVentas, 6000));
         let periodsData = {};
         let papeleraVentas = [];  // ventas eliminadas, recuperables (guarda periodoOrigen para restaurar al periodo correcto)
         let bitacora = [];        // { accion, entidad, detalle, usuario, fecha } — historial de cambios, más reciente primero
@@ -3836,9 +3882,13 @@
             // incluida la cuenta contable, sin tener que anular y volver a registrar todo.
             let mensajeFinal;
             let ventaIdFinal;
+            const _copiaVentas = sales.map(x => ({ ...x })); // por si el guardado falla: se vuelve a como estaba
+            const _copiaMovs = stockMovimientos.slice();
+            const _edicionPrevia = ventaEnEdicionId;
             if (ventaEnEdicionId) {
                 const idx = sales.findIndex(v => v.id === ventaEnEdicionId);
                 if (idx === -1) { showToast('La venta que estabas editando ya no existe — puede haber sido eliminada.', 'error'); return; }
+                const ventaPrevia = sales[idx];
                 sales[idx] = {
                     ...sales[idx], ...datosVenta,
                     editadoPor: config.usuarioActivo || 'Sin identificar', fechaEdicion: new Date().toISOString()
@@ -3850,7 +3900,7 @@
                 document.getElementById('form-venta-modo-edicion').classList.add('hidden');
                 // Las cantidades/productos pudieron cambiar — se descartan los movimientos de
                 // inventario anteriores de esta venta y se regeneran desde cero más abajo.
-                stockMovimientos = stockMovimientos.filter(m => m.ventaId !== ventaIdFinal);
+                stockMovimientos = stockMovimientos.filter(m => !movEsDeVenta(m, ventaPrevia, config.periodoActivo));
             } else {
                 const nextId = sales.length > 0 ? Math.max(...sales.map(v => v.id)) + 1 : 1;
                 sales.push({
@@ -3872,7 +3922,7 @@
                     const nextMovId = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1;
                     stockMovimientos.push({
                         id: nextMovId, fecha: fechaEmision, tipo: 'salida', origen: 'venta',
-                        ventaId: ventaIdFinal, comprobante: `${tipoDoc} ${serie}-${numero}`,
+                        ventaId: ventaIdFinal, ventaPeriodo: config.periodoActivo, comprobante: `${tipoDoc} ${serie}-${numero}`,
                         puntoVenta, productoCodigo: it.productoCodigo, productoNombre: it.productoNombre,
                         unidad: it.unidad, cantidad: it.cantidad,
                         registradoPor: config.usuarioActivo || 'Sin identificar', fechaRegistro: new Date().toISOString()
@@ -3880,8 +3930,18 @@
                 });
             }
 
-            await persistActivePeriod();
-            await persistAll();
+            // (2026-11-24) Si el guardado falla a la mitad, NO se limpia el formulario ni se dice "registrada": se avisa, y la
+            // reparación automática (reconciliarMovimientosVentas) recompone los movimientos de inventario que falten.
+            try {
+                await persistActivePeriod();
+                await persistAll();
+            } catch (errGuardado) {
+                console.error('Error al guardar la venta:', errGuardado);
+                sales = _copiaVentas; stockMovimientos = _copiaMovs; ventaEnEdicionId = _edicionPrevia;
+                if (periodsData[config.periodoActivo]) periodsData[config.periodoActivo].sales = sales;
+                showToast('⚠ No se pudo guardar por completo. Revisa tu conexión o el espacio del equipo y vuelve a pulsar Registrar: lo escrito sigue en pantalla.', 'error');
+                return;
+            }
 
             document.getElementById('form-venta').reset();
             document.getElementById('bloque-detraccion-venta').classList.add('hidden');
@@ -3916,8 +3976,8 @@
             sales = sales.filter(v => v.id !== id);
             // Los movimientos de inventario de esta venta viajan CON ella a la Papelera —
             // así, si se restaura, el stock vuelve a reflejar exactamente lo mismo.
-            const movimientosDeEstaVenta = stockMovimientos.filter(m => m.ventaId === id);
-            stockMovimientos = stockMovimientos.filter(m => m.ventaId !== id);
+            const movimientosDeEstaVenta = stockMovimientos.filter(m => movEsDeVenta(m, venta, config.periodoActivo));
+            stockMovimientos = stockMovimientos.filter(m => !movEsDeVenta(m, venta, config.periodoActivo));
             papeleraVentas.push({ ...venta, _movimientosInventario: movimientosDeEstaVenta, periodoOrigen: config.periodoActivo, eliminadoPor: config.usuarioActivo || 'Sin identificar', fechaEliminacion: new Date().toISOString() });
             // ARREGLO (2026-09-18): a diferencia de la Bitácora (que ya se recortaba
             // sola a 500 registros), la Papelera no tenía ningún límite -- tras meses
@@ -4075,8 +4135,8 @@
         async function clearAllSales() {
             if (!confirm(`¿Eliminar de forma irreversible todas las ventas del periodo activo (${formatPeriodoLabel(config.periodoActivo)})? Esta acción NO pasa por la Papelera — no se puede deshacer.`)) return;
             registrarBitacora('eliminar_permanente', 'periodo_completo', `Se vaciaron ${sales.length} venta(s) de ${formatPeriodoLabel(config.periodoActivo)} de forma irreversible`);
-            const idsEliminados = sales.map(v => v.id);
-            stockMovimientos = stockMovimientos.filter(m => !idsEliminados.includes(m.ventaId));
+            const ventasEliminadas = sales.slice();
+            stockMovimientos = stockMovimientos.filter(m => !ventasEliminadas.some(v => movEsDeVenta(m, v, config.periodoActivo)));
             sales = [];
             await persistActivePeriod();
             await persistAll();
