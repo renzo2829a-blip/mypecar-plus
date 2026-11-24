@@ -1680,7 +1680,7 @@
             movimientosOrdenados().forEach(m => {
                 if (fechaCorte && (m.fecha || '') > fechaCorte) return;
                 const key = m.productoCodigo + '|' + m.puntoVenta;
-                if (!grupos[key]) grupos[key] = { productoCodigo: m.productoCodigo, productoNombre: m.productoNombre, puntoVenta: m.puntoVenta, unidad: m.unidad, cantidad: 0, valor: 0, capasPEPS: [] };
+                if (!grupos[key]) grupos[key] = { productoCodigo: m.productoCodigo, productoNombre: m.productoNombre, puntoVenta: m.puntoVenta, unidad: m.unidad, cantidad: 0, valor: 0, capasPEPS: [], ultimoCostoPEPS: 0 };
                 const g = grupos[key];
                 g.productoNombre = m.productoNombre || g.productoNombre;
                 g.unidad = m.unidad || g.unidad;
@@ -1688,7 +1688,7 @@
                     const costo = (m.costoUnitario !== null && m.costoUnitario !== undefined) ? m.costoUnitario : (g.cantidad > 0.0000001 ? g.valor / g.cantidad : 0);
                     g.cantidad += m.cantidad;
                     g.valor += costo * m.cantidad;
-                    if (metodo === 'PEPS') g.capasPEPS.push({ cantidad: m.cantidad, costoUnitario: costo });
+                    if (metodo === 'PEPS') { g.capasPEPS.push({ cantidad: m.cantidad, costoUnitario: costo }); g.ultimoCostoPEPS = costo; }
                 } else {
                     if (metodo === 'PROMEDIO') {
                         const costoProm = g.cantidad > 0.0000001 ? g.valor / g.cantidad : 0;
@@ -1704,6 +1704,9 @@
                             restante -= usar;
                             if (capa.cantidad <= 0.0000001) g.capasPEPS.shift();
                         }
+                        // (2026-11-24) Salida mayor al stock (venta sin stock): el faltante se valoriza al último costo conocido
+                        // (antes quedaba en S/ 0.00 con PEPS). El saldo queda NEGATIVO y se avisa en Stock Actual.
+                        if (restante > 0.0000001) g.valor -= restante * g.ultimoCostoPEPS;
                         g.cantidad -= m.cantidad;
                     }
                 }
@@ -1719,7 +1722,7 @@
         function construirKardex(productoCodigo, puntoVenta, metodo) {
             const movs = movimientosOrdenados().filter(m => m.productoCodigo === productoCodigo && (!puntoVenta || m.puntoVenta === puntoVenta));
             let saldoCantidad = 0, saldoValor = 0;
-            let capasPEPS = [];
+            let capasPEPS = [], ultimoCostoPEPSK = 0;
             const filas = [];
             movs.forEach(m => {
                 let fila = { ...m, entradaCant: 0, entradaCosto: 0, entradaValor: 0, salidaCant: 0, salidaCosto: 0, salidaValor: 0 };
@@ -1730,7 +1733,7 @@
                     fila.entradaValor = round2(costo * m.cantidad);
                     saldoCantidad += m.cantidad;
                     saldoValor += fila.entradaValor;
-                    if (metodo === 'PEPS') capasPEPS.push({ cantidad: m.cantidad, costoUnitario: costo });
+                    if (metodo === 'PEPS') { capasPEPS.push({ cantidad: m.cantidad, costoUnitario: costo }); ultimoCostoPEPSK = costo; }
                 } else {
                     if (metodo === 'PROMEDIO') {
                         const costoProm = saldoCantidad > 0.0000001 ? saldoValor / saldoCantidad : 0;
@@ -1747,6 +1750,7 @@
                             restante -= usar;
                             if (capa.cantidad <= 0.0000001) capasPEPS.shift();
                         }
+                        if (restante > 0.0000001) valorConsumido += restante * ultimoCostoPEPSK; // faltante de stock al último costo conocido
                         fila.salidaCant = m.cantidad;
                         fila.salidaValor = round2(valorConsumido);
                         fila.salidaCosto = m.cantidad > 0.0000001 ? round2(valorConsumido / m.cantidad) : 0;
@@ -2249,7 +2253,7 @@
                     <td class="px-3 py-2 text-right">S/ ${g.costoProm.toFixed(2)}</td>
                     <td class="px-3 py-2 text-right font-semibold">S/ ${g.valor.toFixed(2)}</td>
                     <td class="px-3 py-2 text-center">${stockMinimo || '-'}</td>
-                    <td class="px-3 py-2 text-center">${bajoMinimo ? '<span class="text-rose-600 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Bajo</span>' : '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> OK</span>'}</td>
+                    <td class="px-3 py-2 text-center">${g.cantidad < 0 ? '<span class="text-rose-700 font-bold" title="Se vendió o sacó más de lo que había en stock. Revisa las compras o entradas que faltan."><i class="fa-solid fa-circle-exclamation"></i> Stock negativo</span>' : bajoMinimo ? '<span class="text-rose-600 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Bajo</span>' : '<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> OK</span>'}</td>
                 `;
                 tbody.appendChild(tr);
             });
