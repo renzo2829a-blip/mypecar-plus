@@ -864,8 +864,29 @@ var LZString = {
   // igual y ya no pueden formar etiquetas HTML). En JSON esos signos solo pueden estar dentro de textos,
   // así que la estructura de los datos no cambia. Lo que se sube a la nube no se altera.
   const CLAVES_CON_HTML_PROPIO = ['libro_diario_consultas_historial']; // se limpia al pintarlo (ver 04)
+  // (2026-11-24) También las comillas: sin "<" ni ">" todavía se podía cerrar un atributo (title="…", onclick='…') con
+  // un nombre como  Pollo" onmouseover="…  y ejecutar código. Dentro de los TEXTOS, " pasa a ” y ' pasa a ’.
+  // Si el dato es JSON se recorren solo sus textos (la estructura no cambia); si es texto suelto se cambia directo.
+  function limpiarCadenaHtml(v) {
+    return v.replace(/</g, '\u2039').replace(/>/g, '\u203a').replace(/"/g, '\u201d').replace(/'/g, '\u2019');
+  }
+  function limpiarValorHtml(v) {
+    if (typeof v === 'string') return /[<>"']/.test(v) ? limpiarCadenaHtml(v) : v;
+    if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = limpiarValorHtml(v[i]); return v; }
+    if (v && typeof v === 'object') { for (const k in v) { if (Object.prototype.hasOwnProperty.call(v, k)) v[k] = limpiarValorHtml(v[k]); } return v; }
+    return v;
+  }
   function neutralizarHtml(t) {
-    return (typeof t === 'string' && (t.indexOf('<') !== -1 || t.indexOf('>') !== -1)) ? t.replace(/</g, '\u2039').replace(/>/g, '\u203a') : t;
+    if (typeof t !== 'string' || t === '') return t;
+    const c = t.charAt(0) === '\ufeff' ? t.charAt(1) : t.charAt(0);
+    const pareceJson = c === '{' || c === '[' || c === '"';
+    if (pareceJson) {
+      // Atajo: sin < > ' ni comillas escapadas dentro de textos, no hay nada que limpiar.
+      if (t.indexOf('<') === -1 && t.indexOf('>') === -1 && t.indexOf("'") === -1 && t.indexOf('\\"') === -1) return t;
+      try { return JSON.stringify(limpiarValorHtml(JSON.parse(t))); }
+      catch (e) { return t.replace(/</g, '\u2039').replace(/>/g, '\u203a'); } // no era JSON válido: al menos sin etiquetas
+    }
+    return /[<>"']/.test(t) ? limpiarCadenaHtml(t) : t;
   }
   function leerTexto(key) {
     const t = leerTextoFisica(claveFisica(key));
