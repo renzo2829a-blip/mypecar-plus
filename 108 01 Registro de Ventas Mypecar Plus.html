@@ -3917,11 +3917,21 @@
             // Todo lo que ingresa el usuario está en la moneda seleccionada; lo que se GUARDA y se usa
             // en el resto del sistema (SIRE, asientos, reportes) siempre va en soles, según la NIC 21.
             const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
-            const baseGravada = round2(baseGravadaIngresada * tipoCambio);
+            let baseGravada = round2(baseGravadaIngresada * tipoCambio);
             const igv = round2(igvIngresado * tipoCambio);
             const baseNoGravada = round2(baseNoGravadaIngresada * tipoCambio);
             const isc = round2(iscIngresado * tipoCambio);
             const otros = round2(otrosIngresado * tipoCambio);
+            // (2026-11-24) En dólares, convertir cada parte y sumarlas podía dar 1 centavo distinto de convertir el total del
+            // comprobante (US$ 0.15 + 0.03 a T.C. 3.751: por partes S/ 0.67, el total convertido S/ 0.68). El total del comprobante
+            // manda: la diferencia de centavos se absorbe en la base gravada.
+            if (tipoCambio !== 1 && baseGravada > 0) {
+                const totalConvertido = round2((baseGravadaIngresada + igvIngresado + baseNoGravadaIngresada + iscIngresado + otrosIngresado) * tipoCambio);
+                const difCentavos = round2(totalConvertido - (baseGravada + igv + baseNoGravada + isc + otros));
+                if (difCentavos !== 0 && Math.abs(difCentavos) <= 0.05) {
+                    baseGravada = round2(baseGravada + difCentavos);
+                }
+            }
             const total = round2(baseGravada + igv + baseNoGravada + isc + otros); // (2026-11-24) sin colas de coma flotante (0.1 + 0.2 = 0.30000000000000004)
             if (total <= 0) { showToast('El total del comprobante debe ser mayor a cero.', 'error'); return; }
 
