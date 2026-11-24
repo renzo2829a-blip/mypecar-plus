@@ -1687,29 +1687,33 @@
                 if (m.tipo === 'entrada') {
                     const costo = (m.costoUnitario !== null && m.costoUnitario !== undefined) ? m.costoUnitario : (g.cantidad > 0.0000001 ? g.valor / g.cantidad : 0);
                     g.cantidad += m.cantidad;
-                    g.valor += costo * m.cantidad;
+                    g.valor += round2(costo * m.cantidad); // (2026-11-24) valor por movimiento a centavos, igual que el Kárdex
                     if (metodo === 'PEPS') { g.capasPEPS.push({ cantidad: m.cantidad, costoUnitario: costo }); g.ultimoCostoPEPS = costo; }
                 } else {
                     if (metodo === 'PROMEDIO') {
                         const costoProm = g.cantidad > 0.0000001 ? g.valor / g.cantidad : 0;
-                        g.valor -= costoProm * m.cantidad;
+                        g.valor -= round2(costoProm * m.cantidad);
                         g.cantidad -= m.cantidad;
                     } else {
-                        let restante = m.cantidad;
+                        let restante = m.cantidad, consumido = 0;
                         while (restante > 0.0000001 && g.capasPEPS.length > 0) {
                             const capa = g.capasPEPS[0];
                             const usar = Math.min(capa.cantidad, restante);
-                            g.valor -= usar * capa.costoUnitario;
+                            consumido += usar * capa.costoUnitario;
                             capa.cantidad -= usar;
                             restante -= usar;
                             if (capa.cantidad <= 0.0000001) g.capasPEPS.shift();
                         }
                         // (2026-11-24) Salida mayor al stock (venta sin stock): el faltante se valoriza al último costo conocido
                         // (antes quedaba en S/ 0.00 con PEPS). El saldo queda NEGATIVO y se avisa en Stock Actual.
-                        if (restante > 0.0000001) g.valor -= restante * g.ultimoCostoPEPS;
+                        if (restante > 0.0000001) consumido += restante * g.ultimoCostoPEPS;
+                        g.valor -= round2(consumido);
                         g.cantidad -= m.cantidad;
                     }
                 }
+                // Igual que el Kárdex: saldo a centavos después de cada movimiento
+                g.valor = round2(g.valor); if (Math.abs(g.valor) < 0.005) g.valor = 0;
+                g.cantidad = round2(g.cantidad);
             });
             return Object.values(grupos).map(g => {
                 const cantidad = round2(g.cantidad);
