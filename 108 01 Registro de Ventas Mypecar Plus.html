@@ -381,6 +381,22 @@
                     </table>
                 </div>
             </div>
+
+            <!-- ===== COBROS REGISTRADOS (2026-11-24) ===== -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-emerald-50">
+                    <h4 class="font-bold text-emerald-900 text-sm flex items-center gap-2"><i class="fa-solid fa-hand-holding-dollar"></i> Cobros del periodo <span id="cobros-periodo-resumen" class="text-xs font-semibold text-emerald-700"></span></h4>
+                    <span class="text-[11px] text-emerald-800">Cobros cuya <b>fecha real de cobro</b> cae en este mes, de ventas de este u otros meses. Se contabilizan en el asiento de ESTE mes (Debe caja o bancos / Haber 121); el asiento del mes de la venta no cambia.</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-[10px] uppercase text-slate-600">
+                            <tr><th class="p-2.5">Fecha de cobro</th><th class="p-2.5">Comprobante cobrado</th><th class="p-2.5">Cliente</th><th class="p-2.5">Pagó</th><th class="p-2.5">Medio</th><th class="p-2.5">Referencia</th><th class="p-2.5 text-right">Monto</th><th class="p-2.5 text-center no-print"></th></tr>
+                        </thead>
+                        <tbody id="cobros-periodo-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
         </section>
 
 
@@ -3586,6 +3602,8 @@
             if (keys.length <= 1) { showToast('No puedes eliminar el único periodo existente.', 'error'); return; }
             if (!confirm(`¿Eliminar de forma permanente el periodo ${formatPeriodoLabel(key)} y todas sus ventas?`)) return;
 
+            if ((periodsData[key].sales || []).some(v => cobrosDeVenta(v).length)) { showToast('Ese periodo tiene ventas con cobros registrados. Anula primero esos cobros antes de eliminarlo.', 'error'); return; }
+            if (cobrosDelPeriodo(key).length && !confirm(`El periodo ${formatPeriodoLabel(key)} tiene ${cobrosDelPeriodo(key).length} cobro(s) de ventas de otros meses (estarían contabilizados aquí). Si lo eliminas, esas ventas volverían a figurar pendientes. ¿Continuar?`)) return;
             delete periodsData[key];
             // Borra la clave de ESE periodo en la nube — nunca toca la clave de
             // ningún otro periodo.
@@ -4014,6 +4032,7 @@
         async function deleteSale(id) {
             const venta = sales.find(v => v.id === id);
             if (!venta) return;
+            if (cobrosDeVenta(venta).length) { showToast(`Esta venta tiene ${cobrosDeVenta(venta).length} cobro(s) registrado(s) (S/ ${totalCobradoVenta(venta).toFixed(2)}). Anula primero sus cobros (pestaña Registro de Ventas → Cobros del periodo) y luego elimínala.`, 'error'); return; }
             if (!confirm('¿Eliminar este comprobante de venta? Se moverá a la Papelera y podrás recuperarlo desde ahí (pestaña "Seguridad").')) return;
             sales = sales.filter(v => v.id !== id);
             // Los movimientos de inventario de esta venta viajan CON ella a la Papelera —
@@ -4177,6 +4196,7 @@
         async function clearAllSales() {
             if (!confirm(`¿Eliminar de forma irreversible todas las ventas del periodo activo (${formatPeriodoLabel(config.periodoActivo)})? Esta acción NO pasa por la Papelera — no se puede deshacer.`)) return;
             registrarBitacora('eliminar_permanente', 'periodo_completo', `Se vaciaron ${sales.length} venta(s) de ${formatPeriodoLabel(config.periodoActivo)} de forma irreversible`);
+            if (sales.some(v => cobrosDeVenta(v).length)) { showToast('Hay ventas de este periodo con cobros registrados. Anula primero esos cobros antes de vaciar el periodo.', 'error'); return; }
             const ventasEliminadas = sales.slice();
             stockMovimientos = stockMovimientos.filter(m => !ventasEliminadas.some(v => movEsDeVenta(m, v, config.periodoActivo)));
             sales = [];
@@ -4194,6 +4214,202 @@
         // ==================================================================
         // TABLERO / DASHBOARD
         // ==================================================================
+
+        // ==================================================================
+        // COBROS DE VENTAS A CRÉDITO — "Registrar cobro" (2026-11-24)
+        // ==================================================================
+        // Una venta a crédito queda "Pendiente" en el mes en que se emitió (asiento: Debe 121 / Haber ventas e IGV) y ESE
+        // asiento no se vuelve a tocar nunca. Cuando el cliente paga, el cobro se anota dentro de la propia venta
+        // (venta.cobros) con su FECHA REAL de cobro, y se contabiliza en el asiento del mes de esa fecha:
+        //     Debe  101 / 1041 / 1052 (según el medio)        Haber 121 (Cuentas por cobrar)
+        // (con detracción: parte va al Debe 1042 Banco de la Nación). Reportes (07) ya lee venta.cobros para sus Cuentas por
+        // Cobrar y su Flujo de Caja, y Caja y Bancos (03) recibe cada cobro solo, como un ingreso de solo lectura.
+        const MEDIOS_COBRO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Billetera'];
+        function cuentaDeMedioCobro(medio) {
+            if (medio === 'Transferencia' || medio === 'Tarjeta') return '1041';
+            if (medio === 'Billetera') return '1052';
+            return '101';
+        }
+        function cobrosDeVenta(v) { return Array.isArray(v && v.cobros) ? v.cobros : []; }
+        function totalCobradoVenta(v) { return round2Money(cobrosDeVenta(v).reduce((s, c) => s + (parseFloat(c.monto) || 0), 0)); }
+        function ventaAdmiteCobro(v) { return !!v && v.tipoDoc !== '07' && v.estadoCobro === 'Pendiente'; }
+        // Lo que todavía debe el cliente por esta venta (0 si ya se cobró entera, si es contado o si es una nota de crédito).
+        function saldoPorCobrarVenta(v) {
+            if (!ventaAdmiteCobro(v)) return 0;
+            return Math.max(0, round2Money((parseFloat(v.total) || 0) - totalCobradoVenta(v)));
+        }
+        // "Cobrado" o "Pendiente" considerando los cobros registrados (una venta a crédito cobrada entera ya figura Cobrada).
+        function estadoEfectivoCobro(v) {
+            if (v.estadoCobro === 'Cobrado') return 'Cobrado';
+            if (v.tipoDoc === '07') return v.estadoCobro;
+            return saldoPorCobrarVenta(v) <= 0.005 && cobrosDeVenta(v).length > 0 ? 'Cobrado' : 'Pendiente';
+        }
+        // Cobros cuya fecha cae en el periodo (de ventas de CUALQUIER mes), con la venta de la que vienen.
+        function cobrosDelPeriodo(periodo) {
+            const out = [];
+            Object.keys(periodsData || {}).sort().forEach(per => {
+                const lista = (per === config.periodoActivo ? sales : (periodsData[per] && periodsData[per].sales)) || [];
+                lista.forEach(v => cobrosDeVenta(v).forEach(c => { if (String(c.fecha || '').slice(0, 7) === periodo) out.push({ c, v, periodoVenta: per }); }));
+            });
+            return out.sort((a, b) => String(a.c.fecha).localeCompare(String(b.c.fecha)) || (a.c.id || 0) - (b.c.id || 0));
+        }
+        function escCobro(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+        // Reparto del cobro entre el medio elegido y Banco de la Nación (detracción), en proporción a la detracción de la venta.
+        function detraccionDeCobro(v, monto) {
+            const total = parseFloat(v.total) || 0, det = v.sujetaDetraccion ? Math.abs(parseFloat(v.montoDetraccion) || 0) : 0;
+            return (total > 0 && det > 0) ? round2Money(Math.min(monto, monto * det / total)) : 0;
+        }
+        async function asegurarPeriodoExiste(periodo) {
+            if (periodsData[periodo]) return;
+            periodsData[periodo] = { sales: [] };
+            await storageSet(claveDePeriodo(periodo), periodsData[periodo]);
+        }
+        async function guardarPeriodoDeVenta(periodoVenta) {
+            if (periodoVenta === config.periodoActivo) await persistActivePeriod();
+            else await storageSet(claveDePeriodo(periodoVenta), periodsData[periodoVenta]);
+        }
+        function refrescarTodoPorCobros() {
+            updateCalculations(); renderRegistro(); generateAsientoResumen(); renderCobrosDelPeriodo();
+            try { renderPeriodSelectors(); } catch (e) {} try { actualizarBadgeAlertas(); } catch (e) {}
+        }
+
+        let _cobroVentaId = null;
+        function abrirRegistrarCobro(id) {
+            const v = sales.find(x => x.id === id);
+            if (!v) return;
+            if (!ventaAdmiteCobro(v)) { showToast('Esta venta no admite cobros (es al contado o es una nota de crédito).', 'error'); return; }
+            const saldo = saldoPorCobrarVenta(v);
+            if (saldo <= 0.005) { showToast('Esta venta ya está cobrada por completo.', 'error'); return; }
+            _cobroVentaId = id;
+            let m = document.getElementById('modal-registrar-cobro');
+            if (m) m.remove();
+            m = document.createElement('div');
+            m.id = 'modal-registrar-cobro';
+            m.className = 'fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4';
+            const cobrado = totalCobradoVenta(v), hoy = fechaLocalYYYYMMDD();
+            const det = v.sujetaDetraccion ? Math.abs(parseFloat(v.montoDetraccion) || 0) : 0;
+            m.innerHTML = `
+              <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
+                <div class="px-5 py-4 border-b flex items-center justify-between bg-emerald-50 rounded-t-2xl">
+                  <h3 class="font-bold text-emerald-900"><i class="fa-solid fa-hand-holding-dollar mr-1"></i> Registrar cobro</h3>
+                  <button type="button" onclick="cerrarRegistrarCobro()" class="text-slate-400 hover:text-slate-700 text-lg"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="p-5 space-y-3 text-xs">
+                  <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p class="font-bold text-slate-800">${escCobro(v.tipoDoc + ' ' + v.serie + '-' + v.numero)} — ${escCobro(v.clienteRazonSocial || 'PÚBLICO EN GENERAL')}</p>
+                    <p class="text-slate-600 mt-1">Emitida el ${formatFechaPeru(v.fechaEmision)} · Total S/ ${(parseFloat(v.total) || 0).toFixed(2)} · Ya cobrado S/ ${cobrado.toFixed(2)} · <b class="text-amber-700">Saldo S/ ${saldo.toFixed(2)}</b></p>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block font-semibold text-slate-600 mb-1">Fecha real de cobro</label>
+                      <input type="date" id="cobro-fecha" value="${hoy}" min="${v.fechaEmision}" max="${hoy}" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"></div>
+                    <div><label class="block font-semibold text-slate-600 mb-1">Monto cobrado (S/)</label>
+                      <input type="number" step="0.01" min="0.01" id="cobro-monto" value="${saldo.toFixed(2)}" oninput="actualizarVistaCobro()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-mono"></div>
+                    <div><label class="block font-semibold text-slate-600 mb-1">Medio de cobro</label>
+                      <select id="cobro-medio" onchange="actualizarVistaCobro()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5">${MEDIOS_COBRO.map(x => `<option value="${x}">${x}</option>`).join('')}</select></div>
+                    <div><label class="block font-semibold text-slate-600 mb-1">N° de operación / referencia</label>
+                      <input type="text" id="cobro-ref" maxlength="60" placeholder="Opcional" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"></div>
+                  </div>
+                  <div><label class="block font-semibold text-slate-600 mb-1">¿Quién pagó?</label>
+                    <input type="text" id="cobro-pagador" maxlength="80" value="${escCobro(v.clienteRazonSocial || 'PÚBLICO EN GENERAL')}" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5"></div>
+                  <div id="cobro-vista" class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-900"></div>
+                  ${det > 0 ? `<p class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">Esta venta tiene <b>detracción</b> de S/ ${det.toFixed(2)}: la parte proporcional del cobro va a Banco de la Nación (1042) y el resto al medio elegido.</p>` : ''}
+                  <div id="cobro-error" class="hidden text-rose-700 font-bold"></div>
+                </div>
+                <div class="px-5 py-3 border-t flex justify-end gap-2 bg-slate-50 rounded-b-2xl">
+                  <button type="button" onclick="cerrarRegistrarCobro()" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold">Cancelar</button>
+                  <button type="button" onclick="guardarCobro()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Guardar cobro</button>
+                </div>
+              </div>`;
+            document.body.appendChild(m);
+            actualizarVistaCobro();
+        }
+        function cerrarRegistrarCobro() { const m = document.getElementById('modal-registrar-cobro'); if (m) m.remove(); _cobroVentaId = null; }
+        function actualizarVistaCobro() {
+            const v = sales.find(x => x.id === _cobroVentaId);
+            const el = document.getElementById('cobro-vista');
+            if (!v || !el) return;
+            const monto = round2Money(parseFloat(document.getElementById('cobro-monto').value) || 0);
+            const medio = document.getElementById('cobro-medio').value;
+            const det = detraccionDeCobro(v, monto), neto = round2Money(monto - det);
+            el.innerHTML = `<b>Asiento en el mes del cobro:</b><br>Debe ${cuentaDeMedioCobro(medio)} ${escCobro(getAccountName(cuentaDeMedioCobro(medio)))}: S/ ${neto.toFixed(2)}` +
+                (det > 0 ? `<br>Debe 1042 Banco de la Nación (detracción): S/ ${det.toFixed(2)}` : '') + `<br>Haber 121 Cuentas por cobrar: S/ ${monto.toFixed(2)}` +
+                `<br><span class="text-slate-600">Saldo que quedará: S/ ${Math.max(0, saldoPorCobrarVenta(v) - monto).toFixed(2)}</span>`;
+        }
+        async function guardarCobro() {
+            const v = sales.find(x => x.id === _cobroVentaId);
+            const err = (t) => { const e = document.getElementById('cobro-error'); if (e) { e.textContent = t; e.classList.remove('hidden'); } };
+            if (!v) { cerrarRegistrarCobro(); return; }
+            const fecha = document.getElementById('cobro-fecha').value;
+            const monto = round2Money(parseFloat(document.getElementById('cobro-monto').value) || 0);
+            const medio = document.getElementById('cobro-medio').value;
+            const pagador = document.getElementById('cobro-pagador').value.trim();
+            const referencia = document.getElementById('cobro-ref').value.trim();
+            const saldo = saldoPorCobrarVenta(v), hoy = fechaLocalYYYYMMDD();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return err('Indica la fecha real de cobro.');
+            if (fecha < v.fechaEmision) return err('La fecha de cobro no puede ser anterior a la fecha de emisión de la venta (' + formatFechaPeru(v.fechaEmision) + ').');
+            if (fecha > hoy) return err('La fecha de cobro no puede ser futura.');
+            if (!(monto > 0)) return err('Ingresa un monto mayor a cero.');
+            if (monto > saldo + 0.005) return err('El monto (S/ ' + monto.toFixed(2) + ') supera el saldo pendiente (S/ ' + saldo.toFixed(2) + ').');
+            if (!MEDIOS_COBRO.includes(medio)) return err('Elige el medio de cobro.');
+            if (!pagador) return err('Escribe quién pagó.');
+            const periodoVenta = config.periodoActivo, periodoCobro = fecha.slice(0, 7);
+            const copia = JSON.stringify(v.cobros || null);
+            const cobros = v.cobros = Array.isArray(v.cobros) ? v.cobros : [];
+            const nextId = cobros.length > 0 ? Math.max(...cobros.map(c => c.id || 0)) + 1 : 1;
+            const det = detraccionDeCobro(v, monto);
+            cobros.push({ id: nextId, fecha, monto, detraccion: det, medio, cuenta: cuentaDeMedioCobro(medio), pagador, referencia,
+                registradoPor: config.usuarioActivo || 'Sin identificar', fechaRegistro: new Date().toISOString() });
+            try {
+                await asegurarPeriodoExiste(periodoCobro);
+                await guardarPeriodoDeVenta(periodoVenta);
+                await persistAll();
+            } catch (e) {
+                console.error('Error al guardar el cobro:', e);
+                v.cobros = copia === 'null' ? undefined : JSON.parse(copia);
+                err('No se pudo guardar el cobro. Revisa tu conexión o el espacio del equipo y vuelve a intentar.');
+                return;
+            }
+            registrarBitacora('crear', 'cobro', `${v.tipoDoc} ${v.serie}-${v.numero} — S/ ${monto.toFixed(2)} por ${medio} el ${formatFechaPeru(fecha)} (pagó: ${pagador}) — asiento de ${formatPeriodoLabel(periodoCobro)}`);
+            try { await persistAll(); } catch (e) {}
+            cerrarRegistrarCobro();
+            refrescarTodoPorCobros();
+            showToast(`Cobro de S/ ${monto.toFixed(2)} registrado el ${formatFechaPeru(fecha)}.` + (periodoCobro !== periodoVenta ? ` Se contabiliza en ${formatPeriodoLabel(periodoCobro)}; el asiento de ${formatPeriodoLabel(periodoVenta)} no cambia.` : ''));
+        }
+        async function anularCobro(periodoVenta, ventaId, cobroId) {
+            const lista = (periodoVenta === config.periodoActivo ? sales : (periodsData[periodoVenta] && periodsData[periodoVenta].sales)) || [];
+            const v = lista.find(x => x.id === ventaId);
+            const c = v && cobrosDeVenta(v).find(x => x.id === cobroId);
+            if (!v || !c) return;
+            if (!confirm(`¿Anular este cobro?\n\n${v.tipoDoc} ${v.serie}-${v.numero} — S/ ${(parseFloat(c.monto) || 0).toFixed(2)} cobrado el ${formatFechaPeru(c.fecha)} (${c.medio}).\n\nLa venta vuelve a figurar con ese saldo pendiente y el asiento de ${formatPeriodoLabel(String(c.fecha).slice(0, 7))} se actualiza.`)) return;
+            v.cobros = v.cobros.filter(x => x.id !== cobroId);
+            if (v.cobros.length === 0) delete v.cobros;
+            registrarBitacora('eliminar', 'cobro', `Se anuló el cobro de ${v.tipoDoc} ${v.serie}-${v.numero} — S/ ${(parseFloat(c.monto) || 0).toFixed(2)} del ${formatFechaPeru(c.fecha)} (${c.medio})`);
+            await guardarPeriodoDeVenta(periodoVenta);
+            await persistAll();
+            refrescarTodoPorCobros();
+            showToast('Cobro anulado. La venta vuelve a tener ese saldo pendiente.');
+        }
+        function renderCobrosDelPeriodo() {
+            const tbody = document.getElementById('cobros-periodo-body');
+            if (!tbody) return;
+            const lista = cobrosDelPeriodo(config.periodoActivo);
+            const total = round2Money(lista.reduce((s, x) => s + (parseFloat(x.c.monto) || 0), 0));
+            const res = document.getElementById('cobros-periodo-resumen');
+            if (res) res.textContent = lista.length ? `— ${lista.length} cobro(s) por S/ ${total.toFixed(2)}` : '';
+            if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" class="p-5 text-center text-slate-400">Aún no hay cobros con fecha de este mes. Usa el botón <b>Cobrar</b> (💰) en una venta pendiente.</td></tr>'; return; }
+            tbody.innerHTML = lista.map(({ c, v, periodoVenta }) => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-2.5 whitespace-nowrap">${formatFechaPeru(c.fecha)}</td>
+                    <td class="p-2.5">${escCobro(v.tipoDoc + ' ' + v.serie + '-' + v.numero)}<span class="block text-[10px] text-slate-400">venta de ${escCobro(formatPeriodoLabel(periodoVenta))}</span></td>
+                    <td class="p-2.5">${escCobro(v.clienteRazonSocial || 'PÚBLICO EN GENERAL')}</td>
+                    <td class="p-2.5">${escCobro(c.pagador || '—')}</td>
+                    <td class="p-2.5">${escCobro(c.medio)} <span class="text-[10px] text-slate-400">(${escCobro(c.cuenta || cuentaDeMedioCobro(c.medio))})</span></td>
+                    <td class="p-2.5 text-slate-500">${escCobro(c.referencia || '—')}</td>
+                    <td class="p-2.5 text-right font-mono font-bold text-emerald-700">${(parseFloat(c.monto) || 0).toFixed(2)}</td>
+                    <td class="p-2.5 text-center no-print"><button onclick="anularCobro('${periodoVenta}', ${v.id}, ${c.id})" title="Anular este cobro" class="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50"><i class="fa-solid fa-rotate-left"></i></button></td>
+                </tr>`).join('');
+        }
+
         function updateCalculations() {
             sales.sort((a, b) => new Date(a.fechaEmision) - new Date(b.fechaEmision));
 
@@ -4207,7 +4423,7 @@
                 totalVentas += parseFloat(v.total) * signo;
                 totalIgv += parseFloat(v.igv) * signo;
                 totalNoGravada += parseFloat(v.baseNoGravada) * signo;
-                if (v.estadoCobro === 'Pendiente') pendientes++;
+                if (v.tipoDoc !== '07' && estadoEfectivoCobro(v) === 'Pendiente') pendientes++;
                 if (totalesPorTipo.hasOwnProperty(v.tipoVenta)) totalesPorTipo[v.tipoVenta] += parseFloat(v.total) * signo;
             });
 
@@ -4304,7 +4520,7 @@
             const filtered = sales.filter(v => {
                 const matchPv = filterPv === 'all' || v.tipoVenta === filterPv;
                 const matchTipo = filterTipoDoc === 'all' || v.tipoDoc === filterTipoDoc;
-                const matchEstado = filterEstado === 'all' || v.estadoCobro === filterEstado;
+                const matchEstado = filterEstado === 'all' || estadoEfectivoCobro(v) === filterEstado;
                 const haystack = `${v.serie}${v.numero}${v.clienteRazonSocial}${v.concepto}`.toLowerCase();
                 const matchSearch = haystack.includes(filterSearch);
                 return matchPv && matchTipo && matchEstado && matchSearch;
@@ -4323,9 +4539,14 @@
                     sumNoGravada += parseFloat(v.baseNoGravada) * signo;
                     sumTotal += parseFloat(v.total) * signo;
 
-                    const estadoBadge = v.estadoCobro === 'Cobrado'
-                        ? '<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">COBRADO</span>'
-                        : '<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">PENDIENTE</span>';
+                    const _cobrosV = cobrosDeVenta(v), _saldoV = saldoPorCobrarVenta(v);
+                    const _ultimoCobro = _cobrosV.length ? _cobrosV.slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).pop() : null;
+                    let estadoBadge;
+                    if (v.estadoCobro === 'Cobrado') estadoBadge = '<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">COBRADO</span>';
+                    else if (estadoEfectivoCobro(v) === 'Cobrado') estadoBadge = `<span title="Cobrado en ${_cobrosV.length} pago(s)" class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">COBRADO ${formatFechaPeru(_ultimoCobro.fecha)}</span>`;
+                    else if (_cobrosV.length) estadoBadge = `<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">PARCIAL<br>saldo ${_saldoV.toFixed(2)}</span>`;
+                    else estadoBadge = '<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">PENDIENTE</span>';
+                    const btnCobrar = (ventaAdmiteCobro(v) && _saldoV > 0.005) ? `<button onclick="abrirRegistrarCobro(${v.id})" title="Registrar cobro (saldo S/ ${_saldoV.toFixed(2)})" class="text-emerald-600 hover:text-emerald-800 p-1 rounded-lg hover:bg-emerald-50 transition-all"><i class="fa-solid fa-hand-holding-dollar"></i></button>` : '';
                     const esNC = v.tipoDoc === '07';
                     const badgeNC = esNC ? `<span title="Reduce las ventas del periodo — comprobante que modifica: ${v.refTipo || ''} ${v.refSerie || ''}-${v.refNumero || ''}" class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 cursor-help">N.C.</span>` : '';
 
@@ -4346,6 +4567,7 @@
                         <td class="p-2.5 text-center border-r border-slate-200 font-semibold text-slate-600">${v.cuenta}</td>
                         <td class="p-2.5 text-center border-r border-slate-200">${estadoBadge}</td>
                         <td class="p-2.5 text-center no-print">
+                            ${btnCobrar}
                             <button onclick="editarVenta(${v.id})" class="text-indigo-500 hover:text-indigo-700 p-1 rounded-lg hover:bg-indigo-50 transition-all"><i class="fa-solid fa-pen"></i></button>
                             <button onclick="deleteSale(${v.id})" class="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 transition-all"><i class="fa-solid fa-trash"></i></button>
                         </td>
@@ -4358,6 +4580,7 @@
             document.getElementById('total-foot-igv').innerText = `S/ ${sumIgv.toFixed(2)}`;
             document.getElementById('total-foot-no-gravada').innerText = `S/ ${sumNoGravada.toFixed(2)}`;
             document.getElementById('total-foot-total').innerText = `S/ ${sumTotal.toFixed(2)}`;
+            try { renderCobrosDelPeriodo(); } catch (e) { console.error('Cobros del periodo:', e); }
         }
 
         // ==================================================================
@@ -4473,6 +4696,19 @@
                 }
             });
 
+            // (2026-11-24) COBROS cuya fecha real cae en ESTE periodo (de ventas de este u otros meses):
+            //   Debe caja/bancos/billetera (neto) [+ Debe 1042 si hubo detracción]  /  Haber 121.
+            // El asiento del mes en que se EMITIÓ la venta no se toca: sigue con su Debe 121.
+            let cobrosMesN = 0, cobrosMesTotal = 0;
+            cobrosDelPeriodo(config.periodoActivo).forEach(({ c }) => {
+                const monto = round2Money(parseFloat(c.monto) || 0), det = Math.min(monto, round2Money(parseFloat(c.detraccion) || 0)), neto = round2Money(monto - det);
+                if (!(monto > 0)) return;
+                const cta = c.cuenta || cuentaDeMedioCobro(c.medio);
+                ensure(cta); resumen[cta].debe += neto;
+                if (det > 0) { ensure('1042'); resumen['1042'].debe += det; }
+                ensure('121'); resumen['121'].haber += monto;
+                cobrosMesN++; cobrosMesTotal += monto;
+            });
             // Suma las líneas manuales / ajustes (Asiento en Blanco) al mismo resumen
             lineasManuales.forEach(l => {
                 const cta = extractCode(l.cuenta);
@@ -4628,7 +4864,7 @@
         // ==================================================================
         function exportAsientoResumenJSON() {
             if (!window._ultimoAsientoResumen || window._ultimoAsientoResumen.lineas.length === 0) {
-                showToast('No hay ventas registradas en este periodo para generar el asiento.', 'error');
+                showToast('No hay ventas ni cobros registrados en este periodo para generar el asiento.', 'error');
                 return;
             }
             // Si en esta misma sesion se concilio contra SUNAT y quedaron discrepancias
@@ -4651,7 +4887,7 @@
                 origen: 'Resumen Ventas',
                 periodo: config.periodoActivo,
                 fecha: '',
-                glosa: `Por el resumen del Registro de Ventas del periodo ${formatPeriodoLabel(config.periodoActivo)}`,
+                glosa: `Por el resumen del Registro de Ventas del periodo ${formatPeriodoLabel(config.periodoActivo)}` + (cobrosDelPeriodo(config.periodoActivo).length ? ' (incluye cobros de ventas a crédito del mes)' : ''),
                 empresa: config.razonSocial,
                 ruc: config.ruc,
                 preparadoPor: config.usuarioActivo || 'Sin identificar',

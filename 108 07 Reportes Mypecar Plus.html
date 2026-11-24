@@ -5103,7 +5103,7 @@ const MypecarPEVista = (function () {
                         (data.sales || []).forEach(v => {
                             totalVentasAcum += v.total || 0;
                             cantidadComprobantesAcum++;
-                            if (v.estadoCobro === 'Pendiente') cxcPendiente += v.total || 0;
+                            if (v.estadoCobro === 'Pendiente') cxcPendiente += Math.max(0, (v.total || 0) - (Array.isArray(v.cobros) ? v.cobros.reduce((s, c) => s + (parseFloat(c.monto) || 0), 0) : 0)); // (2026-11-24) neto de cobros registrados
                         });
                     }
                 });
@@ -10127,7 +10127,7 @@ function renderAnalisisCuenta() {
             if (ventasImport && ventasImport.periodsData[periodo]) {
                 const sales = ventasImport.periodsData[periodo].sales || [];
                 const totalCobrado = sales.filter(s => s.estadoCobro === 'Cobrado').reduce((s, v) => s + v.total, 0);
-                const totalPendiente = sales.filter(s => s.estadoCobro === 'Pendiente').reduce((s, v) => s + v.total, 0);
+                const totalPendiente = sales.filter(s => s.estadoCobro === 'Pendiente').reduce((s, v) => s + Math.max(0, v.total - (Array.isArray(v.cobros) ? v.cobros.reduce((a, c) => a + (parseFloat(c.monto) || 0), 0) : 0)), 0);
                 const diferencia = totalCobrado - movEfectivoVentas;
 
                 detalleHtml += `<div class="bg-slate-50 rounded-lg p-3"><p class="text-slate-500">Ventas marcadas como "Cobrado" (Registro de Ventas)</p><p class="font-bold font-mono text-slate-800">S/ ${totalCobrado.toFixed(2)}</p></div></div>

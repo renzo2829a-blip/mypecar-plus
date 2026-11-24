@@ -2050,6 +2050,49 @@
                 reader.readAsText(file);
             });
         }
+        // (2026-11-24) COBROS de ventas a crédito (botón "Registrar cobro" en 01): cada cobro llega como un ingreso de
+        // SOLO LECTURA en el periodo de su fecha real de cobro (origenCarga:'ventas'). Es idempotente (origenId) y retira
+        // los que ya no existan en Ventas (cobro anulado). No entra al asiento resumen de Caja: ya va en el de 01.
+        async function importarCobrosDeVentas(payload) {
+            if (!payload || payload.tipo !== 'ventas' || !payload.periodsData) return;
+            // Solo cobros de la MISMA empresa
+            if (payload.config && payload.config.ruc && config.ruc && String(payload.config.ruc) !== String(config.ruc)) return;
+            const esperados = {};
+            Object.keys(payload.periodsData).forEach(pv => (payload.periodsData[pv].sales || []).forEach(v => (Array.isArray(v.cobros) ? v.cobros : []).forEach(c => {
+                const monto = Math.round((parseFloat(c.monto) || 0) * 100) / 100;
+                if (!(monto > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(c.fecha || '')) return;
+                esperados[`${pv}:${v.id}:${c.id}`] = { v, c, monto };
+            })));
+            const tocados = new Set();
+            Object.keys(periodsData).forEach(per => {
+                const lista = (per === config.periodoActivo ? movimientos : periodsData[per].movimientos) || [];
+                const antes = lista.length;
+                const filtrada = lista.filter(m => m.origenCarga !== 'ventas' || (esperados[m.origenId] && String(esperados[m.origenId].c.fecha).slice(0, 7) === per));
+                if (filtrada.length !== antes) {
+                    periodsData[per].movimientos = filtrada; if (per === config.periodoActivo) movimientos = filtrada; tocados.add(per);
+                }
+            });
+            Object.keys(esperados).forEach(key => {
+                const { v, c, monto } = esperados[key], per = String(c.fecha).slice(0, 7);
+                if (!periodsData[per]) periodsData[per] = { movimientos: [] };
+                if (!periodsData[per].movimientos) periodsData[per].movimientos = [];
+                const lista = per === config.periodoActivo ? movimientos : periodsData[per].movimientos;
+                if (lista.some(m => m.origenCarga === 'ventas' && m.origenId === key)) return;
+                const det = Math.min(monto, Math.round((parseFloat(c.detraccion) || 0) * 100) / 100), neto = Math.round((monto - det) * 100) / 100;
+                const cta = c.cuenta || '101';
+                const lineas = [{ cuenta: cta, cc: '', debe: neto, haber: 0 }];
+                if (det > 0) lineas.push({ cuenta: '1042', cc: '', debe: det, haber: 0 });
+                lineas.push({ cuenta: '121', cc: '', debe: 0, haber: monto });
+                lista.push({ id: lista.length ? Math.max(...lista.map(m => m.id)) + 1 : 1, fecha: c.fecha, tipo: 'Ingreso', categoria: 'Cobranza de ventas',
+                    concepto: `Cobro ${v.tipoDoc} ${v.serie}-${v.numero} — ${c.pagador || v.clienteRazonSocial || 'Cliente'} (${c.medio}${c.referencia ? ', op. ' + c.referencia : ''})`,
+                    lineas, moneda: 'PEN', tipoCambio: 1, totalMonedaOriginal: null, origenCarga: 'ventas', origenId: key,
+                    registradoPor: c.registradoPor || 'Ventas', fechaRegistro: c.fechaRegistro || new Date().toISOString() });
+                periodsData[per].movimientos = lista; if (per === config.periodoActivo) movimientos = lista; tocados.add(per);
+            });
+            if (!tocados.size) return;
+            for (const per of tocados) await storageSet(claveDePeriodo(per), periodsData[per]);
+            try { updateCalculations(); renderRegistro(); generateAsientoResumen(); renderPeriodSelectors(); } catch (e) { console.warn(e); }
+        }
         async function importarFacturasProvisionadas(fileList, auto) {
             const file = fileList && fileList[0];
             if (!file) return;
@@ -3507,6 +3550,7 @@
         async function deleteMovimiento(id) {
             const mov = movimientos.find(m => m.id === id);
             if (!mov) return;
+            if (mov.origenCarga === 'ventas') { showToast('Este ingreso viene de un cobro registrado en Ventas. Para anularlo, hazlo desde 01 Registro de Ventas → Cobros del periodo.', 'error'); return; }
             if (!confirm('¿Eliminar este movimiento? Se moverá a la Papelera y podrás recuperarlo desde ahí (pestaña "Seguridad").')) return;
             if (movimientoEnEdicionId === id) cancelarEdicionMovimiento();
             movimientos = movimientos.filter(m => m.id !== id);
@@ -3531,6 +3575,7 @@
         function editarMovimiento(id) {
             const mov = movimientos.find(m => m.id === id);
             if (!mov) return;
+            if (mov.origenCarga === 'ventas') { showToast('Este ingreso viene de un cobro registrado en Ventas. Corrígelo desde 01 Registro de Ventas (anula el cobro y regístralo de nuevo).', 'error'); return; }
             movimientoEnEdicionId = id;
 
             document.getElementById('mov-fecha').value = mov.fecha;
@@ -3709,7 +3754,7 @@
                             <td class="p-2.5 text-center border-r border-slate-200 text-slate-500">${l.cc || ''}</td>
                             <td class="p-2.5 text-right border-r border-slate-200 font-bold text-indigo-900">${l.debe > 0 ? l.debe.toFixed(2) : ''}</td>
                             <td class="p-2.5 text-right border-r border-slate-200 font-bold text-indigo-900">${l.haber > 0 ? l.haber.toFixed(2) : ''}</td>
-                            <td class="p-2.5 text-center no-print">${idx === 0 ? `<button onclick="editarMovimiento(${m.id})" class="text-indigo-500 hover:text-indigo-700 p-1 rounded-lg hover:bg-indigo-50 transition-all mr-1"><i class="fa-solid fa-pen"></i></button><button onclick="deleteMovimiento(${m.id})" class="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 transition-all"><i class="fa-solid fa-trash"></i></button>` : ''}</td>
+                            <td class="p-2.5 text-center no-print">${idx === 0 && m.origenCarga === 'ventas' ? '<span class="text-[9px] font-bold text-emerald-700" title="Viene de Registrar cobro en 01 Ventas">desde Ventas</span>' : idx === 0 ? `<button onclick="editarMovimiento(${m.id})" class="text-indigo-500 hover:text-indigo-700 p-1 rounded-lg hover:bg-indigo-50 transition-all mr-1"><i class="fa-solid fa-pen"></i></button><button onclick="deleteMovimiento(${m.id})" class="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-50 transition-all"><i class="fa-solid fa-trash"></i></button>` : ''}</td>
                         `;
                         tbody.appendChild(tr);
                     });
@@ -4229,6 +4274,7 @@
 
             movimientos.forEach(m => {
                 if (gastoReparadoVaAlDiario(m)) return; // va por Gastos Reparados del 04 (no se cuenta dos veces)
+                if (m.origenCarga === 'ventas') return; // cobro de Ventas: ya va en el asiento resumen de 01 (no se cuenta dos veces)
                 m.lineas.forEach(l => {
                     ensure(l.cuenta);
                     resumen[l.cuenta].debe += l.debe;
@@ -4493,8 +4539,11 @@ window.mypecarConstruirSnapshots = function () {
 /* Enlace automático (2026-11-20): las facturas de Compras llegan solas desde la nube (sirven para verificar
    las facturas provisionadas; el mismo contenido que "Datos_Reportes_Compras.json"). */
 (function () {
-    const FUENTES = [{ app: 'compras', tipo: 'reportes', nombre: 'compras' }];
-    async function alRecibir(app, tipo, archivo) { await importarFacturasProvisionadas([archivo], true); }
+    const FUENTES = [{ app: 'compras', tipo: 'reportes', nombre: 'compras' }, { app: 'ventas', tipo: 'reportes', nombre: 'ventas' }];
+    async function alRecibir(app, tipo, archivo, nombre) {
+        if (app === 'ventas') return importarCobrosDeVentas(await leerArchivoJSON(archivo));
+        await importarFacturasProvisionadas([archivo], true);
+    }
     function iniciar() {
         if (!window.MypecarSync || !window.MypecarSync.enlace) return setTimeout(iniciar, 1500);
         window.MypecarSync.enlace.automatico(FUENTES, alRecibir, null);
