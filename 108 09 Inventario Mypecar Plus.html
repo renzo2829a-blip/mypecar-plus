@@ -945,7 +945,7 @@
             historialImportaciones = await storageGet('inventario_historial_importaciones', []);
             alertasResueltas = await cargarAlertasResueltas();
 
-            document.getElementById('ajuste-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('ajuste-fecha').value = hoyPeru();
 
             syncConfigUI();
             switchTab('dashboard');
@@ -1773,7 +1773,7 @@
         // CIERRE CONTABLE — puente hacia 04 Libro Diario (Costo de Ventas real)
         // y hacia 07 Reportes (comparativo Existencias contables vs. Kardex).
         // ==================================================================
-        function fechaHoyISO() { return new Date().toISOString().split('T')[0]; }
+        function fechaHoyISO() { return hoyPeru(); }
 
         // Convierte una fecha YYYY-MM-DD (o vacío = hoy) a formato legible dd/mm/aaaa para
         // mostrar en pantalla, reportes impresos y archivos exportados. Las fechas son
@@ -2419,7 +2419,7 @@
             await persistAll();
 
             document.getElementById('form-ajuste').reset();
-            document.getElementById('ajuste-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('ajuste-fecha').value = hoyPeru();
             document.getElementById('ajuste-producto-codigo').value = '';
             document.getElementById('ajuste-unidad').value = '';
             toggleBloqueCostoAjuste();
@@ -2589,7 +2589,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Respaldo_Inventario_${config.ruc || 'sin_ruc'}_${new Date().toISOString().split('T')[0]}.json`;
+            a.download = `Respaldo_Inventario_${config.ruc || 'sin_ruc'}_${hoyPeru()}.json`;
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
             URL.revokeObjectURL(url);
             showToast('Respaldo completo exportado.');

@@ -1862,7 +1862,7 @@
             try { aplicarLogoCliente(); } catch (e) { console.error('Error al aplicar el logo del cliente:', e); }
             try {
                 const pieEl = document.getElementById('footer-copyright');
-                if (pieEl) pieEl.innerText = `© ${new Date().getFullYear()} VendePollo - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
+                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} VendePollo - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
             } catch (e) { console.error('Error al actualizar el pie de página:', e); }
             // El <title> de la pestaña también debe reflejar la empresa activa — antes
             // quedaba fijo en el nombre de la empresa de ejemplo con la que se armó el
@@ -2404,8 +2404,8 @@
 
             if (!confirm(`Última confirmación: se borrará TODO el historial actual y se creará "${razonSocial.trim()}" (RUC ${ruc.trim()}) desde cero. ¿Confirmas?`)) { showToast('Operación cancelada, no se borró nada.', 'error'); return; }
 
-            const hoy = new Date();
-            const periodoNuevo = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+            const periodoNuevo = mesPeru(); // hora de Perú
+
 
             // Se actualizan solo los campos propios de la empresa — el resto de config
             // (licencia, tipo de cambio por periodo, tipos de venta, etc.) se conserva tal cual.
@@ -2475,7 +2475,7 @@
             if (typeof MypecarSync !== 'undefined' && MypecarSync.seguridad) { if (!(await MypecarSync.seguridad.confirmarBorrado({ accion: 'Vaciar Datos de Prueba' }))) return; } // 2026-10-15b: respaldo + confirmación por RUC antes de borrar
             if (!confirm(`⚠ Esto borrará PERMANENTEMENTE todos los periodos, ventas, clientes, cuentas personalizadas, atajos, la papelera y la bitácora de seguridad guardados para "${config.nombreComercial}" (RUC ${config.ruc}), y creará un periodo de Enero vacío.\n\nEl RUC y los datos de la empresa NO cambian.\n\n¿Continuar?`)) return;
 
-            const anio = (config.periodoActivo || '').split('-')[0] || String(new Date().getFullYear());
+            const anio = (config.periodoActivo || '').split('-')[0] || String(Number(hoyPeru().slice(0, 4)));
             const periodoEnero = `${anio}-01`;
 
             // Mismo motivo que en reiniciarNuevaEmpresa(): borra en la nube todas
@@ -3526,7 +3526,7 @@
         function poblarSelectorAnios() {
             const sel = document.getElementById('new-periodo-anio-sel');
             if (!sel || sel.options.length > 0) return; // ya poblado
-            const anioBase = new Date().getFullYear();
+            const anioBase = Number(hoyPeru().slice(0, 4));
             const anioActivo = parseInt((config.periodoActivo || '').split('-')[0], 10) || anioBase;
             const anioMax = Math.max(anioBase, anioActivo) + 15;
             const anioMin = Math.min(anioBase, anioActivo) - 10;
@@ -5086,7 +5086,7 @@
 
                 const cliente = c.clienteRuc ? clientes.find(cl => cl.ruc === c.clienteRuc) : null;
                 const nextId = sales.length > 0 ? Math.max(...sales.map(v => v.id)) + 1 : 1;
-                const fecha = c.fechaEmision || new Date().toISOString().slice(0, 10);
+                const fecha = c.fechaEmision || hoyPeru();
                 // El Registro guarda TODOS los comprobantes en positivo (incluida la N.C.)
                 // y aplica el signo negativo recién al sumar/mostrar según tipoDoc === '07'
                 // (ver renderRegistro, dashboards y exportación SIRE). El archivo de SUNAT
@@ -5709,7 +5709,8 @@
         // en UTC. Esta función siempre usa los componentes LOCALES (getFullYear /
         // getMonth / getDate), que sí coinciden con el calendario real del usuario.
         function fechaLocalYYYYMMDD(d) {
-            const fecha = d || new Date();
+            if (!d) return hoyPeru(); // (2026-11-24) sin fecha: hoy en hora de Perú, no la del aparato ni UTC
+            const fecha = d;
             const y = fecha.getFullYear();
             const mo = String(fecha.getMonth() + 1).padStart(2, '0');
             const dia = String(fecha.getDate()).padStart(2, '0');
@@ -6164,7 +6165,7 @@
                 key: 'cobranza_vencida',
                 evaluar: function () {
                     const resultado = [];
-                    const hoy = new Date().toISOString().split('T')[0];
+                    const hoy = hoyPeru();
                     Object.keys(periodsData).sort().forEach(periodo => {
                         const ventas = (periodsData[periodo] && periodsData[periodo].sales) || [];
                         ventas.forEach(v => {

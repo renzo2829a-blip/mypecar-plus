@@ -48,6 +48,20 @@
 (function (global) {
   'use strict';
 
+  // (2026-11-24) FECHA DE HOY EN HORA DE PERÚ (America/Lima, UTC-5, sin horario de verano), no la hora mundial (UTC):
+  // a las 8:30 p. m. del 31/05 en Perú, UTC ya es 01/06 y `new Date().toISOString()` daba el día (y el mes) siguiente.
+  // Global para las 9 apps: hoyPeru() -> 'AAAA-MM-DD'.  mesPeru() -> 'AAAA-MM'.
+  if (typeof global.hoyPeru !== 'function') {
+    global.hoyPeru = function (instante) {
+      const d = instante instanceof Date ? instante : new Date();
+      try {
+        const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(p)) return p;
+      } catch (e) { /* navegador sin Intl con zonas: se calcula a mano */ }
+      return new Date(d.getTime() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+    };
+    global.mesPeru = function (instante) { return global.hoyPeru(instante).slice(0, 7); };
+  }
   const VERSION_SYNC = '2026-11-13c';
   const OUTBOX_KEY = 'mypecar_sync_outbox';
   const OUTBOX_BORRADOS_KEY = 'mypecar_sync_outbox_borrados';
