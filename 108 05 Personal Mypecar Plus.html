@@ -4020,7 +4020,10 @@
             const ingreso = new Date(trabajador.fechaIngreso + 'T00:00:00');
             const corte = new Date((fechaCorte || new Date().toISOString().split('T')[0]) + 'T00:00:00');
             let meses = (corte.getFullYear() - ingreso.getFullYear()) * 12 + (corte.getMonth() - ingreso.getMonth());
-            if (corte.getDate() < ingreso.getDate()) meses -= 1;
+            // (2026-11-24) Quien ingresó un día 29, 30 o 31 completa el mes el último día de un mes más corto (ej. ingresó el
+            // 31/01: el 28/02 ya cumplió 1 mes). Antes quedaba en 0 hasta el 31/03.
+            const ultimoDiaDelMesCorte = new Date(corte.getFullYear(), corte.getMonth() + 1, 0).getDate();
+            if (corte.getDate() < Math.min(ingreso.getDate(), ultimoDiaDelMesCorte)) meses -= 1;
             meses = Math.max(0, meses);
             return (diasPorAnio / 12) * meses;
         }
