@@ -5500,6 +5500,40 @@ const MypecarPEVista = (function () {
         // junto con el resto de la configuración de la empresa.
         const REGIMEN_LABEL_IMP = { nrus: 'Nuevo RUS', rer: 'Régimen Especial (RER)', rmt: 'Régimen MYPE Tributario (RMT)', rg: 'Régimen General' };
 
+        // (2026-11-24) IGV del mes SIN los pagos ni compensaciones del mes anterior. Antes se tomaba el neto de la 40111 y de la
+        // 40112, y el mes en que se registraba el pago del PDT (40111 Debe / 40112 Haber, desde Caja) el débito bajaba y el crédito
+        // salía negativo. Regla: el débito es todo lo abonado a la 40111, menos las notas de crédito de ventas (cargos a la 40111 en
+        // asientos de ventas); el crédito es todo lo cargado a la 40112, menos las notas de crédito de compras (abonos a la 40112 en
+        // asientos sin pago de IGV).
+        function esAsientoDePagoDeTributos(a) {
+            return (a.origen === 'Caja y Bancos') || (a.lineas || []).some(l => l.cuenta === '40111' && (l.debe || 0) > 0) && (a.lineas || []).some(l => l.cuenta === '40112' && (l.haber || 0) > 0);
+        }
+        function igvDelMesSinPagos(periodo) {
+            let debito = 0, credito = 0;
+            const asientos = (diarioImport && diarioImport.periodsData[periodo] && diarioImport.periodsData[periodo].asientos) || [];
+            asientos.forEach(a => {
+                const pago = esAsientoDePagoDeTributos(a);
+                const esVenta = String(a.origen || '').startsWith('Resumen Ventas') || (a.lineas || []).some(l => getAccountGrupo(l.cuenta) === 'ingreso');
+                (a.lineas || []).forEach(l => {
+                    if (l.cuenta === '40111') { debito += (l.haber || 0); if (!pago && esVenta) debito -= (l.debe || 0); }
+                    if (l.cuenta === '40112') { credito += (l.debe || 0); if (!pago) credito -= (l.haber || 0); }
+                });
+            });
+            return { debito: round2(debito), credito: round2(credito) };
+        }
+        // IGV a pagar del mes con el saldo a favor que viene arrastrado de los meses anteriores (casilla 145 del 621).
+        function igvConSaldoAFavor(periodo) {
+            const periodos = Object.keys((diarioImport && diarioImport.periodsData) || {}).filter(p => p <= periodo).sort();
+            let saldoFavor = 0, res = { debito: 0, credito: 0, saldoFavorAnterior: 0, aPagar: 0, saldoFavorSiguiente: 0 };
+            periodos.forEach(p => {
+                const { debito, credito } = igvDelMesSinPagos(p);
+                const resultante = round2(debito - credito - saldoFavor);
+                res = { debito, credito, saldoFavorAnterior: saldoFavor, aPagar: Math.max(0, resultante), saldoFavorSiguiente: Math.max(0, -resultante) };
+                saldoFavor = res.saldoFavorSiguiente;
+            });
+            return res;
+        }
+
         function calcularImpuestosDelMesReportes(periodo) {
             const cfg = (diarioImport && diarioImport.config) || {};
             const mov = getMovimientosDelMes(periodo);
@@ -5508,9 +5542,7 @@ const MypecarPEVista = (function () {
             const netoDeudor = (cta) => mov[cta] ? (mov[cta].debe - mov[cta].haber) : 0;
 
             const regimen = cfg.regimenTributario || 'rmt';
-            const igvDebito = neto('40111');
-            const igvCredito = netoDeudor('40112');
-            const igv = regimen === 'nrus' ? 0 : Math.max(0, igvDebito - igvCredito);
+            const igv = regimen === 'nrus' ? 0 : igvConSaldoAFavor(periodo).aPagar;
 
             let rentaMensual = 0, cuotaNRUS = 0;
             if (regimen === 'nrus') { cuotaNRUS = cfg.categoriaNRUS === '2' ? 50 : 20; }
@@ -9773,13 +9805,15 @@ function renderAnalisisCuenta() {
 
             const regimen = cfg.regimenTributario || 'rmt';
             const ventasNetas = er.ventasNetas || 0;
-            const igvVentas = round2(neto('40111'));
-            const igvCompras = round2(netoDeudor('40112'));
+            const igvMes = igvConSaldoAFavor(periodo);
+            const igvVentas = igvMes.debito;
+            const igvCompras = igvMes.credito;
+            const saldoFavorAnterior = regimen === 'nrus' ? 0 : igvMes.saldoFavorAnterior;
             // El crédito fiscal de Compras siempre se calcula a la tasa general (18%),
             // incluso si el negocio vende con la tasa especial de Ley 31556.
             const comprasNetas = round2(igvCompras / 0.18);
-            const igvResultante = regimen === 'nrus' ? 0 : round2(Math.max(0, igvVentas - igvCompras));
-            const saldoFavorIGV = regimen === 'nrus' ? 0 : round2(Math.max(0, igvCompras - igvVentas));
+            const igvResultante = regimen === 'nrus' ? 0 : igvMes.aPagar;
+            const saldoFavorIGV = regimen === 'nrus' ? 0 : igvMes.saldoFavorSiguiente;
 
             const tasaRenta = cfg.tasaRentaMensual != null ? cfg.tasaRentaMensual : 0;
             const rentaMensual = regimen === 'nrus' ? 0 : round2(ventasNetas * (tasaRenta / 100));
@@ -9787,7 +9821,7 @@ function renderAnalisisCuenta() {
 
             return {
                 periodo, regimen, ventasNetas, igvVentas, comprasNetas, igvCompras,
-                igvResultante, saldoFavorIGV, tasaRenta, rentaMensual, cuotaNRUS,
+                igvResultante, saldoFavorIGV, saldoFavorAnterior, tasaRenta, rentaMensual, cuotaNRUS,
                 totalAPagar: round2(igvResultante + rentaMensual + cuotaNRUS)
             };
         }
@@ -9799,6 +9833,7 @@ function renderAnalisisCuenta() {
                 ['107 (ref.)', 'Compras Netas del Periodo (Base con Derecho a Crédito Fiscal)', d.comprasNetas],
                 ['110 (ref.)', 'IGV de Compras (Crédito Fiscal)', d.igvCompras],
             ];
+            if (d.saldoFavorAnterior > 0) filas.push(['145 (ref.)', 'Saldo a Favor del IGV del mes anterior', d.saldoFavorAnterior]);
             if (d.igvResultante > 0) filas.push(['140 (ref.)', 'Tributo Resultante IGV a Pagar', d.igvResultante]);
             if (d.saldoFavorIGV > 0) filas.push(['—', 'Saldo a Favor del IGV (para el mes siguiente)', d.saldoFavorIGV]);
             if (d.regimen === 'nrus') filas.push(['—', 'Cuota Fija Nuevo RUS', d.cuotaNRUS]);
