@@ -2733,6 +2733,18 @@
     </script>
 
 <script>
+/* (2026-11-24) Foto del stock actual para que Ventas (01) avise cuando se vende más de lo que hay.
+   Solo cantidades por producto y local; Ventas la usa únicamente para avisar, nunca para bloquear. */
+window.mypecarConstruirSnapshots = function () {
+    try {
+        if (typeof calcularStockActual !== 'function' || typeof config === 'undefined') return {};
+        const items = calcularStockActual(config.metodoValorizacion || 'PROMEDIO').map(g => ({ productoCodigo: g.productoCodigo, puntoVenta: g.puntoVenta, cantidad: g.cantidad }));
+        return { stock: { tipo: 'stock_actual', origen: 'inventario', generadoEl: new Date().toISOString(), items } };
+    } catch (e) { console.warn('Enlace: no se pudo armar la foto de stock:', e); return {}; }
+};
+</script>
+
+<script>
 /* Enlace automático (2026-11-20): los movimientos de Ventas y Compras llegan solos desde la nube
    (el mismo contenido que los archivos "Movimientos_Inventario_*.json"; reemplazan los anteriores del mismo origen, no se duplican). */
 (function () {
