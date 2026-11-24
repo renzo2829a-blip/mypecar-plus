@@ -2549,15 +2549,17 @@
             // (2026-11-24) Microempresa con el trabajador asegurado al SIS: el empleador no paga EsSalud 9%.
             const sinEssalud = trabajador.regimenLaboral === 'micro' && !!trabajador.seguroSis;
             const essaludPatronal = sinEssalud ? 0 : baseEssalud * 0.09;
+            // (2026-11-24) SIS-Microempresa: el empleador paga un aporte fijo mensual (S/ 15 por trabajador asegurado).
+            const sisPatronal = (sinEssalud && dias > 0) ? round2(Number(config.sisAporteMensual) > 0 ? Number(config.sisAporteMensual) : 15) : 0;
 
             // Gasto de remuneraciones del mes (62111) y costo total para el empleador
             const gastoRemuneraciones = totalIngresos - tardanzas;
             const essaludRedondeado = round2(essaludPatronal);
-            const costoEmpleador = round2(gastoRemuneraciones + essaludRedondeado);
+            const costoEmpleador = round2(gastoRemuneraciones + essaludRedondeado + sisPatronal);
 
             return { dias, sueldoMensual, sueldoBasico, horasExtra25, horasExtra35, valorHoraOrdinaria, montoHorasExtra25, montoHorasExtra35, horasExtras, bonificaciones, asignacionFamiliar, otrosIngresos, totalIngresos,
                 rentaQuinta, afpOnpMonto, afpAporte, afpPrima, afpComision, adelantos, prestamos, tardanzas, otrosDescuentos, totalDescuentos, netoPagar,
-                remuneracionComputable, baseAportes, baseEssalud, essaludPatronal: essaludRedondeado, gastoRemuneraciones, costoEmpleador,
+                remuneracionComputable, baseAportes, baseEssalud, essaludPatronal: essaludRedondeado, sisPatronal, gastoRemuneraciones, costoEmpleador,
                 ordinaria5ta: ing.ordinaria5ta, extraordinaria5ta: ing.extraordinaria5ta, renta5ta: r5 };
         }
 
@@ -2620,7 +2622,7 @@
                     <td class="p-2 text-right">${inp(datos.otrosDescuentos, 'otrosDescuentos', t.id, 'bg-rose-50 border border-rose-200')}</td>
                     <td class="p-2 text-right font-bold">${c.totalDescuentos.toFixed(2)}</td>
                     <td class="p-2 text-right font-bold ${c.netoPagar < 0 ? 'text-rose-700' : 'text-indigo-700'}">${c.netoPagar.toFixed(2)}</td>
-                    <td class="p-2 text-right text-amber-700" title="Remuneración del mes + EsSalud 9% (base S/ ${c.baseEssalud.toFixed(2)})">${c.costoEmpleador.toFixed(2)}</td>
+                    <td class="p-2 text-right text-amber-700" title="Remuneración del mes + EsSalud 9% (base S/ ${c.baseEssalud.toFixed(2)}) + aporte SIS si aplica">${c.costoEmpleador.toFixed(2)}</td>
                 </tr>`;
             }).join('');
 
@@ -2671,7 +2673,7 @@
                 const datos = planillaMes.find(p => p.trabajadorId === t.id) || {};
                 const c = calcularLineaPlanilla(t, datos, periodo);
                 totalGasto += c.gastoRemuneraciones;
-                totalEssalud += c.essaludPatronal;
+                totalEssalud += c.essaludPatronal + (c.sisPatronal || 0);
                 if (t.sistemaPension === 'AFP') totalAfp += c.afpOnpMonto;
                 else if (t.sistemaPension === 'ONP') totalOnp += c.afpOnpMonto;
                 totalRenta5ta += c.rentaQuinta;
@@ -4017,7 +4019,7 @@
                         </div>
                     </div>
                     <div class="px-6 py-3 text-[10px] text-slate-400 border-t border-slate-100">
-                        ${t.regimenLaboral === 'micro' && t.seguroSis ? 'Microempresa con trabajador asegurado al SIS: el empleador no paga EsSalud 9%.' : `Aporte del empleador a EsSalud 9% (informativo, no descontado al trabajador): S/ ${c.essaludPatronal.toFixed(2)} sobre base S/ ${c.baseEssalud.toFixed(2)}`}
+                        ${t.regimenLaboral === 'micro' && t.seguroSis ? `Microempresa con trabajador asegurado al SIS: el empleador no paga EsSalud 9%; paga el aporte SIS de S/ ${(c.sisPatronal || 0).toFixed(2)} al mes.` : `Aporte del empleador a EsSalud 9% (informativo, no descontado al trabajador): S/ ${c.essaludPatronal.toFixed(2)} sobre base S/ ${c.baseEssalud.toFixed(2)}`}
                     </div>
                 </div>`;
             }).join('');
