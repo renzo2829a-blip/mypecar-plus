@@ -1381,7 +1381,7 @@
             const msgZona = overlayEl.querySelector('#mps-zona-msg');
             msgZona.innerHTML = '';
             try {
-              await global.MypecarSync.empresas.actualizarAppsInvitacionPendiente(invId, seleccionadas);
+              await global.MypecarSync.empresas.actualizarAppsInvitacionPendiente(invId, seleccionadas, empresaId);
               msgZona.innerHTML = '<div class="mps-ok">Apps de la invitación actualizadas.</div>';
             } catch (e) {
               msgZona.innerHTML = `<div class="mps-error">${mensajeError(e)}</div>`;
@@ -1395,7 +1395,7 @@
             if (!confirm('¿Cancelar esta invitación pendiente? Si esa persona ya tiene el enlace o intenta registrarse después, no quedará vinculada automáticamente a tu empresa.')) return;
             const invId = btn.dataset.cancelarInvitacion;
             try {
-              await global.MypecarSync.empresas.cancelarInvitacionPendiente(invId);
+              await global.MypecarSync.empresas.cancelarInvitacionPendiente(invId, empresaId);
               cargarInvitacionesPendientes();
             } catch (e) {
               overlayEl.querySelector('#mps-zona-msg').innerHTML = `<div class="mps-error">${mensajeError(e)}</div>`;
