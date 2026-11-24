@@ -790,11 +790,18 @@
         // ==================================================================
         // DEPRECIACIÓN MENSUAL
         // ==================================================================
+        // (2026-11-24) Activos que corresponde depreciar en un periodo: los que siguen en uso, y los dados de baja o vendidos
+        // DESPUÉS (o en) ese mes. Antes solo se tomaban los "en uso" de hoy, y al rehacer el asiento de un mes anterior
+        // el activo dado de baja desaparecía (su depreciación de ese mes ya no salía).
+        function activosDepreciablesEnPeriodo(periodo) {
+            return activos.filter(a => a.estado === 'uso' || (a.fechaBaja && String(a.fechaBaja).slice(0, 7) >= periodo));
+        }
+
         function renderDepreciacion() {
             const tbody = document.getElementById('depreciacion-body');
             const sinAct = document.getElementById('depre-sin-activos');
             const contenido = document.getElementById('depre-contenido');
-            const enUso = activos.filter(a => a.estado === 'uso');
+            const enUso = activosDepreciablesEnPeriodo(config.periodoActivo);
             if (enUso.length === 0) { sinAct.classList.remove('hidden'); contenido.classList.add('hidden'); return; }
             sinAct.classList.add('hidden'); contenido.classList.remove('hidden');
 
@@ -823,7 +830,7 @@
         }
 
         function generarAsientoDepreciacion() {
-            const enUso = activos.filter(a => a.estado === 'uso');
+            const enUso = activosDepreciablesEnPeriodo(config.periodoActivo);
             if (enUso.length === 0) { showToast('No hay activos en uso.', 'error'); return; }
 
             const porCC = {};
@@ -844,7 +851,7 @@
         }
 
         async function exportarDepreciacionExcel() {
-            const enUso = activos.filter(a => a.estado === 'uso');
+            const enUso = activosDepreciablesEnPeriodo(config.periodoActivo);
             const wb = new ExcelJS.Workbook();
             const ws = wb.addWorksheet('Depreciación');
             ws.columns = [{ width: 30 }, { width: 26 }, { width: 6 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }];
