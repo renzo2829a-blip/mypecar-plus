@@ -65,6 +65,17 @@ grupoB (provisional a prueba de abuso) · prueba_gratis_14_dias · prueba_gratis
 - En 01/02/03 `config.tcAutomaticoSunat` (encendido en empresas nuevas confirmadas con la nube; las existentes, en Ajustes).
 - Portal admin: Google pide elegir cuenta y, si la cuenta no es administradora, lo dice y permite cambiarla.
 
+## Correos al cliente en la prueba gratuita (24-nov-2026)
+- `avisar` v7: al iniciar la prueba también envía la **bienvenida** al correo de la sesión del cliente (una vez; clave `bienvenida`).
+- `pruebas_gratis.email`: lo guarda `iniciar_prueba_gratis` desde el JWT (no se lee auth.users).
+- Edge Function `recordatorios-prueba` (verify_jwt=false; exige la clave de Vault `cron_recordatorios` vía
+  `verificar_cron_recordatorios`, solo service_role): correos cuando quedan 4 días, 1 día y al terminar (hasta 3 días después).
+  Se marca en `avisos_enviados` solo si el correo salió. `{probar:true}` no envía.
+- Tarea `mypecar-recordatorios-prueba` (pg_cron, 14:05 UTC = 09:05 Perú) con **pg_net** (activado para esto). Los permisos de
+  `net` para anon/authenticated los otorga supabase_admin y no se pueden quitar desde postgres; el esquema `net` no está en la API.
+- **Remitente:** si `RESEND_FROM` no es un dominio verificado en Resend (p. ej. sigue en onboarding@resend.dev), Resend solo
+  entrega al correo dueño de la cuenta Resend: los correos a clientes fallan (se ve en los registros de las funciones).
+
 ## Pendientes conocidos
 - "Leaked password protection": no disponible en el plan Free (el panel pide plan Pro). Se activa en Auth → Sign In / Providers → Email si
   algún día se pasa a Pro.
