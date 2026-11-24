@@ -4256,13 +4256,32 @@
         // Lo que todavía debe el cliente por esta venta (0 si ya se cobró entera, si es contado o si es una nota de crédito).
         function saldoPorCobrarVenta(v) {
             if (!ventaAdmiteCobro(v)) return 0;
-            return Math.max(0, round2Money((parseFloat(v.total) || 0) - totalCobradoVenta(v)));
+            return Math.max(0, round2Money((parseFloat(v.total) || 0) - totalCobradoVenta(v) - totalNotasCreditoDeVenta(v)));
+        }
+        // (2026-11-24) Notas de crédito que corrigen ESTA factura (mismo tipo, serie y número en "comprobante que se modifica"), de
+        // cualquier periodo: bajan lo que el cliente todavía debe. Se compara el número sin ceros a la izquierda.
+        function normNumDoc(x) { return String(x == null ? '' : x).trim().toUpperCase().replace(/^0+(?=\d)/, ''); }
+        function notasCreditoDeVenta(v) {
+            const res = [];
+            Object.keys(periodsData || {}).forEach(per => {
+                const lista = (per === config.periodoActivo ? sales : (periodsData[per] && periodsData[per].sales)) || [];
+                lista.forEach(n => {
+                    if (n.tipoDoc !== '07' || n === v) return;
+                    if (String(n.refTipo || '') !== String(v.tipoDoc) || normNumDoc(n.refSerie) !== normNumDoc(v.serie) || normNumDoc(n.refNumero) !== normNumDoc(v.numero)) return;
+                    res.push(n);
+                });
+            });
+            return res;
+        }
+        function totalNotasCreditoDeVenta(v) {
+            if (!v || v.tipoDoc === '07') return 0;
+            return round2Money(notasCreditoDeVenta(v).reduce((s, n) => s + Math.abs(parseFloat(n.total) || 0), 0));
         }
         // "Cobrado" o "Pendiente" considerando los cobros registrados (una venta a crédito cobrada entera ya figura Cobrada).
         function estadoEfectivoCobro(v) {
             if (v.estadoCobro === 'Cobrado') return 'Cobrado';
             if (v.tipoDoc === '07') return v.estadoCobro;
-            return saldoPorCobrarVenta(v) <= 0.005 && cobrosDeVenta(v).length > 0 ? 'Cobrado' : 'Pendiente';
+            return saldoPorCobrarVenta(v) <= 0.005 && (cobrosDeVenta(v).length > 0 || totalNotasCreditoDeVenta(v) > 0) ? 'Cobrado' : 'Pendiente';
         }
         // Cobros cuya fecha cae en el periodo (de ventas de CUALQUIER mes), con la venta de la que vienen.
         function cobrosDelPeriodo(periodo) {
@@ -4317,7 +4336,7 @@
                 <div class="p-5 space-y-3 text-xs">
                   <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
                     <p class="font-bold text-slate-800">${escCobro(v.tipoDoc + ' ' + v.serie + '-' + v.numero)} — ${escCobro(v.clienteRazonSocial || 'PÚBLICO EN GENERAL')}</p>
-                    <p class="text-slate-600 mt-1">Emitida el ${formatFechaPeru(v.fechaEmision)} · Total S/ ${(parseFloat(v.total) || 0).toFixed(2)} · Ya cobrado S/ ${cobrado.toFixed(2)} · <b class="text-amber-700">Saldo S/ ${saldo.toFixed(2)}</b></p>
+                    <p class="text-slate-600 mt-1">Emitida el ${formatFechaPeru(v.fechaEmision)} · Total S/ ${(parseFloat(v.total) || 0).toFixed(2)}${totalNotasCreditoDeVenta(v) > 0 ? ` · Notas de crédito −S/ ${totalNotasCreditoDeVenta(v).toFixed(2)}` : ''} · Ya cobrado S/ ${cobrado.toFixed(2)} · <b class="text-amber-700">Saldo S/ ${saldo.toFixed(2)}</b></p>
                   </div>
                   <div class="grid grid-cols-2 gap-3">
                     <div><label class="block font-semibold text-slate-600 mb-1">Fecha real de cobro</label>
@@ -4563,6 +4582,7 @@
                     const _ultimoCobro = _cobrosV.length ? _cobrosV.slice().sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).pop() : null;
                     let estadoBadge;
                     if (v.estadoCobro === 'Cobrado') estadoBadge = '<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">COBRADO</span>';
+                    else if (estadoEfectivoCobro(v) === 'Cobrado' && !_ultimoCobro) estadoBadge = '<span title="Las notas de crédito cubren todo el comprobante: no hay nada que cobrar" class="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-200 text-slate-700">ANULADA POR NC</span>';
                     else if (estadoEfectivoCobro(v) === 'Cobrado') estadoBadge = `<span title="Cobrado en ${_cobrosV.length} pago(s)" class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">COBRADO ${formatFechaPeru(_ultimoCobro.fecha)}</span>`;
                     else if (_cobrosV.length) estadoBadge = `<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">PARCIAL<br>saldo ${_saldoV.toFixed(2)}</span>`;
                     else estadoBadge = '<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">PENDIENTE</span>';
