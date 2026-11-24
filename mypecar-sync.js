@@ -1332,7 +1332,7 @@ var LZString = {
       const gracia = (lic.gracia_dias == null || isNaN(+lic.gracia_dias)) ? 15 : +lic.gracia_dias;
       const bloqueada = dias + gracia < 0;
       return {
-        vence_en: String(lic.vence_en).slice(0, 10), gracia_dias: gracia, periodo_pago: lic.periodo_pago || null,
+        vence_en: String(lic.vence_en).slice(0, 10), gracia_dias: gracia, periodo_pago: lic.periodo_pago || null, plan_nombre: lic.plan_nombre || null,
         dias, enGracia: dias < 0 && !bloqueada, bloqueada, diasDeGracia: bloqueada ? 0 : Math.max(0, dias + gracia)
       };
     },
@@ -1355,7 +1355,11 @@ var LZString = {
       }
       try {
         const consulta = (cols) => supabaseClient.from('empresas').select(cols).eq('id', empresaId).single();
-        let r = await consulta('estado, reinicio_pendiente_revision, vence_en, gracia_dias, periodo_pago');
+        let r = await consulta('estado, reinicio_pendiente_revision, vence_en, gracia_dias, periodo_pago, plan_nombre');
+        // (2026-11-24) Si "plan_nombre" no existiera, se consulta sin ella (la prueba gratuita no se mostraría, nada más).
+        if (r.error && /plan_nombre/i.test(String(r.error.message || ''))) {
+          r = await consulta('estado, reinicio_pendiente_revision, vence_en, gracia_dias, periodo_pago');
+        }
         // Si todavía no se corrió "132 vencimiento_licencias.sql" en Supabase, esas columnas no
         // existen: se consulta como antes para que nada se rompa mientras tanto.
         if (r.error && /column|vence_en|gracia_dias|periodo_pago/i.test(String(r.error.message || ''))) {
@@ -1369,7 +1373,7 @@ var LZString = {
         }
         if (r.error) throw r.error;
         const data = r.data;
-        lsSet(licKey, data.vence_en ? { vence_en: data.vence_en, gracia_dias: data.gracia_dias, periodo_pago: data.periodo_pago } : null);
+        lsSet(licKey, data.vence_en ? { vence_en: data.vence_en, gracia_dias: data.gracia_dias, periodo_pago: data.periodo_pago, plan_nombre: data.plan_nombre || null } : null);
         let estadoEfectivo = data.reinicio_pendiente_revision ? 'pendiente' : data.estado;
         if (estadoEfectivo === 'autorizada') {
           const ev = empresas.evaluarLicencia(lsGet(licKey, null));
@@ -1547,6 +1551,16 @@ var LZString = {
         p_empresa_id: empresaId, p_plan: plan, p_nombre_yape: nombreYape
       });
       if (error) throw error;
+      return data;
+    },
+    // (2026-11-24) Prueba gratuita de 14 días: la base de datos valida todo (dueño, RUC real, una sola vez por empresa/RUC/usuario,
+    // tope diario) y responde { ok, activada, vence_en, dias } o { ok:false, motivo }. Nunca da acceso por sí sola: el estado real
+    // lo decide Supabase.
+    async iniciarPruebaGratis(empresaId) {
+      requiereSupabase();
+      const { data, error } = await supabaseClient.rpc('iniciar_prueba_gratis', { p_empresa_id: empresaId });
+      if (error) throw error;
+      if (data && data.ok) { lsSet('mps_estado_empresa_' + empresaId, 'autorizada'); lsSet('mps_licencia_' + empresaId, { vence_en: data.vence_en, gracia_dias: 0, periodo_pago: null, plan_nombre: 'prueba' }); }
       return data;
     },
     // Aviso al WhatsApp del administrador (registro de empresa / pago declarado). Nunca lanza error.

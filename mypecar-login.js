@@ -441,6 +441,10 @@
         box-shadow:0 8px 24px rgba(15,23,42,.18); font-family:'Manrope','Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif; }
       .mps-aviso-lic.amb { background:#fffbeb; border:1px solid #fcd34d; color:#92400e; }
       .mps-aviso-lic.roj { background:#fef2f2; border:1px solid #fca5a5; color:#991b1b; }
+      .mps-aviso-lic.ver { background:#ecfdf5; border:1px solid #6ee7b7; color:#065f46; }
+      .mps-aviso-lic .mps-acc { cursor:pointer; font-weight:800; text-decoration:underline; white-space:nowrap; }
+      .mps-prueba { background:#ecfdf5; border:1px solid #6ee7b7; border-radius:14px; padding:14px; margin:14px 0 6px; text-align:center; }
+      .mps-prueba p { margin:6px 0 10px; font-size:13.5px; line-height:1.45; color:#065f46; }
       .mps-aviso-lic a { color:inherit; font-weight:800; }
       .mps-aviso-lic .x { flex:none; cursor:pointer; font-weight:800; opacity:.7; padding:0 2px; }
       .mps-contador { font-size:12px; color:#64748b; margin:10px 0 8px; }
@@ -668,7 +672,7 @@
       </div>`;
   }
 
-  function activarCajaPago(estadoEmpresa) {
+  function activarCajaPago(estadoEmpresa, esPrueba) {
     const caja = overlayEl && overlayEl.querySelector('#mps-caja-pago');
     if (!caja) return;
     let sondeo = null;
@@ -679,7 +683,9 @@
         if (!document.body.contains(caja)) { clearInterval(sondeo); return; }
         try {
           const est = await global.MypecarSync.empresas.obtenerEstado(empresaId);
-          if (est === 'autorizada') { clearInterval(sondeo); window.location.reload(); }
+          // En prueba la empresa YA está autorizada: solo se recarga cuando el pago convierte la prueba en suscripción.
+          const lic = esPrueba ? global.MypecarSync.empresas.obtenerLicencia(empresaId) : null;
+          if (est === 'autorizada' && !(esPrueba && lic && lic.plan_nombre === 'prueba')) { clearInterval(sondeo); window.location.reload(); }
         } catch (e) { /* se reintenta */ }
       }, 6000);
     }
@@ -700,7 +706,7 @@
           return;
         }
         if (r && r.activada) { window.location.reload(); return; }
-        msg('Listo. Apenas lleguemos a ver tu Yape, tu empresa se activa sola. No cierres esta pantalla.', 'ok');
+        msg(esPrueba ? 'Listo. Apenas veamos tu Yape, tu suscripción queda activa sola y se suman los días de prueba que te quedan. No cierres esta pantalla.' : 'Listo. Apenas lleguemos a ver tu Yape, tu empresa se activa sola. No cierres esta pantalla.', 'ok');
         btn.textContent = 'Esperando tu pago…';
         vigilar(empresaId);
       } catch (e) {
@@ -711,6 +717,32 @@
     });
   }
 
+  // (2026-11-24) Pantalla "Suscribirme" durante la prueba: se puede cerrar y seguir probando. Los días que sobren de la prueba
+  // se suman a la suscripción (la base de datos extiende desde el vencimiento actual). Incluye descargar un respaldo.
+  function mostrarSuscripcion() {
+    limpiarOverlay();
+    overlayEl = document.createElement('div');
+    overlayEl.className = 'mps-overlay';
+    document.body.appendChild(overlayEl);
+    overlayEl.innerHTML = `
+      <div class="mps-card">
+        ${marcaHtml('Cuentas claras para tu empresa')}
+        <p class="mps-titulo">Suscríbete a MYPECAR PLUS</p>
+        <p class="mps-subtitulo" style="margin-bottom:0;">Tu prueba gratuita sigue corriendo: los días que te falten se <b>suman</b> a tu suscripción y tus datos se conservan tal como están.</p>
+        ${cajaPagoHtml()}
+        ${contactoHtml('Hola, quiero suscribirme a MYPECAR PLUS.')}
+        <p style="text-align:center;margin-top:18px;">
+          <span class="mps-link" id="mps-link-respaldo-sus">Descargar un respaldo de mi empresa</span>
+          &nbsp;·&nbsp;
+          <span class="mps-link" id="mps-link-seguir-prueba">Seguir con mi prueba</span>
+        </p>
+      </div>
+    `;
+    activarCajaPago('autorizada', true);
+    overlayEl.querySelector('#mps-link-seguir-prueba').addEventListener('click', () => limpiarOverlay());
+    overlayEl.querySelector('#mps-link-respaldo-sus').addEventListener('click', () => descargarRespaldoEmpresa());
+  }
+
   function mostrarBloqueoPorAprobacion(opciones, estadoEmpresa) {
     limpiarOverlay();
     overlayEl = document.createElement('div');
@@ -719,7 +751,16 @@
     document.body.appendChild(overlayEl);
 
     let titulo, mensaje, msgWa;
-    if (estadoEmpresa === 'vencida') {
+    let pruebaHtml = '';
+    const empresaIdBloqueo = global.MypecarSync.empresas.activaId();
+    let licBloqueo = null;
+    try { licBloqueo = (JSON.parse(localStorage.getItem('mps_licencia_' + empresaIdBloqueo)) || null); } catch (e) {}
+    const eraPrueba = !!(licBloqueo && licBloqueo.plan_nombre === 'prueba');
+    if (eraPrueba && (estadoEmpresa === 'vencida' || estadoEmpresa === 'suspendida')) {
+      titulo = '⏰ Terminó tu prueba gratuita de ' + DIAS_PRUEBA + ' días';
+      mensaje = 'Gracias por probar MYPECAR PLUS. Tus datos siguen guardados: suscríbete con Yape aquí abajo y vuelves a entrar con todo como lo dejaste.';
+      msgWa = 'Hola, terminó mi prueba gratuita de MYPECAR PLUS y quiero suscribirme.';
+    } else if (estadoEmpresa === 'vencida') {
       titulo = '⏰ Licencia vencida';
       mensaje = 'La licencia de esta empresa venció y terminó el periodo de gracia. Tus datos siguen guardados: apenas se renueve, vuelve a abrir esta página y todo estará como lo dejaste.';
       msgWa = 'Hola, quiero renovar mi licencia de MYPECAR PLUS.';
@@ -728,7 +769,14 @@
       mensaje = 'Tu licencia no está vigente. Escríbenos para renovarla: apenas se registre el pago, vuelves a entrar y todo estará como lo dejaste.';
       msgWa = 'Hola, mi empresa figura suspendida en MYPECAR PLUS y quiero renovar mi licencia.';
     } else {
-      titulo = '⏳ Empresa pendiente de aprobación';
+      titulo = quierePrueba() ? '🎁 ¡Casi listo! Empieza tus ' + DIAS_PRUEBA + ' días gratis' : '⏳ Empresa pendiente de aprobación';
+      pruebaHtml = `
+        <div class="mps-prueba">
+          <div class="mps-pago-tit">🎁 Prueba gratis ${DIAS_PRUEBA} días</div>
+          <p>Usa los 9 módulos sin pagar y sin tarjeta. Verás cuántos días te quedan. Al terminar te invitamos a suscribirte; tus datos no se borran.</p>
+          <button class="mps-btn mps-btn-primario" id="mps-prueba-btn">Empezar mi prueba gratis</button>
+          <div id="mps-prueba-msg"></div>
+        </div>`;
       mensaje = 'Tu empresa fue registrada correctamente. Para activarla, paga con Yape aquí abajo: al avisar tu pago, entras de inmediato con acceso por 48 horas mientras confirmamos. Si prefieres otra forma de pago, escríbenos.';
       msgWa = 'Hola, registré mi empresa en MYPECAR PLUS y quiero activarla.';
     }
@@ -738,6 +786,7 @@
         ${marcaHtml('Cuentas claras para tu empresa')}
         <p class="mps-titulo">${titulo}</p>
         <p class="mps-subtitulo" style="margin-bottom:0;">${mensaje}</p>
+        ${pruebaHtml}
         ${cajaPagoHtml()}
         ${contactoHtml(msgWa)}
         <p style="text-align:center;margin-top:18px;">
@@ -748,6 +797,28 @@
       </div>
     `;
     activarCajaPago(estadoEmpresa);
+    const btnPrueba = overlayEl.querySelector('#mps-prueba-btn');
+    if (btnPrueba) {
+      btnPrueba.addEventListener('click', async () => {
+        const msgP = overlayEl.querySelector('#mps-prueba-msg');
+        const decirP = (t, ok) => { msgP.innerHTML = t ? `<div class="${ok ? 'mps-ok' : 'mps-error'}">${t}</div>` : ''; };
+        btnPrueba.disabled = true; btnPrueba.textContent = 'Activando…';
+        try {
+          const r = await global.MypecarSync.empresas.iniciarPruebaGratis(global.MypecarSync.empresas.activaId());
+          if (r && r.ok) {
+            decirP('¡Listo! Tienes ' + (r.dias || DIAS_PRUEBA) + ' días gratis. Entrando…', true);
+            try { sessionStorage.removeItem('mps_quiere_prueba'); } catch (e) {}
+            setTimeout(() => window.location.reload(), 1200);
+            return;
+          }
+          if (r && r.motivo === 'empresa_ya_activa') { window.location.reload(); return; }
+          decirP(textoMotivoPrueba(r && r.motivo), false);
+        } catch (e) {
+          decirP(/due[nñ]o/i.test(String((e && e.message) || e)) ? 'Solo el dueño de la empresa puede iniciar la prueba.' : 'No se pudo conectar. Revisa tu internet e inténtalo de nuevo.', false);
+        }
+        btnPrueba.disabled = false; btnPrueba.textContent = 'Empezar mi prueba gratis';
+      });
+    }
     overlayEl.querySelector('#mps-link-otra-empresa').addEventListener('click', () => {
       renderElegirEmpresa(opciones, () => window.location.reload());
     });
@@ -791,6 +862,26 @@
   const CONTACTO = { whatsapp: '51996378921', correo: '' };
   // Yape del negocio (pago automático): el cliente yapea a este número y la empresa se activa sola.
   const YAPE = { numero: '996378921', mensual: 59, anual: 590 };
+
+  // (2026-11-24) Prueba gratuita de 14 días: el botón de la página de inicio entra con ?prueba=1. Se recuerda durante la
+  // sesión para destacar la prueba cuando la empresa nueva todavía esté pendiente. No da acceso por sí sola: lo decide Supabase.
+  const DIAS_PRUEBA = 14;
+  function quierePrueba() {
+    try {
+      if (new URLSearchParams(location.search).get('prueba') === '1') sessionStorage.setItem('mps_quiere_prueba', '1');
+      return sessionStorage.getItem('mps_quiere_prueba') === '1';
+    } catch (e) { return false; }
+  }
+  quierePrueba(); // recuerda ?prueba=1 apenas carga, aunque la pantalla de pendiente aparezca después de iniciar sesión
+  function textoMotivoPrueba(motivo) {
+    switch (motivo) {
+      case 'ruc_invalido': return 'El RUC de esta empresa no es válido (revisa los 11 dígitos). Crea la empresa con tu RUC real para usar la prueba.';
+      case 'prueba_ya_usada': return 'Esta empresa, este RUC o este usuario ya usó su prueba gratuita. Para seguir, suscríbete con Yape aquí abajo.';
+      case 'ruc_de_otra_empresa': return 'Ese RUC ya pertenece a otra empresa activa. Escríbenos por WhatsApp para ayudarte.';
+      case 'tope_diario': return 'Hoy se agotaron las pruebas gratuitas. Vuelve mañana o suscríbete con Yape aquí abajo.';
+      default: return 'No se pudo iniciar la prueba. Inténtalo de nuevo o escríbenos por WhatsApp.';
+    }
+  }
 
   function contactoHtml(mensajeWa) {
     const partes = [];
@@ -1042,17 +1133,26 @@
       if (!sync || !sync.empresas || !sync.empresas.obtenerLicencia) return;
       const emp = sync.empresas.activaId && sync.empresas.activaId();
       const lic = emp ? sync.empresas.obtenerLicencia(emp) : null;
-      if (!lic || lic.bloqueada || lic.dias > 15) return;
+      const esPrueba = !!(lic && lic.plan_nombre === 'prueba');
+      if (!lic || lic.bloqueada || (!esPrueba && lic.dias > 15)) return;
       if (sessionStorage.getItem('mps_aviso_lic_' + emp + '_' + lic.vence_en) === 'cerrado') return;
       if (document.getElementById('mps-aviso-lic')) return;
       const f = lic.vence_en.split('-').reverse().join('/');
       let clase = 'amb', texto;
-      if (lic.dias > 1) texto = 'Tu licencia vence en <b>' + lic.dias + ' días</b> (' + f + '). Renueva para no perder el acceso.';
+      if (esPrueba) {
+        // Prueba gratuita: SIEMPRE se muestran los días que quedan (verde, luego ámbar y rojo al final).
+        clase = lic.dias <= 1 ? 'roj' : (lic.dias <= 3 ? 'amb' : 'ver');
+        if (lic.dias > 1) texto = '🎁 Prueba gratuita: te quedan <b>' + lic.dias + ' días</b> (hasta el ' + f + ').';
+        else if (lic.dias === 1) texto = '🎁 Prueba gratuita: te queda <b>1 día</b> (hasta el ' + f + ').';
+        else texto = '🎁 Prueba gratuita: <b>hoy es tu último día</b>.';
+        texto += ' <span class="mps-acc" id="mps-acc-suscribir">Suscribirme</span>';
+      } else if (lic.dias > 1) texto = 'Tu licencia vence en <b>' + lic.dias + ' días</b> (' + f + '). Renueva para no perder el acceso.';
       else if (lic.dias === 1) texto = 'Tu licencia vence <b>mañana</b> (' + f + '). Renueva para no perder el acceso.';
       else if (lic.dias === 0) texto = 'Tu licencia vence <b>hoy</b>. Renueva para no perder el acceso.';
       else { clase = 'roj'; texto = 'Tu licencia <b>venció el ' + f + '</b>. Te quedan <b>' + lic.diasDeGracia + (lic.diasDeGracia === 1 ? ' día' : ' días') + '</b> para renovar; después se suspenderá el acceso.'; }
       const wa = String(CONTACTO.whatsapp || '').replace(/\D/g, '');
-      if (wa) texto += ' <a target="_blank" rel="noopener" href="https://wa.me/' + wa + '?text=' + encodeURIComponent('Hola, quiero renovar mi licencia de MYPECAR PLUS.') + '">Renovar</a>';
+      if (esPrueba) { /* la prueba usa el botón "Suscribirme" de arriba */ }
+      else if (wa) texto += ' <a target="_blank" rel="noopener" href="https://wa.me/' + wa + '?text=' + encodeURIComponent('Hola, quiero renovar mi licencia de MYPECAR PLUS.') + '">Renovar</a>';
       else if (CONTACTO.correo) texto += ' Escríbenos a <a href="mailto:' + escapeHtml(CONTACTO.correo) + '">' + escapeHtml(CONTACTO.correo) + '</a>.';
       const div = document.createElement('div');
       div.id = 'mps-aviso-lic'; div.className = 'mps-aviso-lic ' + clase;
@@ -1061,6 +1161,8 @@
         try { sessionStorage.setItem('mps_aviso_lic_' + emp + '_' + lic.vence_en, 'cerrado'); } catch (e) {}
         div.remove();
       });
+      const accSus = div.querySelector('#mps-acc-suscribir');
+      if (accSus) accSus.addEventListener('click', () => mostrarSuscripcion());
       document.body.appendChild(div);
     } catch (e) { /* el aviso nunca debe impedir abrir la app */ }
   }
