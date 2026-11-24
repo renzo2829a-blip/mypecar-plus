@@ -1400,13 +1400,39 @@ const MypecarPEVista = (function () {
         // ==================================================================
         // CATÁLOGO DE CUENTAS (combina PCGE + personalizadas del Diario importado)
         // ==================================================================
+        // (2026-11-24) El catálogo combina: el PCGE propio + el plan de cuentas que trae el Libro Diario importado
+        // (04 exporta su pcgeCatalog, con subcuentas como 60112 o 10411 que este módulo no tenía) + las personalizadas.
+        // Antes esas subcuentas salían "No Catalogadas" y se ignoraban en Resultados y Situación Financiera.
+        let _cacheCatalogo = { diario: null, n04: -1, nCustom: -1, lista: null, mapa: null };
         function getAllAccounts() {
+            const cat04 = (diarioImport && Array.isArray(diarioImport.pcgeCatalog)) ? diarioImport.pcgeCatalog : [];
             const custom = (diarioImport && diarioImport.customAccounts) || [];
-            return pcgeCatalog.concat(custom);
+            const c = _cacheCatalogo;
+            if (c.lista && c.diario === diarioImport && c.n04 === cat04.length && c.nCustom === custom.length) return c.lista;
+            const mapa = new Map();
+            pcgeCatalog.forEach(a => { if (a && a.codigo && !mapa.has(a.codigo)) mapa.set(a.codigo, a); });
+            cat04.forEach(a => { if (a && a.codigo && !mapa.has(a.codigo)) mapa.set(a.codigo, a); });
+            custom.forEach(a => { if (a && a.codigo && !mapa.has(a.codigo)) mapa.set(a.codigo, a); });
+            _cacheCatalogo = { diario: diarioImport, n04: cat04.length, nCustom: custom.length, lista: Array.from(mapa.values()), mapa };
+            return _cacheCatalogo.lista;
         }
-        function getAccount(codigo) { return getAllAccounts().find(a => a.codigo === codigo); }
-        function getAccountName(codigo) { const f = getAccount(codigo); return f ? f.nombre : 'Cuenta No Catalogada'; }
-        function getAccountGrupo(codigo) { const f = getAccount(codigo); return f ? f.grupo : null; }
+        function getAccount(codigo) { getAllAccounts(); return _cacheCatalogo.mapa.get(codigo); }
+        function getAccountName(codigo) {
+            const f = getAccount(codigo);
+            if (f) return f.nombre;
+            const s = String(codigo || '');
+            for (let n = s.length - 1; n >= 2; n--) { const p = getAccount(s.slice(0, n)); if (p) return `${p.nombre} (subcuenta de ${p.codigo})`; }
+            return 'Cuenta No Catalogada';
+        }
+        // Grupo de la cuenta; si una subcuenta no está en el catálogo, se toma el de su cuenta madre más cercana
+        // (60112 → 6011 → 601 → 60), así una subcuenta nueva nunca desaparece de los estados financieros.
+        function getAccountGrupo(codigo) {
+            const f = getAccount(codigo);
+            if (f) return f.grupo || null;
+            const s = String(codigo || '');
+            for (let n = s.length - 1; n >= 2; n--) { const p = getAccount(s.slice(0, n)); if (p && p.grupo) return p.grupo; }
+            return null;
+        }
 
         function extractCode(raw) { return (raw || '').split(' - ')[0].trim(); }
 
@@ -1441,6 +1467,14 @@ const MypecarPEVista = (function () {
             return getMovimientosPorCuentaRango(periodo, periodo);
         }
 
+        // Centro de costo con más monto entre los movimientos de una cuenta (o null si ninguno tiene CC).
+        function ccHabitualDeCuenta(m) {
+            const pesos = {};
+            (m.movimientos || []).forEach(mv => { if (['90', '94', '95', '97'].includes(mv.cc)) pesos[mv.cc] = (pesos[mv.cc] || 0) + Math.abs((mv.debe || 0) - (mv.haber || 0)); });
+            const ccs = Object.keys(pesos);
+            return ccs.length ? ccs.reduce((a, b) => (pesos[b] > pesos[a] ? b : a)) : null;
+        }
+
         function calcularEstadoResultados(mov) {
             const porCC = { '90': 0, '94': 0, '95': 0, '97': 0, 'sin_cc': 0 };
             let totalIngresos = 0, totalDescuentosIngresos = 0;
@@ -1455,7 +1489,10 @@ const MypecarPEVista = (function () {
                     else totalIngresos += netoCredito;
                 } else if (grupo === 'gasto') {
                     m.movimientos.forEach(mv => {
-                        const cc = mv.cc && porCC.hasOwnProperty(mv.cc) ? mv.cc : 'sin_cc';
+                        // (2026-11-24) Una línea sin centro de costo (ej. el abono a la 60 en el cierre de existencias) toma el
+                        // centro de costo habitual de esa misma cuenta; así el costo de ventas no se infla con la compra y
+                        // "Otros gastos sin CC" no queda negativo.
+                        const cc = mv.cc && porCC.hasOwnProperty(mv.cc) ? mv.cc : (ccHabitualDeCuenta(m) || 'sin_cc');
                         porCC[cc] += (mv.debe - mv.haber);
                     });
                 }
@@ -1480,7 +1517,9 @@ const MypecarPEVista = (function () {
 
             Object.keys(mov).forEach(cta => {
                 const grupo = getAccountGrupo(cta);
-                if (!grupo || grupo === 'gasto' || grupo === 'ingreso') return;
+                // (2026-11-24) Solo cuentas de balance: se excluyen gastos e ingresos y también la Clase 9 (gasto por función)
+                // y la 791 (enlace), que antes hacían caer la Situación Financiera ("Cannot read properties of undefined").
+                if (!grupo || !Object.prototype.hasOwnProperty.call(grupos, grupo)) return;
                 const neto = mov[cta].debe - mov[cta].haber;
                 if (grupo === 'activo_corriente' || grupo === 'activo_no_corriente') {
                     grupos[grupo] += neto;

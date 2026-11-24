@@ -6632,6 +6632,14 @@ function mensajeCuentaNoImputable(codigo, origen) {
         // ==================================================================
         // ESTADO DE RESULTADOS
         // ==================================================================
+        // Centro de costo con más monto entre los movimientos de una cuenta (o null si ninguno tiene CC).
+        function ccHabitualDeCuenta(m) {
+            const pesos = {};
+            (m.movimientos || []).forEach(mv => { if (['90', '94', '95', '97'].includes(mv.cc)) pesos[mv.cc] = (pesos[mv.cc] || 0) + Math.abs((mv.debe || 0) - (mv.haber || 0)); });
+            const ccs = Object.keys(pesos);
+            return ccs.length ? ccs.reduce((a, b) => (pesos[b] > pesos[a] ? b : a)) : null;
+        }
+
         function calcularEstadoResultados(mov) {
             const porCC = { '90': 0, '94': 0, '95': 0, '97': 0, 'sin_cc': 0 };
             let totalIngresos = 0, totalDescuentosIngresos = 0;
@@ -6647,7 +6655,10 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 } else if (grupo === 'gasto') {
                     const netoDebito = m.debe - m.haber;
                     m.movimientos.forEach(mv => {
-                        const cc = mv.cc && porCC.hasOwnProperty(mv.cc) ? mv.cc : 'sin_cc';
+                        // (2026-11-24) Una línea sin centro de costo (ej. el abono a la 60 en el cierre de existencias) toma el
+                        // centro de costo habitual de esa misma cuenta; así el costo de ventas no se infla con la compra y
+                        // "Otros gastos sin CC" no queda negativo.
+                        const cc = mv.cc && porCC.hasOwnProperty(mv.cc) ? mv.cc : (ccHabitualDeCuenta(m) || 'sin_cc');
                         porCC[cc] += (mv.debe - mv.haber);
                     });
                 }
