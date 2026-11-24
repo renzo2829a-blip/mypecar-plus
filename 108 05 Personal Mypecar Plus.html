@@ -231,6 +231,10 @@
                                 <option value="micro">MYPE - Microempresa</option>
                             </select>
                             <p class="text-[10px] text-slate-400 mt-1">Por defecto toma el de Ajustes; puedes cambiarlo por trabajador si aplica.</p>
+                            <label class="mt-2 flex items-start gap-2 text-[11px] text-slate-600">
+                                <input type="checkbox" id="trab-sis" class="rounded mt-0.5">
+                                <span><b>Asegurado al SIS</b> (solo Microempresa): si está marcado, el empleador <b>no paga EsSalud 9%</b> por este trabajador.</span>
+                            </label>
                         </div>
                         <div>
                             <label class="block font-semibold text-slate-600 mb-1">Sistema de Pensión</label>
@@ -1769,6 +1773,7 @@
                     sueldoBasico: parseFloat(document.getElementById('trab-sueldo-basico').value) || 0,
                     tieneHijos: document.getElementById('trab-tiene-hijos').checked,
                     regimenLaboral: document.getElementById('trab-regimen').value,
+                    seguroSis: document.getElementById('trab-regimen').value === 'micro' && document.getElementById('trab-sis').checked,
                     sistemaPension: document.getElementById('trab-sistema-pension').value,
                     afp: document.getElementById('trab-afp').value,
                     afpEsquema: document.getElementById('trab-afp-esquema').value,
@@ -1856,6 +1861,7 @@
             document.getElementById('trab-sueldo-basico').value = t.sueldoBasico;
             document.getElementById('trab-tiene-hijos').checked = t.tieneHijos;
             document.getElementById('trab-regimen').value = t.regimenLaboral;
+            document.getElementById('trab-sis').checked = !!t.seguroSis && t.regimenLaboral === 'micro';
             document.getElementById('trab-sistema-pension').value = t.sistemaPension;
             document.getElementById('trab-afp').value = t.afp || 'integra';
             document.getElementById('trab-afp-esquema').value = t.afpEsquema || 'mixta';
@@ -1876,6 +1882,7 @@
             document.getElementById('form-trabajador').reset();
             document.getElementById('trab-id').value = '';
             document.getElementById('trab-regimen').value = config.regimenLaboralDefault;
+            document.getElementById('trab-sis').checked = false;
             document.getElementById('ficha-form-titulo').innerText = 'Nuevo Trabajador';
             document.getElementById('btn-cancelar-trabajador').classList.add('hidden');
             onSistemaPensionChange();
@@ -2535,7 +2542,9 @@
             // otros ingresos (que SÍ son remunerativos) y no respetaba la base mínima.
             const baseMinimaEssalud = dias > 0 ? (config.rmv || 0) * dias / 30 : 0;
             const baseEssalud = dias > 0 ? Math.max(baseAportes, baseMinimaEssalud) : 0;
-            const essaludPatronal = baseEssalud * 0.09;
+            // (2026-11-24) Microempresa con el trabajador asegurado al SIS: el empleador no paga EsSalud 9%.
+            const sinEssalud = trabajador.regimenLaboral === 'micro' && !!trabajador.seguroSis;
+            const essaludPatronal = sinEssalud ? 0 : baseEssalud * 0.09;
 
             // Gasto de remuneraciones del mes (62111) y costo total para el empleador
             const gastoRemuneraciones = totalIngresos - tardanzas;
@@ -4003,7 +4012,7 @@
                         </div>
                     </div>
                     <div class="px-6 py-3 text-[10px] text-slate-400 border-t border-slate-100">
-                        Aporte del empleador a EsSalud 9% (informativo, no descontado al trabajador): S/ ${c.essaludPatronal.toFixed(2)} sobre base S/ ${c.baseEssalud.toFixed(2)}
+                        ${t.regimenLaboral === 'micro' && t.seguroSis ? 'Microempresa con trabajador asegurado al SIS: el empleador no paga EsSalud 9%.' : `Aporte del empleador a EsSalud 9% (informativo, no descontado al trabajador): S/ ${c.essaludPatronal.toFixed(2)} sobre base S/ ${c.baseEssalud.toFixed(2)}`}
                     </div>
                 </div>`;
             }).join('');
