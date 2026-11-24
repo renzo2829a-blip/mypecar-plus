@@ -1719,6 +1719,7 @@ var LZString = {
         // la intención local vigente. Mismo aislamiento por empresa que arriba.
         const borradoEnCola = borradosDeEstaApp().some(p => (typeof p === 'string' ? p === fila.clave : (p.clave === fila.clave && (p.empresaId || empresaId) === empresaId)));
         if (borradoEnCola) { conflictos.push({ clave: fila.clave, motivo: 'borrado local pendiente de confirmar' }); return; }
+        guardarBase(empresaId, fila.clave, fila.actualizado_en); // (2026-11-24) versión de la nube que este equipo ya vio
         // Ver MARCADOR_VALOR_NULO/push() arriba: si lo que bajó de la nube es
         // ese marcador, se vuelve a convertir en `null` — para el código de
         // cada app, es exactamente como si nunca se hubiera subido nada.
@@ -2181,8 +2182,76 @@ var LZString = {
   // tanto para empezar.
   const TAMANO_LOTE_SUBIDA = 15;
 
+  // =========================================================================
+  // NO PISAR LO QUE OTRA PERSONA GUARDÓ (2026-11-24)
+  // =========================================================================
+  // Cada mes de cada módulo es una clave de app_config. Si dos personas (o dos equipos) abrían el mismo mes y
+  // las dos guardaban, la segunda SOBREESCRIBÍA a la primera sin avisar. Ahora este equipo recuerda cuál era la
+  // versión de la nube cuando la descargó o la subió por última vez ("base"). Antes de subir, pregunta a la
+  // nube cuál es la versión actual: si es MÁS NUEVA que la base, alguien más guardó en el medio -> no se sube
+  // nada de esa clave, se muestra el aviso "otro usuario modificó esto" y se obliga a recargar antes de seguir.
+  // Los cambios sin guardar de esa clave se pueden descargar a un archivo antes de recargar.
+  const VERSIONES_KEY = 'mypecar_versiones_nube';
+  let conflictoActivo = null; // { empresaId, claves: [] }
+  function claveVersion(empresaId, clave) { return empresaId + '|' + (currentApp || '') + '|' + clave; }
+  function leerBase(empresaId, clave) {
+    const m = lsGet(VERSIONES_KEY, {});
+    return (m && typeof m === 'object' && m[claveVersion(empresaId, clave)]) || null;
+  }
+  function guardarBase(empresaId, clave, actualizadoEn) {
+    if (!empresaId || !clave || !actualizadoEn) return;
+    const m = lsGet(VERSIONES_KEY, {});
+    const obj = (m && typeof m === 'object') ? m : {};
+    obj[claveVersion(empresaId, clave)] = actualizadoEn;
+    lsSet(VERSIONES_KEY, obj);
+  }
+  // Solo se protege cada MES de cada módulo (clave "..._periods__AAAA-MM"), que es donde se registra el trabajo del
+  // día. La configuración, las listas auxiliares, la bitácora y la papelera se guardan solas al abrir un módulo, y
+  // protegerlas daría avisos falsos de "otro usuario".
+  function esClaveProtegida(clave) { return /_periods__\d{4}-\d{2}$/.test(String(clave || '')); }
+  function tiempoDe(v) { const t = v ? Date.parse(v) : NaN; return isNaN(t) ? 0 : t; }
+
+  function mostrarAvisoConflicto(empresaId, claves) {
+    conflictoActivo = { empresaId, claves: claves.slice() };
+    if (document.getElementById('mps-conflicto-edicion')) return;
+    const ov = document.createElement('div');
+    ov.id = 'mps-conflicto-edicion';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Manrope,Segoe UI,system-ui,sans-serif';
+    ov.innerHTML = '<div style="background:#fff;border-radius:18px;max-width:460px;width:100%;padding:22px 22px 18px;box-shadow:0 20px 60px rgba(0,0,0,.35)">' +
+      '<div style="font-size:19px;font-weight:800;color:#0f172a;margin-bottom:8px">⚠ Otro usuario está editando esto</div>' +
+      '<p style="font-size:14.5px;line-height:1.5;color:#334155;margin:0 0 10px">Alguien más guardó cambios en este mismo mes mientras tú trabajabas. Para no pisar su trabajo, <b>no se guardó nada de lo tuyo</b> en ese mes.</p>' +
+      '<p style="font-size:14.5px;line-height:1.5;color:#334155;margin:0 0 14px">Debes <b>recargar</b> para ver lo último y volver a registrar lo que te falte. Si quieres conservar lo que hiciste, descárgalo antes.</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
+      '<button id="mps-conf-descargar" style="flex:1;min-width:150px;border:1px solid #0b5d52;background:#fff;color:#0b5d52;border-radius:12px;padding:11px 12px;font-weight:800;font-size:14px;cursor:pointer">Descargar mis cambios</button>' +
+      '<button id="mps-conf-recargar" style="flex:1;min-width:150px;border:0;background:#0b5d52;color:#fff;border-radius:12px;padding:11px 12px;font-weight:800;font-size:14px;cursor:pointer">Recargar y ver lo último</button>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#mps-conf-descargar').onclick = function () {
+      try {
+        const copia = { tipo: 'cambios_sin_guardar_mypecar', generadoEl: new Date().toISOString(), app: currentApp, empresaId, claves: {} };
+        conflictoActivo.claves.forEach(c => { copia.claves[c] = lsGet(c, null); });
+        const blob = new Blob([JSON.stringify(copia)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'MYPECAR_cambios_sin_guardar_' + (currentApp || 'modulo') + '.json';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      } catch (e) { warn('No se pudo descargar la copia de los cambios sin guardar:', e); }
+    };
+    ov.querySelector('#mps-conf-recargar').onclick = function () {
+      try {
+        // Se descartan SOLO los pendientes de las claves en conflicto; al recargar se trae lo último de la nube.
+        const claves = conflictoActivo.claves;
+        guardarOutbox(leerOutbox().filter(i => !(claves.indexOf(i.clave) !== -1 && (i.empresaId || empresaId) === empresaId && esDeEstaApp(i))));
+        claves.forEach(c => { try { localStorage.removeItem('_meta_' + c); } catch (e) {} });
+      } catch (e) { warn('Al preparar la recarga tras un conflicto:', e); }
+      conflictoActivo = null;
+      location.reload();
+    };
+  }
+
   async function flushOutbox() {
     if (flushEnCurso) { reintentoTrasFlush = true; return { subidas: 0, motivo: 'flush-ya-en-curso' }; }
+    if (conflictoActivo) return { subidas: 0, motivo: 'conflicto-de-edicion' }; // hay que recargar primero (ver mostrarAvisoConflicto)
     if (!supabaseClient || !navigator.onLine) return { subidas: 0, motivo: 'sin-conexion-o-supabase' };
 
     const outboxInicial = outboxDeEstaApp();
@@ -2272,17 +2341,47 @@ var LZString = {
             }
             if (filas.length === 0) continue; // nada real que subir en este lote
 
-            const { error } = await supabaseClient.from('app_config').upsert(filas, { onConflict: 'empresa_id,app,clave' });
+            // NO PISAR (2026-11-24): si la nube tiene una versión MÁS NUEVA que la que este equipo descargó/subió por
+            // última vez, otra persona guardó en el medio -> no se sube esa clave y se avisa.
+            let enConflicto = [];
+            try {
+              const protegidas = filas.map(f => f.clave).filter(esClaveProtegida);
+              const { data: remotas, error: errRem } = protegidas.length === 0 ? { data: [], error: null } : await supabaseClient.from('app_config')
+                .select('clave, actualizado_en').eq('empresa_id', empresaId).eq('app', currentApp)
+                .in('clave', protegidas);
+              if (errRem) throw errRem;
+              (remotas || []).forEach(r => {
+                const base = leerBase(empresaId, r.clave);
+                if (!base || tiempoDe(r.actualizado_en) > tiempoDe(base)) enConflicto.push(r.clave);
+              });
+            } catch (eVer) {
+              // Si no se pudo comprobar, NO se arriesga a pisar: el lote se queda en la cola para el próximo intento.
+              warn('No se pudo verificar la versión de la nube antes de subir (se reintentará):', eVer && eVer.message);
+              setUltimoError('No se pudo verificar la versión de la nube: ' + String((eVer && eVer.message) || eVer));
+              continue;
+            }
+            if (enConflicto.length) {
+              warn('Conflicto de edición: otra persona guardó antes estas claves:', enConflicto);
+              mostrarAvisoConflicto(empresaId, enConflicto);
+              const sinConflicto = filas.filter(f => enConflicto.indexOf(f.clave) === -1);
+              if (sinConflicto.length === 0) continue;
+              filas.length = 0; sinConflicto.forEach(f => filas.push(f));
+            }
+
+            const { data: guardadas, error } = await supabaseClient.from('app_config')
+              .upsert(filas, { onConflict: 'empresa_id,app,clave' }).select('clave, actualizado_en');
             if (error) {
               warn('No se pudo subir un lote de', filas.length, 'clave(s) de la empresa', empresaId, ':', error.message);
               setUltimoError(error.message);
             } else {
               subidas += filas.length;
+              (guardadas || []).forEach(g => guardarBase(empresaId, g.clave, g.actualizado_en));
               // Se quita del outbox SOLO lo que este lote de verdad subió -- se
               // relee el outbox actual (por si en paralelo se encoló algo
               // nuevo, p.ej. otra pestaña o el propio reintento automático) y
               // se identifica cada fila del lote por clave+seq, igual que antes.
-              const idsSubidos = new Set(filasConValor.map(({ item }) => item.clave + '::' + item.seq));
+              const clavesSubidas = new Set(filas.map(f => f.clave));
+              const idsSubidos = new Set(filasConValor.filter(({ item }) => clavesSubidas.has(item.clave)).map(({ item }) => item.clave + '::' + item.seq));
               const outboxActual = leerOutbox();
               const restante = outboxActual.filter(i => !idsSubidos.has(i.clave + '::' + i.seq));
               guardarOutbox(restante);
