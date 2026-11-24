@@ -815,11 +815,6 @@
                             <button type="button" onclick="verificarRucEnSunat('set-ruc')" title="Abre la consulta oficial de RUC en SUNAT en una pestaña nueva" class="shrink-0 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3 rounded-lg transition-all"><i class="fa-solid fa-magnifying-glass"></i></button>
                         </div>
                     </div>
-                    <div>
-                        <label class="block font-semibold text-slate-600 mb-1 flex items-center gap-1.5"><i class="fa-solid fa-stamp text-amber-500"></i> Licenciado a (marca de agua)</label>
-                        <input type="text" id="set-licenciado-a" placeholder="Ej. Estudio Contable Torres & Asociados" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-rose-500 focus:border-rose-500">
-                        <p class="text-[10px] text-slate-400 mt-1">Si este archivo fue entregado bajo licencia, escribe aquí el nombre del cliente/estudio.</p>
-                    </div>
                     <div class="border-t pt-4">
                         <label class="block font-semibold text-slate-600 mb-1 flex items-center gap-1.5"><i class="fa-solid fa-triangle-exclamation text-red-500"></i> Límite de Bancarización (Ley N° 28194)</label>
                         <div class="grid grid-cols-2 gap-3">
@@ -1049,7 +1044,6 @@
             importarContado: false,           // (2026-11-24) traer ventas al contado de 01 como ingresos de solo lectura
             limiteBancarizacionSoles: 2000,   // Ley N° 28194 - Ley de Bancarización (monto vigente, puede cambiar)
             limiteBancarizacionUSD: 500,
-            licenciadoA: '',  // nombre del cliente/estudio licenciado (marca de agua)
             usuarioActivo: '',           // nombre de quien está usando el sistema (trazabilidad)
             ultimoRespaldoFecha: null    // fecha ISO del último export de respaldo
         };
@@ -1682,7 +1676,6 @@
                         if (configEnBlanco || configDeOtraEmpresa) {
                             if (configDeOtraEmpresa) {
                                 console.warn('[MYPECAR] La configuración guardada era de otra empresa (RUC ' + rucLocal + '); se corrige con los datos oficiales de la empresa activa (RUC ' + rucNube + ').');
-                                config.licenciadoA = '';
                                 config.logoBase64 = '';
                             }
                             config.ruc = datosEmpresa.ruc || '';
@@ -1817,19 +1810,10 @@
 
         // Marca de agua discreta y persistente en pantalla (identifica la licencia autorizada).
         function aplicarMarcaDeAgua() {
-            let barra = document.getElementById('marca-agua-licencia');
-            if (!config.licenciadoA) {
-                if (barra) barra.remove();
-            } else {
-                if (!barra) {
-                    barra = document.createElement('div');
-                    barra.id = 'marca-agua-licencia';
-                    barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0F172A;color:#94A3B8;font-size:10px;text-align:center;padding:3px 8px;font-family:Arial,sans-serif;';
-                    document.body.appendChild(barra);
-                    document.body.style.paddingBottom = '20px';
-                }
-                barra.innerText = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros`;
-            }
+            // (2026-11-24) "Licenciado a" se retiró: la protección real es el inicio de sesión y la licencia por empresa en Supabase.
+            // Esta función queda solo para quitar la franja si algún navegador la tenía de antes.
+            const barra = document.getElementById('marca-agua-licencia');
+            if (barra) { barra.remove(); document.body.style.paddingBottom = ''; }
         }
 
         // Sello discreto "hecho con MYPECAR CONTABLE" — a diferencia de la barra de
@@ -1841,7 +1825,7 @@
             if (document.getElementById('sello-mypecar')) return;
             const sello = document.createElement('div');
             sello.id = 'sello-mypecar';
-            sello.style.cssText = 'position:fixed;bottom:' + (config.licenciadoA ? '26px' : '8px') + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
+            sello.style.cssText = 'position:fixed;bottom:' + '8px' + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
             sello.innerHTML = '<img src="data:image/png;base64,' + MYPECAR_ICONO_B64 + '" style="height:14px;width:auto;display:block;" alt="MYPECAR CONTABLE">';
             document.body.appendChild(sello);
         }
@@ -1991,8 +1975,6 @@
             if (setLimiteSoles) setLimiteSoles.value = (config.limiteBancarizacionSoles != null) ? config.limiteBancarizacionSoles : 2000;
             const setLimiteUSD = document.getElementById('set-limite-bancarizacion-usd');
             if (setLimiteUSD) setLimiteUSD.value = (config.limiteBancarizacionUSD != null) ? config.limiteBancarizacionUSD : 500;
-            const licInput = document.getElementById('set-licenciado-a');
-            if (licInput) licInput.value = config.licenciadoA || '';
             const txtEmpresaVaciar = document.getElementById('txt-empresa-actual-vaciar');
             if (txtEmpresaVaciar) txtEmpresaVaciar.innerText = `${config.nombreComercial} - RUC ${config.ruc}`;
             const txtPeriodo = formatPeriodoLabel(config.periodoActivo);
@@ -2223,8 +2205,6 @@
             if (limiteSolesInput) config.limiteBancarizacionSoles = parseFloat(limiteSolesInput.value) || 2000;
             const limiteUSDInput = document.getElementById('set-limite-bancarizacion-usd');
             if (limiteUSDInput) config.limiteBancarizacionUSD = parseFloat(limiteUSDInput.value) || 500;
-            const licInput = document.getElementById('set-licenciado-a');
-            if (licInput) config.licenciadoA = licInput.value.trim();
             const grInput = document.getElementById('set-gr-al-diario');
             if (grInput) { config.gastosReparadosAlDiario = !!grInput.checked; if (grInput.checked) asegurarCuentaGastoReparado(); }
             await storageSet('cajabancos_config', config);

@@ -1053,10 +1053,6 @@
                     <label class="block font-semibold text-slate-600 mb-1 text-xs">RUC</label>
                     <input type="text" id="set-ruc" maxlength="11" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
                 </div>
-                <div>
-                    <label class="block font-semibold text-slate-600 mb-1 text-xs flex items-center gap-1.5"><i class="fa-solid fa-stamp text-amber-500"></i> Licenciado a (marca de agua)</label>
-                    <input type="text" id="set-licenciado-a" placeholder="Ej. Estudio Contable Torres & Asociados" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
-                </div>
 
                 <div class="border-t pt-4">
                     <h4 class="font-bold text-slate-800 flex items-center gap-2 mb-2 text-sm"><i class="fa-solid fa-diagram-project text-teal-600"></i> Destinos por Cuenta (Clase 9)</h4>
@@ -1640,7 +1636,6 @@
                 profuturo: { comisionFlujo: 1.69, prima: 1.37 },
                 habitat: { comisionFlujo: 1.47, prima: 1.37 }
             },
-            licenciadoA: '',  // nombre del cliente/estudio licenciado (marca de agua)
             // Destino (Clase 9) por defecto de cada cuenta de gasto de planilla — editable en
             // Ajustes. Genera automáticamente el asiento de reclasificación 6 → 79 → 9 al exportar.
             destinosPorCuenta: {
@@ -2038,12 +2033,6 @@
             ws.mergeCells(row, 1, row, numCols);
             ws.getCell(row, 1).value = `Generado automáticamente desde MYPECAR CONTABLE — ${(config.nombreComercial || config.razonSocial || '').trim()}.`;
             ws.getCell(row, 1).font = { italic: true, size: 8, color: { argb: 'FF94A3B8' } };
-            if (config.licenciadoA) {
-                row++;
-                ws.mergeCells(row, 1, row, numCols);
-                ws.getCell(row, 1).value = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros.`;
-                ws.getCell(row, 1).font = { italic: true, size: 8, bold: true, color: { argb: 'FF64748B' } };
-            }
         }
 
         // ==================================================================
@@ -4615,8 +4604,6 @@
             document.getElementById('set-onp-tasa').value = config.onpTasa;
             document.getElementById('set-afp-tope').value = config.afpTope;
             { const e = document.getElementById('set-afp-tope-estado'); if (e) { const d = diasDesdeConfirmacionTopeAfp(); e.innerHTML = d === null ? '<b class="text-rose-600">⚠ Sin confirmar:</b> la SBS actualiza este tope cada trimestre. Verifícalo en sbs.gob.pe y pulsa Guardar Ajustes para confirmarlo.' : `Confirmado el ${config.afpTopeFecha} (hace ${d} días). La SBS lo actualiza cada trimestre.`; } }
-            const licInput = document.getElementById('set-licenciado-a');
-            if (licInput) licInput.value = config.licenciadoA || '';
             renderAfpTasasInputs();
             renderDestinosPorCuenta();
             document.getElementById('set-tasa-retencion-4ta').value = config.tasaRetencion4ta != null ? config.tasaRetencion4ta : 8;
@@ -4692,8 +4679,6 @@
                 config.afpTasas[key].comisionFlujo = parseFloat(document.getElementById(`afp-comision-${key}`).value) || 0;
                 config.afpTasas[key].prima = parseFloat(document.getElementById(`afp-prima-${key}`).value) || 0;
             });
-            const licInput = document.getElementById('set-licenciado-a');
-            if (licInput) config.licenciadoA = licInput.value.trim();
             config.tasaRetencion4ta = parseFloat(document.getElementById('set-tasa-retencion-4ta').value);
             if (isNaN(config.tasaRetencion4ta)) config.tasaRetencion4ta = 8;
             config.umbralRetencion4ta = parseFloat(document.getElementById('set-umbral-retencion-4ta').value);
@@ -5408,7 +5393,6 @@
                         if (configEnBlanco || configDeOtraEmpresa) {
                             if (configDeOtraEmpresa) {
                                 console.warn('[MYPECAR] La configuración guardada era de otra empresa (RUC ' + rucLocal + '); se corrige con los datos oficiales de la empresa activa (RUC ' + rucNube + ').');
-                                config.licenciadoA = '';
                                 config.logoBase64 = '';
                             }
                             config.ruc = datosEmpresa.ruc || '';
@@ -5574,19 +5558,10 @@
 
         // Marca de agua discreta y persistente en pantalla (identifica la licencia autorizada).
         function aplicarMarcaDeAgua() {
-            let barra = document.getElementById('marca-agua-licencia');
-            if (!config.licenciadoA) {
-                if (barra) barra.remove();
-            } else {
-                if (!barra) {
-                    barra = document.createElement('div');
-                    barra.id = 'marca-agua-licencia';
-                    barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0F172A;color:#94A3B8;font-size:10px;text-align:center;padding:3px 8px;font-family:Arial,sans-serif;';
-                    document.body.appendChild(barra);
-                    document.body.style.paddingBottom = '20px';
-                }
-                barra.innerText = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros`;
-            }
+            // (2026-11-24) "Licenciado a" se retiró: la protección real es el inicio de sesión y la licencia por empresa en Supabase.
+            // Esta función queda solo para quitar la franja si algún navegador la tenía de antes.
+            const barra = document.getElementById('marca-agua-licencia');
+            if (barra) { barra.remove(); document.body.style.paddingBottom = ''; }
         }
 
         // Sello discreto "hecho con MYPECAR CONTABLE" — a diferencia de la barra de
@@ -5598,7 +5573,7 @@
             if (document.getElementById('sello-mypecar')) return;
             const sello = document.createElement('div');
             sello.id = 'sello-mypecar';
-            sello.style.cssText = 'position:fixed;bottom:' + (config.licenciadoA ? '26px' : '8px') + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
+            sello.style.cssText = 'position:fixed;bottom:' + '8px' + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
             sello.innerHTML = '<img src="data:image/png;base64,' + MYPECAR_ICONO_B64 + '" style="height:14px;width:auto;display:block;" alt="MYPECAR CONTABLE">';
             document.body.appendChild(sello);
         }
