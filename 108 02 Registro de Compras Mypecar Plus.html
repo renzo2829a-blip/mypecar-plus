@@ -1410,7 +1410,7 @@
             return (c.cuentas || []).filter(l => l.sujetoInventario && l.productoCodigo && l.cantidad > 0).filter(l => {
                 const p = getProducto(l.productoCodigo); return !(p && p.controlaStock === false);
             }).map(l => ({
-                fecha: c.fechaEmision, tipo: 'entrada', origen: 'compra', compraId: c.id, compraPeriodo: periodo,
+                fecha: c.fechaEmision, tipo: c.tipoDoc === '07' ? 'salida' : 'entrada', origen: 'compra', compraId: c.id, compraPeriodo: periodo,
                 comprobante: `${c.tipoDoc} ${c.serie}-${c.numero}`,
                 puntoVenta: c.puntoVenta || ((config.puntosVenta && config.puntosVenta[0]) ? config.puntosVenta[0].codigo : 'PV1'),
                 productoCodigo: l.productoCodigo, productoNombre: l.productoNombre, cuenta: l.cuenta || '',
@@ -1420,10 +1420,39 @@
         }
         // Reparación automática: si un guardado se cortó a la mitad y una compra con productos de inventario quedó SIN sus
         // movimientos de entrada, se regeneran desde la propia compra. Nunca borra.
+        // (2026-11-24) Notas de Crédito ANTIGUAS cuyo movimiento de stock quedó al revés. NO se corrigen solas: si alguien ya
+        // compensó la diferencia a mano (por ejemplo con un Ajuste Manual en 09 Inventario), corregirlas otra vez duplicaría el
+        // arreglo. Se muestra un aviso para que el dueño decida, NC por NC: "Corregir" (invierte solo ese movimiento) o
+        // "Ya lo corregí a mano" (lo marca como revisado y no vuelve a preguntar). Nada se cambia sin esa decisión.
+        function avisoNcAntiguasAlReves(lista, alDecidir) {
+            if (!lista.length || document.getElementById('mps-nc-alreves')) return;
+            const caja = document.createElement('div');
+            caja.id = 'mps-nc-alreves';
+            caja.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:2147480000;max-width:820px;margin:0 auto;background:#fff7ed;border:1px solid #f97316;border-radius:14px;padding:12px 14px;font:600 13.5px Manrope,system-ui,sans-serif;color:#7c2d12;box-shadow:0 10px 30px rgba(0,0,0,.25);max-height:60vh;overflow:auto';
+            const pintar = () => {
+                const pend = lista.filter(x => !x.decidido);
+                if (!pend.length) { caja.remove(); return; }
+                caja.innerHTML = '<div style="font-weight:800;margin-bottom:6px">⚠ Notas de Crédito antiguas con el stock al revés (' + pend.length + ')</div>' +
+                    '<div style="font-weight:500;margin-bottom:8px">Se registraron antes de una corrección del sistema: movieron el stock en sentido contrario. Si ya lo arreglaste a mano (por ejemplo con un Ajuste Manual en Inventario), elige <b>Ya lo corregí a mano</b> para no duplicar.</div>' +
+                    pend.map((x, i) => '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid #fed7aa;padding:6px 0">' +
+                        '<span>' + x.texto + '</span><span style="display:flex;gap:6px">' +
+                        '<button data-i="' + lista.indexOf(x) + '" data-a="corregir" style="border:0;background:#0b5d52;color:#fff;border-radius:9px;padding:6px 10px;font-weight:800;cursor:pointer">Corregir</button>' +
+                        '<button data-i="' + lista.indexOf(x) + '" data-a="manual" style="border:1px solid #b45309;background:#fff;color:#7c2d12;border-radius:9px;padding:6px 10px;font-weight:800;cursor:pointer">Ya lo corregí a mano</button></span></div>').join('');
+                caja.querySelectorAll('button').forEach(b => b.onclick = async () => {
+                    const x = lista[+b.dataset.i];
+                    x.decidido = true;
+                    await alDecidir(x, b.dataset.a === 'corregir');
+                    pintar();
+                });
+            };
+            document.body.appendChild(caja);
+            pintar();
+        }
         async function reconciliarMovimientosCompras() {
             try {
                 if (!periodsData || !Object.keys(periodsData).length || !Array.isArray(stockMovimientos)) return 0;
                 let reparadas = 0, etiquetadas = 0;
+                const ncAlReves = [];
                 Object.keys(periodsData).forEach(per => {
                     const lista = (per === config.periodoActivo ? purchases : (periodsData[per] && periodsData[per].purchases)) || [];
                     lista.forEach(c => {
@@ -1431,6 +1460,8 @@
                         if (!esperados.length) return;
                         const existentes = stockMovimientos.filter(m => movEsDeCompra(m, c, per));
                         existentes.forEach(m => { if (!m.compraPeriodo) { m.compraPeriodo = per; etiquetadas++; } });
+                        // (2026-11-24) NC antiguas con el movimiento al revés: NO se tocan aquí; se listan para que el dueño decida.
+                        if (c.tipoDoc === '07') existentes.forEach(m => { if (m.tipo === 'entrada' && !m.ncRevisada) ncAlReves.push({ m, texto: `${c.tipoDoc} ${c.serie}-${c.numero} (${formatPeriodoLabel(per)}): ${m.cantidad} ${m.unidad || ''} de ${m.productoNombre || m.productoCodigo} — hoy suma al stock, debería restar` }); });
                         if (existentes.length >= esperados.length) return;
                         stockMovimientos = stockMovimientos.filter(m => !movEsDeCompra(m, c, per));
                         esperados.forEach(e => { e.id = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1; stockMovimientos.push(e); });
@@ -1441,6 +1472,12 @@
                     localStorage.setItem('comprapollo_stock_movimientos', JSON.stringify(stockMovimientos));
                     if (reparadas) console.warn(`Se repararon los movimientos de inventario de ${reparadas} compra(s) que habían quedado sin ellos.`);
                 }
+                avisoNcAntiguasAlReves(ncAlReves, async (x, corregir) => {
+                    if (corregir) x.m.tipo = 'salida';
+                    x.m.ncRevisada = true; // decidido: no se vuelve a preguntar ni a tocar
+                    registrarBitacora('editar', 'inventario', `NC antigua ${x.texto.split(':')[0]}: ${corregir ? 'movimiento corregido a salida' : 'marcada como ya corregida a mano'}`);
+                    localStorage.setItem('comprapollo_stock_movimientos', JSON.stringify(stockMovimientos));
+                });
                 return reparadas;
             } catch (e) { console.warn('No se pudo revisar la coherencia compras / inventario:', e); return 0; }
         }
@@ -4849,7 +4886,8 @@
                 if (producto && producto.controlaStock === false) return;
                 const nextMovId = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1;
                 stockMovimientos.push({
-                    id: nextMovId, fecha: fechaEmision, tipo: 'entrada', origen: 'compra',
+                    // (2026-11-24) Una Nota de Crédito (07) del proveedor es una DEVOLUCIÓN: el producto sale del almacén.
+                    id: nextMovId, fecha: fechaEmision, tipo: tipoDoc === '07' ? 'salida' : 'entrada', origen: 'compra',
                     compraId: compraIdFinal, compraPeriodo: config.periodoActivo, comprobante: `${tipoDoc} ${serie}-${numero}`,
                     puntoVenta, productoCodigo: c.productoCodigo, productoNombre: c.productoNombre,
                     cuenta: c.cuenta || '', // (2026-10-11) para el Grupo contable automático en 09 Inventario
@@ -6981,14 +7019,45 @@
         // Líneas de cuenta del comprobante (con producto/cantidad en las de cuenta 60).
         // Devuelve { lineas|null, pendiente }. `lineas` es null cuando no hace falta nada nuevo
         // (el comprobante se importa exactamente como antes).
+
+        // (2026-11-24) Lee un monto importado de Excel/CSV aunque venga como TEXTO: "1,234.50", "1.234,50", "15,50",
+        // "S/ 1,234.50", "(1,234.50)" o "-1234.5". Devuelve null si la celda está vacía y NaN si no se puede leer
+        // (en ese caso la fila NO se importa y se avisa). Antes, parseFloat("1,234.50") daba 1.00 sin ningún aviso.
+        function numImport(v) {
+            if (v === null || v === undefined) return null;
+            if (typeof v === 'number') return isFinite(v) ? v : NaN;
+            let s = String(v).trim();
+            if (!s || s === '-') return null;
+            let neg = false;
+            if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+            s = s.replace(/\s+/g, '').replace(/^(S\/\.?|US\$|\$|PEN|USD)/i, '').replace(/(S\/\.?|PEN|USD)$/i, '');
+            if (s.startsWith('-')) { neg = !neg; s = s.slice(1); } else if (s.endsWith('-')) { neg = !neg; s = s.slice(0, -1); }
+            if (!/^[\d.,]+$/.test(s) || !/\d/.test(s)) return NaN;
+            const c = s.lastIndexOf(','), d = s.lastIndexOf('.');
+            if (c !== -1 && d !== -1) {
+                const dec = c > d ? ',' : '.', mil = dec === ',' ? '.' : ',';
+                if (s.split(dec).length > 2) return NaN;
+                s = s.split(mil).join('').replace(dec, '.');
+            } else if (c !== -1) {
+                if (/^\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '');
+                else if (s.split(',').length === 2) s = s.replace(',', '.');
+                else return NaN;
+            } else if (d !== -1 && s.split('.').length > 2) {
+                if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, ''); else return NaN;
+            }
+            const n = Number(s);
+            if (!isFinite(n)) return NaN;
+            return neg ? -n : n;
+        }
+
         function construirLineasImportacion(grupo, mapeo, ctx) {
             const usaKardex = mapeo.producto !== null || mapeo.cantidad !== null;
             if (!usaKardex || ctx.esNotaCredito) return { lineas: null, pendiente: false };
-            const num = (fila, campo) => (mapeo[campo] === null) ? NaN : parseFloat(fila[mapeo[campo]]);
+            const num = (fila, campo) => { if (mapeo[campo] === null) return NaN; const n = numImport(fila[mapeo[campo]]); return n === null ? NaN : n; };
             const items = grupo.map(fila => {
                 const categoriaFila = String(mapeo.categoria !== null ? (fila[mapeo.categoria] ?? '') : '').trim();
                 const cuenta = (categoriaFila && impState.categoriaMapeo[categoriaFila]) || ctx.cuentaPorProveedor || ctx.cuentaDefault;
-                const total = Math.abs(parseFloat(fila[mapeo.monto]) || 0);
+                const total = Math.abs(numImport(fila[mapeo.monto]) || 0);
                 const ng = Math.abs(num(fila, 'noGravado') || 0), icb = Math.abs(num(fila, 'icbper') || 0), otr = Math.abs(num(fila, 'otrosTributos') || 0);
                 const baseF = num(fila, 'base');
                 const peso = (!isNaN(baseF) && baseF !== 0) ? Math.abs(baseF) + ng + icb + otr : Math.max(0, total - ng - icb - otr) / 1.18 + ng + icb + otr;
@@ -7054,7 +7123,7 @@
                 if (producto && producto.controlaStock === false) return;
                 const nextMovId = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1;
                 stockMovimientos.push({
-                    id: nextMovId, fecha: compra.fechaEmision, tipo: 'entrada', origen: 'compra',
+                    id: nextMovId, fecha: compra.fechaEmision, tipo: compra.tipoDoc === '07' ? 'salida' : 'entrada', origen: 'compra',
                     compraId: compra.id, compraPeriodo: config.periodoActivo, comprobante: `${compra.tipoDoc} ${compra.serie}-${compra.numero}`,
                     puntoVenta: compra.puntoVenta || ((config.puntosVenta && config.puntosVenta[0]) ? config.puntosVenta[0].codigo : 'PV1'),
                     productoCodigo: c.productoCodigo, productoNombre: c.productoNombre,
@@ -7125,7 +7194,11 @@
                 let cuenta = cuentaPorCategoria || cuentaPorProveedor || cuentaDefault;
                 const origenCuenta = cuentaPorCategoria ? 'categoria' : (cuentaPorProveedor ? 'proveedor' : 'defecto');
                 const categoriaEfectiva = categoria || (proveedorRegistrado && proveedorRegistrado.categoria) || '';
-                let total = parseFloat(get('monto')) || 0;
+                const _nMonto = numImport(get('monto')), _nBaseI = numImport(get('base')), _nIgvI = numImport(get('igv'));
+                const _nNoGrav = numImport(get('noGravado')), _nIcb = numImport(get('icbper')), _nOtros = numImport(get('otrosTributos'));
+                const montosIlegibles = [['Monto', get('monto'), _nMonto], ['Base', get('base'), _nBaseI], ['IGV', get('igv'), _nIgvI], ['No gravado', get('noGravado'), _nNoGrav], ['ICBPER', get('icbper'), _nIcb], ['Otros tributos', get('otrosTributos'), _nOtros]]
+                    .filter(x => Number.isNaN(x[2])).map(x => `${x[0]} "${String(x[1]).slice(0, 25)}"`);
+                let total = Number.isFinite(_nMonto) ? _nMonto : 0;
 
                 // Prioridad: (1) columnas separadas de Serie y Número, si están mapeadas;
                 // (2) si no, el campo combinado "Serie-Número"; (3) si tampoco, el código interno.
@@ -7158,13 +7231,13 @@
                 // proveedor o no: el desglose contable siempre debe reflejar cuánto del
                 // monto es base y cuánto es IGV, aunque el crédito fiscal solo se pueda
                 // usar tributariamente cuando el comprobante tiene RUC identificable.
-                const baseImportada = parseFloat(get('base'));
-                const igvImportado = parseFloat(get('igv'));
+                const baseImportada = Number.isFinite(_nBaseI) ? _nBaseI : NaN;
+                const igvImportado = Number.isFinite(_nIgvI) ? _nIgvI : NaN;
                 // No Gravado / ICBPER / Otros: forman parte del Total pero no de la base
                 // gravada ni del IGV, así que se descuentan ANTES de desglosar base e IGV.
-                let noGravado = parseFloat(get('noGravado')) || 0;
-                let icbper = parseFloat(get('icbper')) || 0;
-                let otrosTributos = parseFloat(get('otrosTributos')) || 0;
+                let noGravado = Number.isFinite(_nNoGrav) ? _nNoGrav : 0;
+                let icbper = Number.isFinite(_nIcb) ? _nIcb : 0;
+                let otrosTributos = Number.isFinite(_nOtros) ? _nOtros : 0;
                 const totalGravadoMasIgv = total - noGravado - icbper - otrosTributos;
                 let baseGravada, igv;
                 if (!isNaN(baseImportada) && baseImportada !== 0) {
@@ -7208,7 +7281,8 @@
                 let valido = true;
                 let accionEspecial = null, compraExistenteId = null;
                 const idxExistente = existentesPorKey.get(key);
-                if (!fecha) { valido = false; nota = 'Fecha inválida o vacía'; }
+                if (montosIlegibles.length) { valido = false; nota = `No se pudo leer el monto: ${montosIlegibles.join(', ')}. Corrígelo en el archivo; esta fila no se importa.`; }
+                else if (!fecha) { valido = false; nota = 'Fecha inválida o vacía'; }
                 else if (cuenta && String(cuenta) !== CUENTA_POR_CLASIFICAR && !esCuentaImputable(String(cuenta))) { valido = false; nota = `Cuenta ${cuenta} es PRINCIPAL (tiene subdivisionarias) — corrige la cuenta del proveedor, la categoría o la cuenta por defecto`; }
                 else if (total === 0) { valido = false; nota = 'Monto en cero'; }
                 else if (!numero) { valido = false; nota = 'Sin comprobante ni código interno'; }
