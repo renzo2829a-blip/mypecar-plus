@@ -1,0 +1,2 @@
+# verify_jwt activado: Supabase rechaza de entrada toda llamada sin un token de sesión válido.
+verify_jwt = true
