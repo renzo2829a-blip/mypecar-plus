@@ -2516,9 +2516,11 @@
                 afpAporte = baseAportes * (config.afpAporte / 100);
                 afpPrima = Math.min(baseAportes, config.afpTope) * (tasas.prima / 100);
                 afpComision = trabajador.afpEsquema === 'flujo' ? baseAportes * (tasas.comisionFlujo / 100) : 0;
-                afpOnpMonto = afpAporte + afpPrima + afpComision;
+                // (2026-11-24) Cada componente a centavos: lo impreso en la boleta suma exactamente el descuento y el asiento.
+                afpAporte = round2(afpAporte); afpPrima = round2(afpPrima); afpComision = round2(afpComision);
+                afpOnpMonto = round2(afpAporte + afpPrima + afpComision);
             } else if (trabajador.sistemaPension === 'ONP') {
-                afpOnpMonto = baseAportes * (config.onpTasa / 100);
+                afpOnpMonto = round2(baseAportes * (config.onpTasa / 100));
             }
 
             const r5 = calcularRenta5taTrabajador(trabajador, p);
@@ -2539,11 +2541,12 @@
 
             // Gasto de remuneraciones del mes (62111) y costo total para el empleador
             const gastoRemuneraciones = totalIngresos - tardanzas;
-            const costoEmpleador = gastoRemuneraciones + essaludPatronal;
+            const essaludRedondeado = round2(essaludPatronal);
+            const costoEmpleador = round2(gastoRemuneraciones + essaludRedondeado);
 
             return { dias, sueldoMensual, sueldoBasico, horasExtra25, horasExtra35, valorHoraOrdinaria, montoHorasExtra25, montoHorasExtra35, horasExtras, bonificaciones, asignacionFamiliar, otrosIngresos, totalIngresos,
                 rentaQuinta, afpOnpMonto, afpAporte, afpPrima, afpComision, adelantos, prestamos, tardanzas, otrosDescuentos, totalDescuentos, netoPagar,
-                remuneracionComputable, baseAportes, baseEssalud, essaludPatronal, gastoRemuneraciones, costoEmpleador,
+                remuneracionComputable, baseAportes, baseEssalud, essaludPatronal: essaludRedondeado, gastoRemuneraciones, costoEmpleador,
                 ordinaria5ta: ing.ordinaria5ta, extraordinaria5ta: ing.extraordinaria5ta, renta5ta: r5 };
         }
 
@@ -4117,7 +4120,7 @@
             const gratifSemestre = semestre === 'mayo' ? calcularGratificacionTrabajador(trabajador, 'diciembre', anio - 1).monto : calcularGratificacionTrabajador(trabajador, 'julio', anio).monto;
             const sextoGratif = gratifSemestre / 6;
             const remuneracionComputable = rem + sextoGratif;
-            const monto = (remuneracionComputable / 12 * Math.min(6, meses) + remuneracionComputable / 360 * dias) * factor.cts;
+            const monto = round2((remuneracionComputable / 12 * Math.min(6, meses) + remuneracionComputable / 360 * dias) * factor.cts); // (2026-11-24) a centavos
             return { meses: Math.min(6, meses), dias, monto, remuneracionComputable, sextoGratif };
         }
 
@@ -4292,9 +4295,9 @@
             const meses = Math.min(6, mesesYDiasEntre(desde, finSemestre).meses);
             if (meses === 0) return vacio;
             const remuneracionComputable = trabajador.sueldoBasico + (trabajador.tieneHijos ? config.asignacionFamiliar : 0);
-            const monto = (remuneracionComputable * meses / 6) * factor.gratif;
-            const bonifExtraordinaria = monto * 0.09;
-            return { meses, monto, bonifExtraordinaria, total: monto + bonifExtraordinaria, remuneracionComputable };
+            const monto = round2((remuneracionComputable * meses / 6) * factor.gratif); // (2026-11-24) a centavos
+            const bonifExtraordinaria = round2(monto * 0.09);
+            return { meses, monto, bonifExtraordinaria, total: round2(monto + bonifExtraordinaria), remuneracionComputable };
         }
 
         function renderGratificacion() {
