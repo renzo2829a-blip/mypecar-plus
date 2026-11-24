@@ -1409,10 +1409,39 @@
         }
         // Reparación automática: si un guardado se cortó a la mitad (se cerró la pestaña, se fue el internet, etc.) y una
         // venta con detalle de productos quedó SIN sus movimientos de salida, se regeneran desde la propia venta. Nunca borra.
+        // (2026-11-24) Notas de Crédito ANTIGUAS cuyo movimiento de stock quedó al revés. NO se corrigen solas: si alguien ya
+        // compensó la diferencia a mano (por ejemplo con un Ajuste Manual en 09 Inventario), corregirlas otra vez duplicaría el
+        // arreglo. Se muestra un aviso para que el dueño decida, NC por NC: "Corregir" (invierte solo ese movimiento) o
+        // "Ya lo corregí a mano" (lo marca como revisado y no vuelve a preguntar). Nada se cambia sin esa decisión.
+        function avisoNcAntiguasAlReves(lista, alDecidir) {
+            if (!lista.length || document.getElementById('mps-nc-alreves')) return;
+            const caja = document.createElement('div');
+            caja.id = 'mps-nc-alreves';
+            caja.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:2147480000;max-width:820px;margin:0 auto;background:#fff7ed;border:1px solid #f97316;border-radius:14px;padding:12px 14px;font:600 13.5px Manrope,system-ui,sans-serif;color:#7c2d12;box-shadow:0 10px 30px rgba(0,0,0,.25);max-height:60vh;overflow:auto';
+            const pintar = () => {
+                const pend = lista.filter(x => !x.decidido);
+                if (!pend.length) { caja.remove(); return; }
+                caja.innerHTML = '<div style="font-weight:800;margin-bottom:6px">⚠ Notas de Crédito antiguas con el stock al revés (' + pend.length + ')</div>' +
+                    '<div style="font-weight:500;margin-bottom:8px">Se registraron antes de una corrección del sistema: movieron el stock en sentido contrario. Si ya lo arreglaste a mano (por ejemplo con un Ajuste Manual en Inventario), elige <b>Ya lo corregí a mano</b> para no duplicar.</div>' +
+                    pend.map((x, i) => '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border-top:1px solid #fed7aa;padding:6px 0">' +
+                        '<span>' + x.texto + '</span><span style="display:flex;gap:6px">' +
+                        '<button data-i="' + lista.indexOf(x) + '" data-a="corregir" style="border:0;background:#0b5d52;color:#fff;border-radius:9px;padding:6px 10px;font-weight:800;cursor:pointer">Corregir</button>' +
+                        '<button data-i="' + lista.indexOf(x) + '" data-a="manual" style="border:1px solid #b45309;background:#fff;color:#7c2d12;border-radius:9px;padding:6px 10px;font-weight:800;cursor:pointer">Ya lo corregí a mano</button></span></div>').join('');
+                caja.querySelectorAll('button').forEach(b => b.onclick = async () => {
+                    const x = lista[+b.dataset.i];
+                    x.decidido = true;
+                    await alDecidir(x, b.dataset.a === 'corregir');
+                    pintar();
+                });
+            };
+            document.body.appendChild(caja);
+            pintar();
+        }
         async function reconciliarMovimientosVentas() {
             try {
                 if (!periodsData || !Object.keys(periodsData).length || !Array.isArray(stockMovimientos)) return 0;
                 let reparadas = 0, etiquetadas = 0;
+                const ncAlReves = [];
                 Object.keys(periodsData).forEach(per => {
                     const lista = (per === config.periodoActivo ? sales : (periodsData[per] && periodsData[per].sales)) || [];
                     lista.forEach(v => {
@@ -1420,9 +1449,8 @@
                         if (!esperados.length) return;
                         const existentes = stockMovimientos.filter(m => movEsDeVenta(m, v, per));
                         existentes.forEach(m => { if (!m.ventaPeriodo) { m.ventaPeriodo = per; etiquetadas++; } });
-                        // (2026-11-24) Notas de Crédito registradas antes de este arreglo: su movimiento quedó como "salida".
-                        const tipoCorrecto = v.tipoDoc === '07' ? 'entrada' : 'salida';
-                        existentes.forEach(m => { if (m.tipo !== tipoCorrecto) { m.tipo = tipoCorrecto; etiquetadas++; } });
+                        // (2026-11-24) NC antiguas con el movimiento al revés: NO se tocan aquí; se listan para que el dueño decida.
+                        if (v.tipoDoc === '07') existentes.forEach(m => { if (m.tipo === 'salida' && !m.ncRevisada) ncAlReves.push({ m, texto: `${v.tipoDoc} ${v.serie}-${v.numero} (${formatPeriodoLabel(per)}): ${m.cantidad} ${m.unidad || ''} de ${m.productoNombre || m.productoCodigo} — hoy resta del stock, debería sumar` }); });
                         if (existentes.length >= esperados.length) return;
                         stockMovimientos = stockMovimientos.filter(m => !movEsDeVenta(m, v, per));
                         esperados.forEach(e => { e.id = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1; stockMovimientos.push(e); });
@@ -1433,6 +1461,13 @@
                     await storageSet('vendepollo_stock_movimientos', stockMovimientos);
                     if (reparadas) console.warn(`Se repararon los movimientos de inventario de ${reparadas} venta(s) que habían quedado sin ellos.`);
                 }
+                avisoNcAntiguasAlReves(ncAlReves, async (x, corregir) => {
+                    if (corregir) x.m.tipo = 'entrada';
+                    x.m.ncRevisada = true; // decidido: no se vuelve a preguntar ni a tocar
+                    registrarBitacora('editar', 'inventario', `NC antigua ${x.texto.split(':')[0]}: ${corregir ? 'movimiento corregido a entrada' : 'marcada como ya corregida a mano'}`);
+                    await storageSet('vendepollo_stock_movimientos', stockMovimientos);
+                    try { await persistAll(); } catch (e) {}
+                });
                 return reparadas;
             } catch (e) { console.warn('No se pudo revisar la coherencia ventas / inventario:', e); return 0; }
         }
@@ -1738,7 +1773,12 @@
             const cloudConfirmadaComoVacia = !estadoSyncInicial.conectadoASupabase // sin nube configurada: no hay nada que proteger
                 || (resultadoPull && !resultadoPull.motivo); // pullAll() habló con la nube y no encontró ningún "motivo" de fallo/omisión
 
-            config = await storageGet('vendepollo_config', config);
+            const _configGuardado = await storageGet('vendepollo_config', null);
+            config = _configGuardado || config;
+            // (2026-11-24) La tasa del 18% es SOLO para una empresa nueva de verdad (nube confirmada vacía). Si no hay ajustes en
+            // este equipo pero no se pudo confirmar con la nube (sin internet, por ejemplo), se usa la tasa de antes (10.5%) para
+            // no cambiarle la tasa a una empresa existente que se abre por primera vez en un equipo nuevo.
+            if (!_configGuardado && !cloudConfirmadaComoVacia) config.igvRate = 0.105;
             if (!config.tipoCambioPorPeriodo) config.tipoCambioPorPeriodo = {}; // migración: archivos guardados antes de esta función
             if (config.igvRate == null || isNaN(config.igvRate)) config.igvRate = 0.105; // migración: archivos guardados antes de que la tasa de IGV fuera configurable
             if (!config.tiposVenta || config.tiposVenta.length === 0) config.tiposVenta = [{ codigo: 'SALON', nombre: 'Salón' }, { codigo: 'DELIVERY', nombre: 'Delivery' }]; // migración: archivos guardados antes de esta función
