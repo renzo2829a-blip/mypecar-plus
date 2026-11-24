@@ -1215,6 +1215,7 @@
       ${lista.length ? '<div class="mps-menu-titulo">Cambiar de empresa</div>' + filas + '<hr class="mps-menu-sep">' : ''}
       ${esOwner ? '<div id="mps-menu-accesos" class="mps-menu-item">Gestionar accesos</div>' : ''}
       ${esOwner ? '<div id="mps-menu-respaldo" class="mps-menu-item">Descargar respaldo de la empresa</div>' : ''}
+      ${esOwner ? '<div id="mps-menu-restaurar" class="mps-menu-item">Restaurar respaldo…</div>' : ''}
       <div id="mps-menu-nueva" class="mps-menu-item">+ Registrar otra empresa</div>
       <div id="mps-menu-salir" class="mps-menu-item">Cerrar sesión</div>
     `;
@@ -1234,6 +1235,11 @@
     if (acc) acc.addEventListener('click', () => {
       menu.parentNode.removeChild(menu);
       renderGestionarAccesos(opciones, empresaId);
+    });
+    const rest = menu.querySelector('#mps-menu-restaurar');
+    if (rest) rest.addEventListener('click', () => {
+      menu.parentNode.removeChild(menu);
+      abrirRestaurarRespaldo();
     });
     const resp = menu.querySelector('#mps-menu-respaldo');
     if (resp) resp.addEventListener('click', () => {
@@ -1289,6 +1295,85 @@
     } catch (e) {
       avisoRespaldo('No se pudo descargar el respaldo: ' + ((e && e.message) || e), 'error');
     }
+  }
+  // Restaurar un respaldo (2026-11-24): solo el dueño y solo el respaldo de ESTA misma empresa. Pide confirmar escribiendo el
+  // RUC, descarga primero un respaldo automático de lo que hay ahora, y recién entonces restaura.
+  function abrirRestaurarRespaldo() {
+    const S = global.MypecarSync;
+    const empresaId = S.empresas.activaId();
+    const ov = document.createElement('div');
+    ov.id = 'mps-restaurar';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:2147483200;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Manrope,Segoe UI,system-ui,sans-serif';
+    document.body.appendChild(ov);
+    const caja = (html) => { ov.innerHTML = '<div style="background:#fff;border-radius:18px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.35);color:#0f172a">' + html + '</div>'; };
+    const cerrar = () => { if (ov.parentNode) ov.parentNode.removeChild(ov); };
+    const btn = (id, txt, estilo) => '<button id="' + id + '" style="' + (estilo || '') + ';border-radius:12px;padding:11px 14px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit">' + txt + '</button>';
+    const PRIM = 'border:0;background:#0b5d52;color:#fff', SEC = 'border:1px solid #94a3b8;background:#fff;color:#334155', PELIGRO = 'border:0;background:#b91c1c;color:#fff';
+    const titulo = (t) => '<div style="font-size:19px;font-weight:800;margin-bottom:8px">' + t + '</div>';
+
+    function paso1() {
+      caja(titulo('Restaurar un respaldo') +
+        '<p style="font-size:14.5px;line-height:1.5;color:#334155;margin:0 0 12px">Elige el archivo <b>MYPECAR_respaldo_RUC_fecha.json</b> que descargaste de <b>esta misma empresa</b>. Antes de restaurar, el sistema descarga solo un respaldo de lo que hay ahora, por si te equivocas.</p>' +
+        '<input id="mps-rest-archivo" type="file" accept=".json,application/json" style="display:block;width:100%;margin-bottom:14px;font-size:14px">' +
+        '<div id="mps-rest-msg"></div>' +
+        '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">' + btn('mps-rest-cancelar', 'Cancelar', SEC) + '</div>');
+      ov.querySelector('#mps-rest-cancelar').onclick = cerrar;
+      ov.querySelector('#mps-rest-archivo').onchange = async (ev) => {
+        const msg = ov.querySelector('#mps-rest-msg');
+        const archivo = ev.target.files && ev.target.files[0];
+        if (!archivo) return;
+        msg.innerHTML = '<p style="font-size:14px;color:#334155">Revisando el archivo…</p>';
+        let obj = null;
+        try { obj = JSON.parse(await archivo.text()); } catch (e) { msg.innerHTML = '<p style="font-size:14px;color:#b91c1c;font-weight:700">El archivo no se pudo leer: no es un JSON válido.</p>'; return; }
+        let datos = null;
+        try { datos = await S.empresas.obtenerDatos(empresaId); } catch (e) { msg.innerHTML = '<p style="font-size:14px;color:#b91c1c;font-weight:700">No se pudieron leer los datos de la empresa (¿hay internet?).</p>'; return; }
+        const v = S.seguridad.validarRespaldo(obj, empresaId, datos);
+        if (!v.ok) { msg.innerHTML = '<p style="font-size:14.5px;line-height:1.5;color:#b91c1c;font-weight:700;margin:0">' + escapeHtml(v.motivo) + '</p>'; return; }
+        paso2(obj, v.resumen, datos, archivo.name);
+      };
+    }
+
+    function paso2(obj, resumen, datos, nombreArchivo) {
+      const ruc = String((datos && datos.ruc) || '').trim();
+      const palabra = ruc || 'RESTAURAR';
+      const fecha = resumen.generadoEl ? new Date(resumen.generadoEl).toLocaleString('es-PE') : 'fecha desconocida';
+      const apps = Object.keys(resumen.porApp).sort().map(a => escapeHtml(a) + ': ' + resumen.porApp[a]).join(' · ');
+      caja(titulo('¿Estás seguro?') +
+        '<p style="font-size:14.5px;line-height:1.5;color:#334155;margin:0 0 8px">Vas a restaurar <b>' + escapeHtml((datos && (datos.razonSocial || datos.nombreComercial)) || 'la empresa') + '</b>' + (ruc ? ' (RUC ' + escapeHtml(ruc) + ')' : '') + ' con el respaldo de <b>' + escapeHtml(fecha) + '</b>.</p>' +
+        '<div style="background:#f1f5f9;border-radius:12px;padding:10px 12px;font-size:13.5px;line-height:1.5;margin-bottom:10px"><b>' + resumen.registros + ' registros</b> en el respaldo<br><span style="color:#475569">' + apps + '</span><br><span style="color:#64748b;font-size:12.5px">Archivo: ' + escapeHtml(nombreArchivo) + '</span></div>' +
+        '<p style="font-size:14px;line-height:1.5;color:#7f1d1d;background:#fee2e2;border-radius:12px;padding:10px 12px;margin:0 0 10px">⚠ Lo que hay hoy en la nube de esta empresa será <b>reemplazado</b> por lo del respaldo, <b>para todas las personas</b> que la usan. Primero se descargará un respaldo de lo de hoy (archivo <b>ANTES_DE_RESTAURAR_…</b>); guárdalo.</p>' +
+        '<label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;line-height:1.45;margin-bottom:12px;color:#334155"><input id="mps-rest-posteriores" type="checkbox" style="margin-top:3px"> <span>Quitar también lo registrado <b>después</b> de la fecha del respaldo (volver exactamente a como estaba). Si no lo marcas, lo posterior se conserva.</span></label>' +
+        '<label style="display:block;font-size:13.5px;font-weight:700;margin-bottom:4px">Para continuar escribe ' + (ruc ? 'el RUC de la empresa (<b>' + escapeHtml(ruc) + '</b>)' : '<b>RESTAURAR</b>') + ':</label>' +
+        '<input id="mps-rest-confirma" autocomplete="off" style="width:100%;box-sizing:border-box;border:1px solid #94a3b8;border-radius:10px;padding:10px 12px;font-size:15px;margin-bottom:12px;font-family:inherit">' +
+        '<div id="mps-rest-msg"></div>' +
+        '<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">' + btn('mps-rest-atras', 'Atrás', SEC) + btn('mps-rest-ir', 'Restaurar', PELIGRO + ';opacity:.45') + '</div>');
+      const ir = ov.querySelector('#mps-rest-ir'), inp = ov.querySelector('#mps-rest-confirma');
+      ir.disabled = true;
+      inp.oninput = () => { const ok = inp.value.trim().toUpperCase() === palabra.toUpperCase(); ir.disabled = !ok; ir.style.opacity = ok ? '1' : '.45'; };
+      ov.querySelector('#mps-rest-atras').onclick = paso1;
+      ir.onclick = async () => {
+        if (inp.value.trim().toUpperCase() !== palabra.toUpperCase()) return;
+        const eliminar = ov.querySelector('#mps-rest-posteriores').checked;
+        caja(titulo('Restaurando…') + '<p id="mps-rest-prog" style="font-size:14.5px;line-height:1.5;color:#334155;margin:0">Preparando…</p><p style="font-size:13px;color:#64748b;margin:10px 0 0">No cierres esta pantalla ni apagues el equipo.</p>');
+        try {
+          const r = await S.seguridad.restaurarRespaldo(obj, { eliminarPosteriores: eliminar, alProgreso: (t) => { const el = ov.querySelector('#mps-rest-prog'); if (el) el.textContent = t; } });
+          caja(titulo('✔ Restauración completa') +
+            '<p style="font-size:14.5px;line-height:1.5;color:#334155;margin:0 0 10px">Se restauraron <b>' + r.restaurados + '</b> registros' + (r.eliminados ? ' y se quitaron ' + r.eliminados + ' posteriores' : '') + '.' +
+            (r.respaldoPrevio ? '<br>Tu información de antes quedó en el archivo <b>' + escapeHtml(r.respaldoPrevio) + '</b> (guárdalo por si te equivocaste).' : '') + '</p>' +
+            '<p style="font-size:13.5px;color:#64748b;margin:0 0 12px">La página se recargará para mostrar los datos restaurados. Si otras personas tienen la empresa abierta, deben recargar.</p>' +
+            '<div style="display:flex;justify-content:flex-end">' + btn('mps-rest-recargar', 'Recargar ahora', PRIM) + '</div>');
+          ov.querySelector('#mps-rest-recargar').onclick = () => location.reload();
+          setTimeout(() => location.reload(), 6000);
+        } catch (e) {
+          caja(titulo('No se completó') + '<p style="font-size:14.5px;line-height:1.5;color:#b91c1c;font-weight:700;margin:0 0 12px">' + escapeHtml((e && e.message) || String(e)) + '</p>' +
+            '<p style="font-size:13.5px;color:#64748b;margin:0 0 12px">Por seguridad, recarga la página antes de seguir trabajando.</p>' +
+            '<div style="display:flex;justify-content:flex-end;gap:8px">' + btn('mps-rest-cerrar', 'Cerrar', SEC) + btn('mps-rest-recargar', 'Recargar', PRIM) + '</div>');
+          ov.querySelector('#mps-rest-cerrar').onclick = cerrar;
+          ov.querySelector('#mps-rest-recargar').onclick = () => location.reload();
+        }
+      };
+    }
+    paso1();
   }
   async function avisarRespaldoPendiente() {
     try {
