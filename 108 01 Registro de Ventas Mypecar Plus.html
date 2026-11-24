@@ -3916,7 +3916,7 @@
             const baseNoGravada = round2(baseNoGravadaIngresada * tipoCambio);
             const isc = round2(iscIngresado * tipoCambio);
             const otros = round2(otrosIngresado * tipoCambio);
-            const total = baseGravada + igv + baseNoGravada + isc + otros;
+            const total = round2(baseGravada + igv + baseNoGravada + isc + otros); // (2026-11-24) sin colas de coma flotante (0.1 + 0.2 = 0.30000000000000004)
             if (total <= 0) { showToast('El total del comprobante debe ser mayor a cero.', 'error'); return; }
 
             const cliente = clientes.find(c => c.ruc === clienteRuc);
