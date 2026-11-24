@@ -842,7 +842,24 @@ var LZString = {
   // que solo pudo quedar en memoria por falta de espacio. Trabaja siempre con
   // la clave FÍSICA (ver claveFisica arriba) para que respaldoMemoria y el
   // disco hablen siempre de la misma empresa.
-  function leerTexto(key) { return leerTextoFisica(claveFisica(key)); }
+  // SEGURIDAD (2026-11-24): los módulos pintan nombres de clientes, proveedores, conceptos, etc. con
+  // innerHTML. Si alguien con acceso a la empresa (o un archivo importado) guardara un nombre con código
+  // HTML/JavaScript (p.ej. "<img src=x onerror=...>"), ese código se ejecutaría en la sesión de quien lo
+  // abra (por ejemplo, el dueño) y podría robar su sesión. Para cortarlo de raíz en los 9 módulos a la
+  // vez, al LEER los datos de la empresa los signos "<" y ">" se cambian por "‹" y "›" (se ven casi
+  // igual y ya no pueden formar etiquetas HTML). En JSON esos signos solo pueden estar dentro de textos,
+  // así que la estructura de los datos no cambia. Lo que se sube a la nube no se altera.
+  const CLAVES_CON_HTML_PROPIO = ['libro_diario_consultas_historial']; // se limpia al pintarlo (ver 04)
+  function neutralizarHtml(t) {
+    return (typeof t === 'string' && (t.indexOf('<') !== -1 || t.indexOf('>') !== -1)) ? t.replace(/</g, '\u2039').replace(/>/g, '\u203a') : t;
+  }
+  function leerTexto(key) {
+    const t = leerTextoFisica(claveFisica(key));
+    if (t === null || t === undefined) return t;
+    const k = String(key);
+    if (!requiereAislamientoPorEmpresa(k) || k.indexOf('_meta_') === 0 || CLAVES_CON_HTML_PROPIO.indexOf(k) !== -1) return t;
+    return neutralizarHtml(t);
+  }
   function leerTextoFisica(fisica) {
     if (respaldoMemoria.has(fisica)) return respaldoMemoria.get(fisica);
     return descomprimirCrudo(rawGetFisica(fisica));
@@ -2727,7 +2744,8 @@ var LZString = {
         const { data, error } = await supabaseClient.from('app_config')
           .select('valor, actualizado_en').eq('empresa_id', empresaId).eq('app', app).eq('clave', enlace.PREFIJO + tipo).maybeSingle();
         if (error || !data || !data.valor || typeof data.valor !== 'object') return null;
-        return { payload: data.valor, actualizado_en: data.actualizado_en };
+        // Misma protección que leerTexto(): sin etiquetas HTML en los datos que llegan de otro módulo.
+        return { payload: JSON.parse(neutralizarHtml(JSON.stringify(data.valor))), actualizado_en: data.actualizado_en };
       } catch (e) { return null; }
     },
     // Igual que leer(), pero entrega un File .json listo para la rutina de importación de siempre.

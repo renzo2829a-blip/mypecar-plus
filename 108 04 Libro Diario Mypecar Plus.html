@@ -9215,15 +9215,19 @@ function mensajeCuentaNoImputable(codigo, origen) {
             return `No encontré una respuesta directa para eso. Puedo ayudarte con datos como ventas, saldos de cuentas, impuestos, utilidad o el balance — de cualquier mes ya registrado (ej. "cuánto vendí en marzo"), con dudas de uso del sistema, y también puedo indicarte en qué archivo encontrar funciones como planilla, activos fijos o reportes. Intenta reformular tu pregunta, o prueba una de las sugerencias de abajo.`;
         }
 
+        // SEGURIDAD (2026-11-24): el historial se sincroniza entre usuarios de la empresa; se pinta sin código:
+        // el texto del usuario va escapado y en las respuestas solo se permiten <b>, <br>, <strong>, <i>, <ul>, <ol>, <li>.
+        function escConsulta(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+        function htmlBasicoConsulta(s) { return escConsulta(s).replace(/&lt;(\/?)(b|br|strong|i|ul|ol|li)\s*\/?&gt;/gi, '<$1$2>'); }
         function renderMensajesConsultas() {
             const cont = document.getElementById('consultas-mensajes');
             cont.innerHTML = historialConsultas.map(m => {
                 if (m.rol === 'usuario') {
-                    return `<div class="flex justify-end"><div class="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[75%] text-sm">${m.texto}</div></div>`;
+                    return `<div class="flex justify-end"><div class="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[75%] text-sm">${escConsulta(m.texto)}</div></div>`;
                 }
                 return `<div class="flex justify-start items-start gap-2">
                     <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5"><i class="fa-solid fa-robot text-xs"></i></div>
-                    <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%] text-sm text-slate-700 leading-relaxed">${m.texto}</div>
+                    <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%] text-sm text-slate-700 leading-relaxed">${htmlBasicoConsulta(m.texto)}</div>
                 </div>`;
             }).join('');
             cont.scrollTop = cont.scrollHeight;

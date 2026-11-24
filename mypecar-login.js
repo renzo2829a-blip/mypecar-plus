@@ -507,7 +507,7 @@
     if (/already registered|user already exists/i.test(m)) return 'Ya existe una cuenta con ese correo. Intenta iniciar sesión.';
     if (/password should be at least/i.test(m)) return 'La contraseña debe tener al menos 6 caracteres.';
     if (/rate limit/i.test(m)) return 'Demasiados intentos seguidos. Espera un minuto e intenta de nuevo.';
-    return 'Ocurrió un problema: ' + m;
+    return 'Ocurrió un problema: ' + escapeHtml(m);
   }
 
   // ---------------------------------------------------------------------
