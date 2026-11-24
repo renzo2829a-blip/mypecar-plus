@@ -5578,10 +5578,20 @@ const MypecarPEVista = (function () {
             if (regimen === 'nrus') { cuotaNRUS = cfg.categoriaNRUS === '2' ? 50 : 20; }
             else { rentaMensual = er.ventasNetas * ((cfg.tasaRentaMensual || 0) / 100); }
 
-            const essalud = neto('4031') + neto('403'); // 403 = asientos anteriores a la subdivisionaria 4031
-            const onp = neto('4032') + neto('401'); // 401 = asientos anteriores a la subdivisionaria 4032
-            const afp = neto('407');
-            const renta4ta5ta = neto('4017');
+            // (2026-11-24) Tributos y aportes del mes SIN los pagos del mes anterior: antes se tomaba el neto de cada cuenta y el
+            // mes en que se pagaba la PLAME o el PDT desde Caja el monto bajaba (o salía negativo). Además la 4017 recibe dos cosas:
+            // la retención de 5ta/4ta (desde Personal) y la renta de 3ra; aquí solo se cuentan las retenciones que vienen de Personal.
+            const ORIGENES_PERSONAL = ['Planilla', 'Recibos por Honorarios', 'Gratificación', 'CTS', 'Liquidación'];
+            const asientosMes = (diarioImport && diarioImport.periodsData[periodo] && diarioImport.periodsData[periodo].asientos) || [];
+            const abonosSinPagos = (cuentas, soloPersonal) => round2(asientosMes.reduce((s, a) => {
+                if (a.origen === 'Caja y Bancos') return s;
+                if (soloPersonal && !ORIGENES_PERSONAL.includes(a.origen)) return s;
+                return s + (a.lineas || []).filter(l => cuentas.includes(l.cuenta)).reduce((x, l) => x + (l.haber || 0) - (l.debe || 0), 0);
+            }, 0));
+            const essalud = abonosSinPagos(['4031', '403']); // 403 = asientos anteriores a la subdivisionaria 4031
+            const onp = abonosSinPagos(['4032', '401']); // 401 = asientos anteriores a la subdivisionaria 4032
+            const afp = abonosSinPagos(['407']);
+            const renta4ta5ta = abonosSinPagos(['4017', '40172', '40173'], true);
             const totalPDT621 = igv + rentaMensual + cuotaNRUS;
             const totalPLAME = essalud + onp + afp + renta4ta5ta;
 
