@@ -4107,6 +4107,21 @@
         //    en el semestre (julio para May-Oct, diciembre del año anterior para Nov-Abr),
         //    no un sexto teórico de la remuneración — para quien ingresó después o está en
         //    Pequeña Empresa (gratificación de medio sueldo) el monto antes salía mayor.
+        // (2026-11-24) Bonificaciones regulares del semestre (comisión fija, bono mensual): forman parte de la remuneración
+        // computable de CTS y gratificación si se percibieron al menos 3 meses del semestre; se promedian entre 6.
+        // Antes solo se tomaba sueldo + asignación familiar. Recibe los meses como [año, mes(1-12)].
+        function promedioBonificacionesSemestre(trabajador, mesesSemestre) {
+            let suma = 0, conMonto = 0;
+            mesesSemestre.forEach(([y, m]) => {
+                const per = `${y}-${String(m).padStart(2, '0')}`;
+                const d = filaPlanillaDe(trabajador.id, per);
+                const b = d ? (parseFloat(d.bonificaciones) || 0) : 0;
+                if (b > 0) { suma += b; conMonto++; }
+            });
+            return conMonto >= 3 ? suma / 6 : 0;
+        }
+        function mesesDelSemestre(anioIni, mesIni) { const r = []; for (let i = 0; i < 6; i++) { const m = mesIni - 1 + i; r.push([anioIni + Math.floor(m / 12), (m % 12) + 1]); } return r; }
+
         function calcularCTSTrabajador(trabajador, semestre, hastaFecha) {
             const factor = TIENE_CTS_GRATIF[trabajador.regimenLaboral] || { cts: 1 };
             const anio = parseInt(config.periodoActivo.split('-')[0]);
@@ -4122,7 +4137,8 @@
             const desde = ingreso > inicioSemestre ? ingreso : inicioSemestre;
             if (desde > hasta) return vacio;
             const { meses, dias } = mesesYDiasEntre(desde, hasta);
-            const rem = trabajador.sueldoBasico + (trabajador.tieneHijos ? config.asignacionFamiliar : 0);
+            const promBonif = promedioBonificacionesSemestre(trabajador, semestre === 'mayo' ? mesesDelSemestre(anio - 1, 11) : mesesDelSemestre(anio, 5));
+            const rem = trabajador.sueldoBasico + (trabajador.tieneHijos ? config.asignacionFamiliar : 0) + promBonif;
             const gratifSemestre = semestre === 'mayo' ? calcularGratificacionTrabajador(trabajador, 'diciembre', anio - 1).monto : calcularGratificacionTrabajador(trabajador, 'julio', anio).monto;
             const sextoGratif = gratifSemestre / 6;
             const remuneracionComputable = rem + sextoGratif;
@@ -4300,7 +4316,8 @@
             const desde = ingreso > inicioSemestre ? ingreso : inicioSemestre;
             const meses = Math.min(6, mesesYDiasEntre(desde, finSemestre).meses);
             if (meses === 0) return vacio;
-            const remuneracionComputable = trabajador.sueldoBasico + (trabajador.tieneHijos ? config.asignacionFamiliar : 0);
+            const promBonif = promedioBonificacionesSemestre(trabajador, semestre === 'julio' ? mesesDelSemestre(anio, 1) : mesesDelSemestre(anio, 7));
+            const remuneracionComputable = trabajador.sueldoBasico + (trabajador.tieneHijos ? config.asignacionFamiliar : 0) + promBonif;
             const monto = (remuneracionComputable * meses / 6) * factor.gratif;
             const bonifExtraordinaria = monto * 0.09;
             return { meses, monto, bonifExtraordinaria, total: monto + bonifExtraordinaria, remuneracionComputable };
