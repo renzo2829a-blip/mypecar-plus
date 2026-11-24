@@ -3436,6 +3436,21 @@
                 ...(esCuentaPorPagarComerciales(l.cuenta) && (l.facturaRefSerie || l.facturaRefNumero || l.facturaRefRuc)
                     ? { facturaRefSerie: l.facturaRefSerie.toUpperCase(), facturaRefNumero: l.facturaRefNumero, facturaRefRuc: l.facturaRefRuc } : {}) }));
 
+            // (2026-11-24) Movimiento en dólares: cada línea se convierte y se redondea por separado, y la suma del Debe
+            // podía diferir de la del Haber por 1 centavo (US$ 13.00 + 2.34 contra 15.34 a T.C. 3.755 = 57.61 vs 57.60).
+            // Se ajusta la línea MÁS GRANDE de cada lado para que ambos lados sumen el total convertido (el redondeo del total).
+            if (tipoCambio !== 1) {
+                const objetivo = round2(sumaDebeIngresada * tipoCambio);
+                ['debe', 'haber'].forEach(lado => {
+                    const conLado = lineas.filter(l => l[lado] > 0);
+                    if (!conLado.length) return;
+                    const dif = round2(objetivo - conLado.reduce((s, l) => s + l[lado], 0));
+                    if (dif === 0 || Math.abs(dif) > 0.05) return;
+                    const mayor = conLado.reduce((a, b) => (b[lado] > a[lado] ? b : a));
+                    mayor[lado] = round2(mayor[lado] + dif);
+                });
+            }
+
             // (2026-10-24) Préstamo recibido (Haber 45/46) → cronograma; pago (Debe 45/46) → préstamo que se paga.
             const movAnterior = movimientoEnEdicionId ? movimientos.find(m => m.id === movimientoEnEdicionId) : null;
             let prestamo = null, pagoPrestamo = null;
