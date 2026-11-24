@@ -3173,6 +3173,77 @@ var LZString = {
     }
   };
 
+  // ------------------------------------------------------------------------
+  // (2026-11-24) TIPO DE CAMBIO SUNAT AUTOMÁTICO: al elegir dólares (o cambiar la fecha) en Ventas, Compras o Caja, se trae
+  // el T.C. VENTA publicado por SUNAT para la fecha del comprobante (Edge Function "tipo-cambio", con caché en la nube).
+  // Se activa con config.tcAutomaticoSunat (por defecto en empresas nuevas). Si el usuario escribe otro T.C., se respeta.
+  // ------------------------------------------------------------------------
+  const tcSunat = {
+    _cache: {},
+    async obtener(fecha) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha || '')) return null;
+      if (tcSunat._cache[fecha]) return tcSunat._cache[fecha];
+      if (!supabaseClient || !navigator.onLine) return null;
+      try {
+        const r = await supabaseClient.functions.invoke('tipo-cambio', { body: { fecha } });
+        if (r.error || !r.data || !(Number(r.data.venta) > 0)) return null;
+        tcSunat._cache[fecha] = r.data;
+        return r.data;
+      } catch (e) { warn('tcSunat.obtener:', e && e.message); return null; }
+    },
+    // o = { moneda, fecha, tc, origen: ids de los campos; config(): devuelve el config; guardar(); alCambiar() }
+    conectar(o) {
+      const $ = (id) => document.getElementById(id);
+      const mon = $(o.moneda), fec = $(o.fecha), tc = $(o.tc), ori = o.origen ? $(o.origen) : null;
+      if (!mon || !fec || !tc) return;
+      const fmt = (f) => { const p = String(f || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : f; };
+      tc.addEventListener('input', () => { tc.dataset.manual = tc.value === '' ? '' : '1'; });
+      let turno = 0;
+      const aplicar = async (motivo) => {
+        const cfg = o.config && o.config();
+        if (!cfg || !cfg.tcAutomaticoSunat || mon.value !== 'USD') return;
+        if (motivo === 'moneda') tc.dataset.manual = '';
+        if (tc.dataset.manual === '1') return;
+        const f = fec.value;
+        if (!f) { if (ori) { ori.textContent = 'Elige la fecha del comprobante para traer el T.C. de SUNAT.'; ori.className = 'text-[10px] text-slate-500 mt-0.5'; } return; }
+        const mio = ++turno;
+        if (ori) { ori.textContent = 'Consultando el T.C. de SUNAT…'; ori.className = 'text-[10px] text-slate-500 mt-0.5'; }
+        const r = await tcSunat.obtener(f);
+        if (mio !== turno || mon.value !== 'USD' || tc.dataset.manual === '1') return;
+        if (r) {
+          tc.value = r.venta;
+          if (ori) {
+            const otraFecha = r.fecha_publicada && r.fecha_publicada !== f;
+            ori.textContent = 'T.C. venta SUNAT ' + (otraFecha ? 'del ' + fmt(r.fecha_publicada) + ' (último publicado antes del ' + fmt(f) + ')' : 'del ' + fmt(f)) + ': ' + r.venta + ' — automático. Edítalo si tu comprobante dice otro.';
+            ori.className = 'text-[10px] text-emerald-700 font-bold mt-0.5';
+          }
+          if (typeof o.alCambiar === 'function') { try { o.alCambiar(); } catch (e) {} }
+        } else if (ori) {
+          ori.textContent = 'No se pudo traer el T.C. de SUNAT (sin conexión o sin dato para esa fecha). Escríbelo a mano.';
+          ori.className = 'text-[10px] text-amber-700 font-bold mt-0.5';
+        }
+      };
+      mon.addEventListener('change', () => aplicar('moneda'));
+      fec.addEventListener('change', () => aplicar('fecha'));
+      // Casilla en Ajustes, encima de "Tipo de Cambio por Mes".
+      const lista = $('tc-lista-container');
+      if (lista && !$('mps-tc-auto')) {
+        const lab = document.createElement('label');
+        lab.className = 'flex items-start gap-2 text-xs text-slate-700 mb-3';
+        lab.innerHTML = '<input type="checkbox" id="mps-tc-auto" class="mt-0.5"> <span><b>T.C. automático de SUNAT:</b> al registrar en dólares, se llena solo con el tipo de cambio <b>venta</b> publicado por SUNAT para la fecha del comprobante. Si está apagado, se usa el T.C. del mes de abajo.</span>';
+        lista.parentNode.insertBefore(lab, lista);
+        const chk = $('mps-tc-auto');
+        const sync = () => { const cfg = o.config && o.config(); if (cfg && document.activeElement !== chk) chk.checked = !!cfg.tcAutomaticoSunat; };
+        sync(); setInterval(sync, 1500);
+        chk.addEventListener('change', async () => {
+          const cfg = o.config && o.config(); if (!cfg) return;
+          cfg.tcAutomaticoSunat = chk.checked;
+          try { if (typeof o.guardar === 'function') await o.guardar(); } catch (e) { warn('tcSunat.guardar:', e && e.message); }
+        });
+      }
+    }
+  };
+
   global.MypecarSync = {
     init, getEstado, onEstadoCambio, appActual,
     auth, empresas,
@@ -3192,7 +3263,7 @@ var LZString = {
     // 2026-11-20
     enlace,
     // 2026-11-24
-    bandejaAsientos
+    bandejaAsientos, tcSunat
   };
 
   // Se instala apenas carga este archivo (antes de que cualquier app lea o escriba): a partir
