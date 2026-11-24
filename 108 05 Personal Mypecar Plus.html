@@ -1140,6 +1140,7 @@
                     <div class="mt-2">
                         <label class="block font-semibold text-slate-600 mb-1 text-xs">Tope de Remuneración Asegurable AFP (S/.)</label>
                         <input type="number" step="0.01" id="set-afp-tope" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-mono">
+                        <p id="set-afp-tope-estado" class="text-[10px] mt-1 text-slate-500"></p>
                     </div>
                 </div>
 
@@ -1628,6 +1629,7 @@
             afpAporte: 10,
             onpTasa: 13,
             afpTope: 12209.11,
+            afpTopeFecha: '', // (2026-11-24) fecha en que se confirmó el tope vigente (la SBS lo actualiza cada trimestre); vacío = sin confirmar
             afpTasas: {
                 integra: { comisionFlujo: 1.55, prima: 1.37 },
                 prima: { comisionFlujo: 1.60, prima: 1.37 },
@@ -4575,6 +4577,7 @@
             document.getElementById('set-afp-aporte').value = config.afpAporte;
             document.getElementById('set-onp-tasa').value = config.onpTasa;
             document.getElementById('set-afp-tope').value = config.afpTope;
+            { const e = document.getElementById('set-afp-tope-estado'); if (e) { const d = diasDesdeConfirmacionTopeAfp(); e.innerHTML = d === null ? '<b class="text-rose-600">⚠ Sin confirmar:</b> la SBS actualiza este tope cada trimestre. Verifícalo en sbs.gob.pe y pulsa Guardar Ajustes para confirmarlo.' : `Confirmado el ${config.afpTopeFecha} (hace ${d} días). La SBS lo actualiza cada trimestre.`; } }
             const licInput = document.getElementById('set-licenciado-a');
             if (licInput) licInput.value = config.licenciadoA || '';
             renderAfpTasasInputs();
@@ -4647,6 +4650,7 @@
             config.afpAporte = parseFloat(document.getElementById('set-afp-aporte').value) || 10;
             config.onpTasa = parseFloat(document.getElementById('set-onp-tasa').value) || 13;
             config.afpTope = parseFloat(document.getElementById('set-afp-tope').value) || 12209.11;
+            config.afpTopeFecha = new Date().toISOString().split('T')[0]; // al guardar Ajustes se da por verificado
             Object.keys(config.afpTasas).forEach(key => {
                 config.afpTasas[key].comisionFlujo = parseFloat(document.getElementById(`afp-comision-${key}`).value) || 0;
                 config.afpTasas[key].prima = parseFloat(document.getElementById(`afp-prima-${key}`).value) || 0;
@@ -4902,7 +4906,30 @@
 
         // Misma condición que ya usaba el banner renderAlertaContratos(): contratos
         // de trabajadores activos que ya vencieron o están por vencer en 7 días o menos.
+        // (2026-11-24) Días desde que se confirmó el tope de remuneración asegurable AFP (null = nunca confirmado).
+        function diasDesdeConfirmacionTopeAfp() {
+            if (!config.afpTopeFecha) return null;
+            const d = new Date(config.afpTopeFecha + 'T00:00:00');
+            if (isNaN(d)) return null;
+            return Math.floor((Date.now() - d.getTime()) / 86400000);
+        }
+
         const REGLAS_ALERTAS = [
+            {
+                key: 'afp_tope_sin_confirmar',
+                evaluar: function () {
+                    const d = diasDesdeConfirmacionTopeAfp();
+                    if (d !== null && d <= 90) return [];
+                    return [{
+                        id: 'afp_tope_sin_confirmar__' + (config.afpTopeFecha || 'nunca'),
+                        regla: 'afp_tope_sin_confirmar',
+                        recordId: 0,
+                        titulo: 'Tope de remuneración asegurable AFP sin confirmar',
+                        detalle: `El tope vigente en el sistema es S/ ${Number(config.afpTope).toFixed(2)} y ${d === null ? 'nunca se ha confirmado' : 'se confirmó hace ' + d + ' días'}. La SBS lo actualiza cada trimestre: verifícalo y guarda Ajustes (pestaña Ajustes → Tasas de AFP y ONP).`,
+                        severidad: 'media'
+                    }];
+                }
+            },
             {
                 key: 'contrato_vencido_por_vencer',
                 evaluar: function () {
@@ -5022,7 +5049,7 @@
                             <p class="text-xs text-slate-600 mt-1">${a.detalle}</p>
                         </div>
                         <div class="flex flex-wrap gap-2 shrink-0">
-                            <button onclick="irAContratoDeAlerta(${Number(a.recordId)})" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-3 py-2 rounded-lg transition-all"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Ir al contrato</button>
+                            ${a.regla === 'afp_tope_sin_confirmar' ? `<button onclick="switchTab('settings')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-3 py-2 rounded-lg transition-all"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Ir a Ajustes</button>` : `<button onclick="irAContratoDeAlerta(${Number(a.recordId)})" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-3 py-2 rounded-lg transition-all"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Ir al contrato</button>`}
                             <button onclick="marcarAlertaAtendida('${a.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3 py-2 rounded-lg transition-all"><i class="fa-solid fa-check mr-1"></i> Atendida</button>
                             <button onclick="marcarAlertaNoAplicable('${a.id}')" class="bg-slate-500 hover:bg-slate-600 text-white text-[11px] font-bold px-3 py-2 rounded-lg transition-all"><i class="fa-solid fa-ban mr-1"></i> No aplicable</button>
                         </div>
