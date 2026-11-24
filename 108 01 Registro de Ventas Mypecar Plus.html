@@ -1083,11 +1083,6 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-600 mb-1 flex items-center gap-1.5"><i class="fa-solid fa-stamp text-amber-500"></i> Licenciado a (marca de agua)</label>
-                        <input type="text" id="set-licenciado-a" placeholder="Ej. Estudio Contable Torres & Asociados" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-emerald-500 focus:border-emerald-500">
-                        <p class="text-[10px] text-slate-400 mt-1">Si este archivo fue entregado bajo licencia, escribe aquí el nombre del cliente/estudio. Aparecerá como marca discreta en pantalla, para identificar el uso autorizado.</p>
-                    </div>
-                    <div>
                         <label class="block font-semibold text-slate-600 mb-1">Tasa de IGV en Ventas</label>
                         <select id="set-igv-rate" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-emerald-500 focus:border-emerald-500">
                             <option value="0.18">18% — Tasa general (la mayoría de negocios)</option>
@@ -1364,7 +1359,6 @@
             ruc: '',
             periodoActivo: '2026-05',
             igvRate: 0.18, // Tasa de IGV en VENTAS. (2026-11-24) Empresa NUEVA: 18% (tasa general). Las pollerías/restaurantes eligen 10.5% (Ley 31556/32219/32387) en Ajustes. Las empresas ya existentes conservan lo que tienen guardado.
-            licenciadoA: '',  // nombre del cliente/estudio licenciado (marca de agua)
             tipoCambioPorPeriodo: {},  // { 'YYYY-MM': valor } — T.C. de referencia del mes, editable en Ajustes
             usuarioActivo: '',           // nombre de quien está usando el sistema (trazabilidad)
             ultimoRespaldoFecha: null,   // fecha ISO del último export de respaldo
@@ -1853,7 +1847,6 @@
                         if (configEnBlanco || configDeOtraEmpresa) {
                             if (configDeOtraEmpresa) {
                                 console.warn('[MYPECAR] La configuración guardada era de otra empresa (RUC ' + rucLocal + '); se corrige con los datos oficiales de la empresa activa (RUC ' + rucNube + ').');
-                                config.licenciadoA = '';
                                 config.logoBase64 = '';
                             }
                             config.ruc = datosEmpresa.ruc || '';
@@ -2077,19 +2070,10 @@
 
         // Marca de agua discreta y persistente en pantalla (identifica la licencia autorizada).
         function aplicarMarcaDeAgua() {
-            let barra = document.getElementById('marca-agua-licencia');
-            if (!config.licenciadoA) {
-                if (barra) barra.remove();
-            } else {
-                if (!barra) {
-                    barra = document.createElement('div');
-                    barra.id = 'marca-agua-licencia';
-                    barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0F172A;color:#94A3B8;font-size:10px;text-align:center;padding:3px 8px;font-family:Arial,sans-serif;';
-                    document.body.appendChild(barra);
-                    document.body.style.paddingBottom = '20px';
-                }
-                barra.innerText = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros`;
-            }
+            // (2026-11-24) "Licenciado a" se retiró: la protección real es el inicio de sesión y la licencia por empresa en Supabase.
+            // Esta función queda solo para quitar la franja si algún navegador la tenía de antes.
+            const barra = document.getElementById('marca-agua-licencia');
+            if (barra) { barra.remove(); document.body.style.paddingBottom = ''; }
         }
 
         // Sello discreto "hecho con MYPECAR CONTABLE" — a diferencia de la barra de
@@ -2101,7 +2085,7 @@
             if (document.getElementById('sello-mypecar')) return;
             const sello = document.createElement('div');
             sello.id = 'sello-mypecar';
-            sello.style.cssText = 'position:fixed;bottom:' + (config.licenciadoA ? '26px' : '8px') + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
+            sello.style.cssText = 'position:fixed;bottom:' + '8px' + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
             sello.innerHTML = '<img src="data:image/png;base64,' + MYPECAR_ICONO_B64 + '" style="height:14px;width:auto;display:block;" alt="MYPECAR CONTABLE">';
             document.body.appendChild(sello);
         }
@@ -2283,8 +2267,6 @@
             document.getElementById('set-ruc').value = config.ruc;
             const igvSelect = document.getElementById('set-igv-rate');
             if (igvSelect) igvSelect.value = config.igvRate;
-            const licInput = document.getElementById('set-licenciado-a');
-            if (licInput) licInput.value = config.licenciadoA || '';
             const detraccionSelect = document.getElementById('set-detraccion-default');
             if (detraccionSelect) detraccionSelect.value = config.detraccionDefault || '';
             aplicarLogoCliente();
@@ -2381,8 +2363,6 @@
             config.nombreComercial = document.getElementById('set-nombre-comercial').value;
             config.ruc = rucInput;
             config.igvRate = parseFloat(document.getElementById('set-igv-rate').value) || 0.18;
-            const licInput = document.getElementById('set-licenciado-a');
-            if (licInput) config.licenciadoA = licInput.value.trim();
             const detraccionSelect = document.getElementById('set-detraccion-default');
             if (detraccionSelect) config.detraccionDefault = detraccionSelect.value;
             await storageSet('vendepollo_config', config);

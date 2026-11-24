@@ -724,10 +724,6 @@
                         </div>
                         <p class="text-[10px] text-slate-500 mt-1">Reemplaza el ícono genérico del encabezado por tu propio logo. Máximo 300 KB — formatos PNG, JPG, WEBP o SVG.</p>
                     </div>
-                    <div class="md:col-span-3">
-                        <label class="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1.5"><i class="fa-solid fa-stamp text-amber-500"></i> Licenciado a (marca de agua)</label>
-                        <input type="text" id="set-licenciado-a" placeholder="Ej. Estudio Contable Torres & Asociados" onchange="guardarDatosEmpresa()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                    </div>
                 </div>
                 <p class="text-[10px] text-slate-400 mt-2">Estos datos se completan automáticamente con la primera importación, pero puedes editarlos si es necesario.</p>
             </div>
@@ -829,7 +825,6 @@
             ],
             productos: [], // { codigo, nombre, unidad, stockMinimo, controlaStock }
             usuarioActivo: '', // igual que en las demás 8 apps: identifica quién registra cada movimiento (sin contraseña)
-            licenciadoA: ''    // nombre del cliente/estudio licenciado (marca de agua) — igual que en las demás 8 apps
         };
 
         // stockMovimientos: unión de lo importado desde Ventas (salidas), Compras (entradas)
@@ -898,7 +893,6 @@
             if (!config.puntosVenta || config.puntosVenta.length === 0) config.puntosVenta = [{ codigo: 'PV1', nombre: 'Principal' }];
             if (!config.productos) config.productos = [];
             if (!config.metodoValorizacion) config.metodoValorizacion = 'PROMEDIO';
-            if (config.licenciadoA == null) config.licenciadoA = '';
 
             // NUEVO en 09 (2026-09-24b, 6ta ronda; igual que en 01-06) -- los datos legales de la empresa
             // (RUC, razón social, nombre comercial) salen SIEMPRE de Supabase, que es
@@ -920,7 +914,6 @@
                         if (configEnBlanco || configDeOtraEmpresa) {
                             if (configDeOtraEmpresa) {
                                 console.warn('[MYPECAR] La configuración guardada era de otra empresa (RUC ' + rucLocal + '); se corrige con los datos oficiales de la empresa activa (RUC ' + rucNube + ').');
-                                config.licenciadoA = '';
                                 config.logoBase64 = '';
                             }
                             config.ruc = datosEmpresa.ruc || '';
@@ -1188,19 +1181,10 @@
         }
 
         function aplicarMarcaDeAgua() {
-            let barra = document.getElementById('marca-agua-licencia');
-            if (!config.licenciadoA) {
-                if (barra) barra.remove();
-            } else {
-                if (!barra) {
-                    barra = document.createElement('div');
-                    barra.id = 'marca-agua-licencia';
-                    barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0F172A;color:#94A3B8;font-size:10px;text-align:center;padding:3px 8px;font-family:Arial,sans-serif;';
-                    document.body.appendChild(barra);
-                    document.body.style.paddingBottom = '20px';
-                }
-                barra.innerText = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros`;
-            }
+            // (2026-11-24) "Licenciado a" se retiró: la protección real es el inicio de sesión y la licencia por empresa en Supabase.
+            // Esta función queda solo para quitar la franja si algún navegador la tenía de antes.
+            const barra = document.getElementById('marca-agua-licencia');
+            if (barra) { barra.remove(); document.body.style.paddingBottom = ''; }
         }
 
         const MYPECAR_ICONO_B64 = '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';
@@ -1209,7 +1193,7 @@
             if (document.getElementById('sello-mypecar')) return;
             const sello = document.createElement('div');
             sello.id = 'sello-mypecar';
-            sello.style.cssText = 'position:fixed;bottom:' + (config.licenciadoA ? '26px' : '8px') + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
+            sello.style.cssText = 'position:fixed;bottom:' + '8px' + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
             sello.innerHTML = '<img src="data:image/png;base64,' + MYPECAR_ICONO_B64 + '" style="height:14px;width:auto;display:block;" alt="MYPECAR CONTABLE">';
             document.body.appendChild(sello);
         }
@@ -1324,8 +1308,6 @@
             document.getElementById('set-nombre-comercial').value = config.nombreComercial || '';
             document.getElementById('set-ruc').value = config.ruc || '';
             document.getElementById('set-metodo-valorizacion').value = config.metodoValorizacion;
-            const licInput = document.getElementById('set-licenciado-a');
-            if (licInput) licInput.value = config.licenciadoA || '';
             aplicarLogoCliente();
             populateProductoDatalist();
             poblarSelectoresPuntoVenta();
@@ -1361,8 +1343,6 @@
             config.razonSocial = document.getElementById('set-razon-social').value.trim();
             config.nombreComercial = document.getElementById('set-nombre-comercial').value.trim();
             config.ruc = ruc;
-            const licInput = document.getElementById('set-licenciado-a');
-            if (licInput) config.licenciadoA = licInput.value.trim();
             await persistAll();
             syncConfigUI();
             aplicarMarcaDeAgua();

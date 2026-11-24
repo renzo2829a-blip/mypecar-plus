@@ -2742,14 +2742,6 @@ const MypecarPEVista = (function () {
 
         <!-- ================= PESTAÑA: AJUSTES ================= -->
         <section id="tab-ajustes" class="tab-content hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2 mb-1"><i class="fa-solid fa-stamp text-amber-500"></i> Licencia de Uso (marca de agua)</h3>
-                <p class="text-xs text-slate-500 mb-3">Si este archivo fue entregado bajo licencia a un cliente o estudio contable, registra aquí su nombre. Aparecerá como marca discreta en pantalla.</p>
-                <div class="flex flex-wrap items-end gap-3">
-                    <input type="text" id="set-licenciado-a" placeholder="Ej. Estudio Contable Torres & Asociados" class="flex-1 min-w-[220px] bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
-                    <button onclick="guardarLicenciaDeUso()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-all"><i class="fa-solid fa-check mr-1"></i> Guardar</button>
-                </div>
-            </div>
 
         </section>
 
@@ -3190,7 +3182,7 @@ const MypecarPEVista = (function () {
         let diarioImport = null;   // { config, periodsData: {YYYY-MM:{asientos:[]}}, customAccounts, existenciasPorPeriodo }
         let cajaImport = null;     // (2026-10-24) desde 03 Caja y Bancos: { periodsData, prestamos: [...], pagosFacturas: [...] }
         let inventarioImport = null; // { fechaCorte, metodoValorizacion, valorTotal, productos: [...] } — desde 09 Inventario
-        let appConfig = { licenciadoA: '', djAnual: {}, usuarioActivo: '' }; // config propia de este archivo (no depende de lo importado). djAnual: { '2026': { uit, adiciones:[{descripcion,monto}], deducciones:[...] } }
+        let appConfig = { djAnual: {}, usuarioActivo: '' }; // config propia de este archivo (no depende de lo importado). djAnual: { '2026': { uit, adiciones:[{descripcion,monto}], deducciones:[...] } }
 
         function showToast(message, type = 'success') {
             let toast = document.getElementById('toast');
@@ -6871,12 +6863,6 @@ function renderAnalisisCuenta() {
             ws.mergeCells(row, 1, row, numCols);
             ws.getCell(row, 1).value = `Generado automáticamente desde MYPECAR CONTABLE — ${(cfg.nombreComercial || cfg.razonSocial || '').trim()}.`;
             ws.getCell(row, 1).font = { italic: true, size: 8, color: { argb: 'FF94A3B8' } };
-            if (cfg.licenciadoA) {
-                row++;
-                ws.mergeCells(row, 1, row, numCols);
-                ws.getCell(row, 1).value = `Licenciado a: ${cfg.licenciadoA} — Uso no autorizado para terceros.`;
-                ws.getCell(row, 1).font = { italic: true, size: 8, bold: true, color: { argb: 'FF64748B' } };
-            }
         }
 
         // Inserta el logo del negocio (si tiene uno subido) en una fila nueva y vacía,
@@ -7980,8 +7966,6 @@ function renderAnalisisCuenta() {
             try { bitacora = JSON.parse(localStorage.getItem('reportes_bitacora') || '[]'); } catch (e) { bitacora = []; }
             actualizarEstadoImportacion();
             switchTab('importar');
-            const licInput = document.getElementById('set-licenciado-a');
-            if (licInput) licInput.value = appConfig.licenciadoA || '';
         }
         window.onload = inicializarApp;
 
@@ -8142,29 +8126,13 @@ function renderAnalisisCuenta() {
             }
         }
 
-        function guardarLicenciaDeUso() {
-            const licInput = document.getElementById('set-licenciado-a');
-            appConfig.licenciadoA = licInput.value.trim();
-            localStorage.setItem('reportes_app_config', JSON.stringify(appConfig));
-            aplicarMarcaDeAgua();
-            showToast(appConfig.licenciadoA ? `Licencia registrada: ${appConfig.licenciadoA}` : 'Marca de agua desactivada.');
-        }
 
         // Marca de agua discreta y persistente en pantalla (identifica la licencia autorizada).
         function aplicarMarcaDeAgua() {
-            let barra = document.getElementById('marca-agua-licencia');
-            if (!appConfig.licenciadoA) {
-                if (barra) barra.remove();
-            } else {
-                if (!barra) {
-                    barra = document.createElement('div');
-                    barra.id = 'marca-agua-licencia';
-                    barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0F172A;color:#94A3B8;font-size:10px;text-align:center;padding:3px 8px;font-family:Arial,sans-serif;';
-                    document.body.appendChild(barra);
-                    document.body.style.paddingBottom = '20px';
-                }
-                barra.innerText = `Licenciado a: ${appConfig.licenciadoA} — Uso no autorizado para terceros`;
-            }
+            // (2026-11-24) "Licenciado a" se retiró: la protección real es el inicio de sesión y la licencia por empresa en Supabase.
+            // Esta función queda solo para quitar la franja si algún navegador la tenía de antes.
+            const barra = document.getElementById('marca-agua-licencia');
+            if (barra) { barra.remove(); document.body.style.paddingBottom = ''; }
         }
 
         // Sello discreto "hecho con MYPECAR CONTABLE" — a diferencia de la barra de
@@ -8176,7 +8144,7 @@ function renderAnalisisCuenta() {
             if (document.getElementById('sello-mypecar')) return;
             const sello = document.createElement('div');
             sello.id = 'sello-mypecar';
-            sello.style.cssText = 'position:fixed;bottom:' + (appConfig.licenciadoA ? '26px' : '8px') + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
+            sello.style.cssText = 'position:fixed;bottom:' + '8px' + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
             sello.innerHTML = '<img src="data:image/png;base64,' + MYPECAR_ICONO_B64 + '" style="height:14px;width:auto;display:block;" alt="MYPECAR CONTABLE">';
             document.body.appendChild(sello);
         }

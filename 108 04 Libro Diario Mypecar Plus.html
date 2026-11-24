@@ -2158,20 +2158,6 @@ const MypecarPEVista = (function () {
 
         <!-- ================= PESTAÑA: AJUSTES ================= -->
         <section id="tab-settings" class="tab-content hidden space-y-6">
-            <!-- Licencia / marca de agua -->
-            <div class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 mb-1"><i class="fa-solid fa-stamp text-amber-600"></i> Licencia de Uso</h3>
-                <p class="text-xs text-slate-500 mb-4">Si este sistema fue entregado bajo licencia a un cliente o estudio contable, registra aquí su nombre. Aparecerá como marca de agua discreta en la pantalla y en los documentos impresos/exportados, para identificar el uso autorizado.</p>
-                <div class="flex flex-wrap items-end gap-3">
-                    <div class="flex-1 min-w-[220px]">
-                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Licenciado a</label>
-                        <input type="text" id="seg-licenciado-a" placeholder="Ej. Estudio Contable Torres & Asociados" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm">
-                    </div>
-                    <button onclick="guardarLicenciaDeUso()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-all">
-                        <i class="fa-solid fa-check mr-1"></i> Guardar
-                    </button>
-                </div>
-            </div>
 
 
 
@@ -2532,7 +2518,6 @@ const MypecarPEVista = (function () {
             limiteBancarizacionSoles: 2000,  // Ley N° 28194 - Ley de Bancarización (monto vigente, puede cambiar)
             limiteBancarizacionUSD: 500,
             usuarioActivo: '',           // nombre de quien está usando el sistema (trazabilidad)
-            licenciadoA: '',             // nombre del cliente/estudio licenciado (marca de agua)
             ultimoRespaldoFecha: null,   // fecha ISO del último export de respaldo
             destinosPorCuenta: { ...DESTINOS_POR_CUENTA_DEFAULT },
             // Control de Cierre de Mes: { 'YYYY-MM': { 'Ventas': {cerrado,fecha,usuario}, ... } }.
@@ -3217,7 +3202,6 @@ const MypecarPEVista = (function () {
                         if (configEnBlanco || configDeOtraEmpresa) {
                             if (configDeOtraEmpresa) {
                                 console.warn('[MYPECAR] La configuración guardada era de otra empresa (RUC ' + rucLocal + '); se corrige con los datos oficiales de la empresa activa (RUC ' + rucNube + ').');
-                                config.licenciadoA = '';
                                 config.logoBase64 = '';
                             }
                             config.ruc = datosEmpresa.ruc || '';
@@ -3845,12 +3829,6 @@ const MypecarPEVista = (function () {
             ws.mergeCells(row, 1, row, 4);
             ws.getCell(row, 1).value = 'Generado automáticamente. Verifica siempre contra tu criterio profesional y el cronograma oficial vigente en sunat.gob.pe antes de declarar.';
             ws.getCell(row, 1).font = { italic: true, size: 8, color: { argb: 'FF94A3B8' } };
-            if (config.licenciadoA) {
-                row++;
-                ws.mergeCells(row, 1, row, 4);
-                ws.getCell(row, 1).value = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros.`;
-                ws.getCell(row, 1).font = { italic: true, size: 8, bold: true, color: { argb: 'FF64748B' } };
-            }
 
             const buffer = await wb.xlsx.writeBuffer();
             const blob = new Blob([buffer], { type: 'application/octet-stream' });
@@ -8171,12 +8149,6 @@ function mensajeCuentaNoImputable(codigo, origen) {
             ws.mergeCells(row, 1, row, numCols);
             ws.getCell(row, 1).value = `Generado automáticamente desde MYPECAR CONTABLE — ${(config.nombreComercial || config.razonSocial || '').trim()}.`;
             ws.getCell(row, 1).font = { italic: true, size: 8, color: { argb: 'FF94A3B8' } };
-            if (config.licenciadoA) {
-                row++;
-                ws.mergeCells(row, 1, row, numCols);
-                ws.getCell(row, 1).value = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros.`;
-                ws.getCell(row, 1).font = { italic: true, size: 8, bold: true, color: { argb: 'FF64748B' } };
-            }
         }
 
         // Genera y descarga un workbook de una sola hoja, ya construida por buildFn(ws).
@@ -8927,12 +8899,6 @@ function mensajeCuentaNoImputable(codigo, origen) {
             ws.mergeCells(row, 1, row, 12);
             ws.getCell(row, 1).value = `Generado automáticamente el ${new Date().toLocaleDateString('es-PE')} desde MYPECAR CONTABLE — ${(config.nombreComercial || config.razonSocial || '').trim()}. Este resumen es una herramienta de apoyo a la gestión; no reemplaza el análisis del contador.`;
             ws.getCell(row, 1).font = { italic: true, size: 7.5, color: { argb: 'FF94A3B8' } };
-            if (config.licenciadoA) {
-                row++;
-                ws.mergeCells(row, 1, row, 12);
-                ws.getCell(row, 1).value = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros.`;
-                ws.getCell(row, 1).font = { italic: true, size: 7.5, bold: true, color: { argb: 'FF64748B' } };
-            }
         }
 
         // ==================================================================
@@ -9597,30 +9563,14 @@ function mensajeCuentaNoImputable(codigo, origen) {
             showToast(valor ? `Usuario activo: ${valor}` : 'Usuario activo borrado.');
         }
 
-        async function guardarLicenciaDeUso() {
-            const valor = document.getElementById('seg-licenciado-a').value.trim();
-            config.licenciadoA = valor;
-            await persistAll();
-            aplicarMarcaDeAgua();
-            showToast(valor ? `Licencia registrada: ${valor}` : 'Marca de agua desactivada.');
-        }
 
         // Marca de agua discreta y persistente en pantalla (no bloquea nada; ver capítulo de
         // Aspectos Importantes del manual sobre las limitaciones reales de esta protección).
         function aplicarMarcaDeAgua() {
-            let barra = document.getElementById('marca-agua-licencia');
-            if (!config.licenciadoA) {
-                if (barra) barra.remove();
-            } else {
-                if (!barra) {
-                    barra = document.createElement('div');
-                    barra.id = 'marca-agua-licencia';
-                    barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0F172A;color:#94A3B8;font-size:10px;text-align:center;padding:3px 8px;font-family:Arial,sans-serif;';
-                    document.body.appendChild(barra);
-                    document.body.style.paddingBottom = '20px';
-                }
-                barra.innerText = `Licenciado a: ${config.licenciadoA} — Uso no autorizado para terceros`;
-            }
+            // (2026-11-24) "Licenciado a" se retiró: la protección real es el inicio de sesión y la licencia por empresa en Supabase.
+            // Esta función queda solo para quitar la franja si algún navegador la tenía de antes.
+            const barra = document.getElementById('marca-agua-licencia');
+            if (barra) { barra.remove(); document.body.style.paddingBottom = ''; }
         }
 
         // Sello discreto "hecho con MYPECAR CONTABLE" — a diferencia de la barra de
@@ -9632,7 +9582,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             if (document.getElementById('sello-mypecar')) return;
             const sello = document.createElement('div');
             sello.id = 'sello-mypecar';
-            sello.style.cssText = 'position:fixed;bottom:' + (config.licenciadoA ? '26px' : '8px') + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
+            sello.style.cssText = 'position:fixed;bottom:' + '8px' + ';right:8px;z-index:9998;opacity:0.55;background:rgba(255,255,255,0.85);border-radius:6px;padding:3px 5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);display:flex;align-items:center;pointer-events:none;transition:bottom .2s;';
             sello.innerHTML = '<img src="data:image/png;base64,' + MYPECAR_ICONO_B64 + '" style="height:14px;width:auto;display:block;" alt="MYPECAR CONTABLE">';
             document.body.appendChild(sello);
         }
@@ -9787,7 +9737,6 @@ function mensajeCuentaNoImputable(codigo, origen) {
         const ICONOS_BITACORA = { crear: '➕', eliminar: '🗑️', restaurar: '♻️', eliminar_permanente: '⚠️', editar: '✏️' };
         function renderSeguridad() {
             document.getElementById('seg-usuario-activo').value = config.usuarioActivo || '';
-            document.getElementById('seg-licenciado-a').value = config.licenciadoA || '';
             verificarRecordatorioRespaldo();
 
             const papBody = document.getElementById('seg-papelera-body');
