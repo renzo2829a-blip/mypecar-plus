@@ -7956,7 +7956,7 @@ function renderAnalisisCuenta() {
             const item = papeleraDJ[idx];
             if (!item) return;
             if (!appConfig.djAnual) appConfig.djAnual = {};
-            if (!appConfig.djAnual[item.anio]) appConfig.djAnual[item.anio] = { uit: 5350, adiciones: [], deducciones: [] };
+            if (!appConfig.djAnual[item.anio]) appConfig.djAnual[item.anio] = { uit: uitDelAnio(item.anio), adiciones: [], deducciones: [] };
             if (!appConfig.djAnual[item.anio][item.tipo]) appConfig.djAnual[item.anio][item.tipo] = [];
             appConfig.djAnual[item.anio][item.tipo].push({ descripcion: item.descripcion, monto: item.monto });
             localStorage.setItem('reportes_app_config', JSON.stringify(appConfig));
@@ -9722,7 +9722,7 @@ function renderAnalisisCuenta() {
             if (periodos.includes(actual)) sel.value = actual;
         }
 
-        const REGIMEN_LABEL = { nrus: 'Nuevo RUS', rer: 'Régimen Especial (RER)', rmt: 'MYPE Tributario (RMT)', general: 'Régimen General' };
+        const REGIMEN_LABEL = { nrus: 'Nuevo RUS', rer: 'Régimen Especial (RER)', rmt: 'MYPE Tributario (RMT)', rg: 'Régimen General', general: 'Régimen General' }; // (2026-11-24) el Diario guarda 'rg'
 
         function calcularDJMensualDetalle(periodo) {
             if (!diarioImport || !periodo) return null;
@@ -9858,6 +9858,18 @@ function renderAnalisisCuenta() {
             if (anios.includes(actual)) sel.value = actual;
         }
 
+        // (2026-11-24) UIT por año (valor oficial); se usa si el usuario no la cambió para ese ejercicio.
+        const UIT_POR_ANIO = { '2024': 5150, '2025': 5350, '2026': 5500 };
+        function uitDelAnio(anio) { return UIT_POR_ANIO[anio] || UIT_POR_ANIO['2026']; }
+        // (2026-11-24) Impuesto anual según el régimen: MYPE Tributario = 10% hasta 15 UIT y 29.5% el exceso; Régimen General =
+        // 29.5% sobre todo; RER y Nuevo RUS no presentan esta declaración anual (sus pagos mensuales son definitivos).
+        function impuestoRentaAnual(regimen, rentaNeta, uit) {
+            if (regimen === 'rer' || regimen === 'nrus') return 0;
+            if (regimen === 'rg' || regimen === 'general') return rentaNeta * 0.295;
+            const tope15uit = 15 * uit;
+            return rentaNeta <= tope15uit ? rentaNeta * 0.10 : tope15uit * 0.10 + (rentaNeta - tope15uit) * 0.295;
+        }
+
         function calcularDJAnual(anio) {
             if (!diarioImport || !anio) return null;
             const mesesDisponibles = Object.keys(diarioImport.periodsData).filter(p => p.startsWith(anio + '-')).sort();
@@ -9873,26 +9885,24 @@ function renderAnalisisCuenta() {
             const gastosOperativos = er.gastosAdmin + er.gastosVentas + er.gastosFinancieros + er.gastosSinCC;
 
             const params = (appConfig.djAnual && appConfig.djAnual[anio]) || {};
-            const uit = params.uit != null ? params.uit : 5350;
+            const uit = params.uit != null ? params.uit : uitDelAnio(anio);
+            const regimen = ((diarioImport && diarioImport.config) || {}).regimenTributario || 'rmt';
             const adiciones = params.adiciones || [];
             const deducciones = params.deducciones || [];
             const totalAdiciones = adiciones.reduce((s, l) => s + l.monto, 0);
             const totalDeducciones = deducciones.reduce((s, l) => s + l.monto, 0);
             const rentaNetaImponible = Math.max(0, er.utilidad + totalAdiciones - totalDeducciones);
 
-            const tope15uit = 15 * uit;
-            const impuesto = rentaNetaImponible <= tope15uit
-                ? rentaNetaImponible * 0.10
-                : tope15uit * 0.10 + (rentaNetaImponible - tope15uit) * 0.295;
+            const impuesto = impuestoRentaAnual(regimen, rentaNetaImponible, uit);
 
-            const saldo = round2(impuesto - pagosACuenta); // positivo = por pagar, negativo = a favor
+            const saldo = (regimen === 'rer' || regimen === 'nrus') ? 0 : round2(impuesto - pagosACuenta); // positivo = por pagar, negativo = a favor (RER/RUS: no aplica)
 
             return {
                 anio, mesesDisponibles: mesesDisponibles.length,
                 ingresos: er.ventasNetas, costoVentas: er.costoVentas, gastosOperativos,
                 utilidadContable: er.utilidad, pagosACuenta,
                 totalAdiciones, totalDeducciones, rentaNetaImponible, impuesto, saldo,
-                uit, adiciones, deducciones
+                uit, adiciones, deducciones, regimen
             };
         }
 
@@ -9900,8 +9910,8 @@ function renderAnalisisCuenta() {
             const anio = document.getElementById('dj-anio').value;
             if (!anio) return;
             if (!appConfig.djAnual) appConfig.djAnual = {};
-            if (!appConfig.djAnual[anio]) appConfig.djAnual[anio] = { uit: 5350, adiciones: [], deducciones: [] };
-            appConfig.djAnual[anio].uit = parseFloat(document.getElementById('dj-uit').value) || 5350;
+            if (!appConfig.djAnual[anio]) appConfig.djAnual[anio] = { uit: uitDelAnio(anio), adiciones: [], deducciones: [] };
+            appConfig.djAnual[anio].uit = parseFloat(document.getElementById('dj-uit').value) || uitDelAnio(anio);
             localStorage.setItem('reportes_app_config', JSON.stringify(appConfig));
             renderDJAnual();
         }
@@ -9916,7 +9926,7 @@ function renderAnalisisCuenta() {
             if (!descripcion) { showToast('Escribe una descripción.', 'error'); return; }
             if (!monto || monto <= 0) { showToast('Escribe un monto válido.', 'error'); return; }
             if (!appConfig.djAnual) appConfig.djAnual = {};
-            if (!appConfig.djAnual[anio]) appConfig.djAnual[anio] = { uit: 5350, adiciones: [], deducciones: [] };
+            if (!appConfig.djAnual[anio]) appConfig.djAnual[anio] = { uit: uitDelAnio(anio), adiciones: [], deducciones: [] };
             if (!appConfig.djAnual[anio][tipo]) appConfig.djAnual[anio][tipo] = [];
             appConfig.djAnual[anio][tipo].push({ descripcion, monto });
             localStorage.setItem('reportes_app_config', JSON.stringify(appConfig));
@@ -9966,7 +9976,7 @@ function renderAnalisisCuenta() {
             document.getElementById('dj-kpi-pagosacuenta').innerText = `S/ ${d.pagosACuenta.toFixed(2)}`;
             document.getElementById('dj-kpi-meses').innerText = `${d.mesesDisponibles} / 12`;
             document.getElementById('dj-kpi-rentaneta').innerText = `S/ ${d.rentaNetaImponible.toFixed(2)}`;
-            document.getElementById('dj-kpi-impuesto').innerText = `S/ ${d.impuesto.toFixed(2)}`;
+            document.getElementById('dj-kpi-impuesto').innerText = (d.regimen === 'rer' || d.regimen === 'nrus') ? `No aplica (${d.regimen === 'rer' ? 'RER' : 'Nuevo RUS'})` : `S/ ${d.impuesto.toFixed(2)}`;
             document.getElementById('dj-kpi-pagos2').innerText = `S/ ${d.pagosACuenta.toFixed(2)}`;
             document.getElementById('dj-saldo-label').innerText = d.saldo >= 0 ? 'Saldo a Pagar' : 'Saldo a Favor';
             document.getElementById('dj-kpi-saldo').innerText = `S/ ${Math.abs(d.saldo).toFixed(2)}`;
