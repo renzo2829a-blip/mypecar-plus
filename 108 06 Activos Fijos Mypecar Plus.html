@@ -610,8 +610,9 @@
             const corte = new Date((fechaCorte || hoyPeru()) + 'T00:00:00');
             let meses = (corte.getFullYear() - inicioUso.getFullYear()) * 12 + (corte.getMonth() - inicioUso.getMonth()) + 1;
             meses = Math.max(0, meses);
-            let depreAcumulada = depreMensual * meses;
-            depreAcumulada = Math.min(depreAcumulada, valorDepreciable);
+            // (2026-11-24) La acumulada se redondea a centavos ANTES de restar mes a mes: así la suma de las depreciaciones
+            // mensuales es exactamente la acumulada y el último mes llega justo al valor depreciable (no 3,500.16 ni 999.84).
+            let depreAcumulada = round2(Math.min(depreMensual * meses, valorDepreciable));
             const valorNeto = activo.costo - depreAcumulada;
             const mesesVidaUtilTotal = activo.tasaDepreciacion > 0 ? Math.ceil((100 / activo.tasaDepreciacion) * 12) : 0;
             const mesesRestantes = Math.max(0, mesesVidaUtilTotal - meses);
