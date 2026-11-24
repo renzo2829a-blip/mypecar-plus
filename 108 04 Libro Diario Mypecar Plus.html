@@ -6780,6 +6780,38 @@ function mensajeCuentaNoImputable(codigo, origen) {
         // ==================================================================
         // ESTADO DE SITUACIÓN FINANCIERA
         // ==================================================================
+        // (2026-11-24) SITUACIÓN FINANCIERA CON SALDOS DE AÑOS ANTERIORES (mismo criterio que 07 Reportes). Las cuentas de balance
+        // se acumulan desde el último asiento de Apertura (o desde el primer mes con datos), no solo desde enero; el resultado de
+        // años anteriores sin cierre contra la 59 se muestra como "Resultados de ejercicios anteriores". Con Apertura en enero,
+        // todo queda igual que antes.
+        function asientosDelPeriodo04(p) { return p === config.periodoActivo ? asientos : ((periodsData[p] && periodsData[p].asientos) || []); }
+        function getMovimientosRango04(desde, hasta) {
+            const map = {};
+            Object.keys(periodsData).filter(p => p >= desde && p <= hasta).sort().forEach(p => {
+                asientosDelPeriodo04(p).forEach(a => (a.lineas || []).forEach(l => {
+                    if (!map[l.cuenta]) map[l.cuenta] = { debe: 0, haber: 0, movimientos: [] };
+                    map[l.cuenta].debe += l.debe; map[l.cuenta].haber += l.haber;
+                    map[l.cuenta].movimientos.push({ numero: a.numero, fecha: a.fecha, glosa: a.glosa, debe: l.debe, haber: l.haber, origen: a.origen, cc: l.cc, periodo: p });
+                }));
+            });
+            return map;
+        }
+        function periodoInicioBalance04(periodoHasta) {
+            const periodos = Object.keys(periodsData).filter(p => p <= periodoHasta).sort();
+            const conApertura = periodos.filter(p => asientosDelPeriodo04(p).some(a => a.origen === 'Apertura'));
+            return conApertura.length ? conApertura[conApertura.length - 1] : (periodos[0] || periodoHasta);
+        }
+        function estadoSituacionAl(periodoHasta, utilidadEjercicio) {
+            const desde = periodoInicioBalance04(periodoHasta);
+            const inicioAnio = periodoHasta.slice(0, 4) + '-01';
+            const finAnioAnterior = (parseInt(periodoHasta.slice(0, 4), 10) - 1) + '-12';
+            const resultadosAnteriores = desde < inicioAnio ? calcularEstadoResultados(getMovimientosRango04(desde, finAnioAnterior)).utilidad : 0;
+            const s = calcularEstadoSituacion(getMovimientosRango04(desde, periodoHasta), utilidadEjercicio + resultadosAnteriores);
+            s.resultadosAnteriores = resultadosAnteriores;
+            s.utilidadEjercicio = utilidadEjercicio;
+            return s;
+        }
+
         function calcularEstadoSituacion(mov, utilidad) {
             const grupos = { activo_corriente: 0, activo_no_corriente: 0, pasivo_corriente: 0, pasivo_no_corriente: 0, patrimonio: 0 };
             const detalle = { activo_corriente: [], activo_no_corriente: [], pasivo_corriente: [], pasivo_no_corriente: [], patrimonio: [] };
@@ -7035,9 +7067,9 @@ function mensajeCuentaNoImputable(codigo, origen) {
         }
 
         function renderEstadoSituacion() {
-            const mov = getMovimientosPorCuenta();
+            const mov = getMovimientosPorCuentaAcumulado(config.periodoActivo); // (2026-11-24) antes: solo los movimientos del mes
             const { utilidad } = calcularEstadoResultados(mov);
-            const s = calcularEstadoSituacion(mov, utilidad);
+            const s = estadoSituacionAl(config.periodoActivo, utilidad);
             const lbl = document.getElementById('pantalla-periodo-esf'); if (lbl) lbl.innerText = formatPeriodoLabel(config.periodoActivo);
 
             const rowsFor = (grupo) => s.detalle[grupo]
@@ -7067,6 +7099,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 <tr class="border-t-2 border-slate-800"><td class="py-2 font-bold text-slate-900">TOTAL PASIVO</td><td class="py-2 text-right font-mono font-bold text-slate-900">S/ ${s.totalPasivo.toFixed(2)}</td></tr>
                 <tr><td class="py-2 font-bold text-slate-700 pt-4" colspan="2">Patrimonio</td></tr>
                 ${rowsFor('patrimonio') || '<tr><td class="py-1 pl-2 text-slate-400 text-xs" colspan="2">Sin movimientos</td></tr>'}
+                ${Math.abs(s.resultadosAnteriores || 0) > 0.005 ? `<tr><td class="py-1.5 pl-2 text-slate-600" title="Resultado de años anteriores que todavía no se trasladó a la cuenta 59 con un asiento de cierre">Resultados de ejercicios anteriores (sin cierre)</td><td class="py-1.5 text-right font-mono ${s.resultadosAnteriores < 0 ? 'text-rose-600' : ''}">${s.resultadosAnteriores.toFixed(2)}</td></tr>` : ''}
                 <tr><td class="py-1.5 pl-2 text-slate-600">Utilidad (Pérdida) del Ejercicio</td><td class="py-1.5 text-right font-mono ${utilidad < 0 ? 'text-rose-600' : ''}">${utilidad.toFixed(2)}</td></tr>
                 <tr class="border-t border-slate-200"><td class="py-1.5 font-semibold text-slate-700">Total Patrimonio</td><td class="py-1.5 text-right font-mono font-semibold">${s.totalPatrimonio.toFixed(2)}</td></tr>
                 <tr class="border-t-2 border-slate-800"><td class="py-2 font-black text-slate-900">TOTAL PASIVO Y PATRIMONIO</td><td class="py-2 text-right font-mono font-black text-slate-900">S/ ${s.totalPasivoPatrimonio.toFixed(2)}</td></tr>
@@ -7124,7 +7157,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             const er = calcularEstadoResultados(mov);
             const movAcum = getMovimientosPorCuentaAcumulado(periodo);
             const erAcum = calcularEstadoResultados(movAcum);
-            const s = calcularEstadoSituacion(movAcum, erAcum.utilidad);
+            const s = estadoSituacionAl(periodo, erAcum.utilidad);
 
             const lbl1 = document.getElementById('pantalla-periodo-notas'); if (lbl1) lbl1.innerText = formatPeriodoLabel(periodo);
             const lbl2 = document.getElementById('print-periodo-notas'); if (lbl2) lbl2.innerText = formatPeriodoLabel(periodo);
@@ -7190,7 +7223,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             const periodo = config.periodoActivo;
             const movAcum = getMovimientosPorCuentaAcumulado(periodo);
             const erAcum = calcularEstadoResultados(movAcum);
-            const s = calcularEstadoSituacion(movAcum, erAcum.utilidad);
+            const s = estadoSituacionAl(periodo, erAcum.utilidad);
 
             const buckets = {};
             ['activo_corriente', 'activo_no_corriente', 'pasivo_corriente', 'pasivo_no_corriente', 'patrimonio'].forEach(grupo => {
@@ -7321,7 +7354,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
 
             const movAcum = getMovimientosPorCuentaAcumulado(periodo);
             const erAcum = calcularEstadoResultados(movAcum);
-            const esAcum = calcularEstadoSituacion(movAcum, erAcum.utilidad);
+            const esAcum = estadoSituacionAl(periodo, erAcum.utilidad);
             const dif = Math.abs(e.totalFinal - esAcum.totalPatrimonio);
             const estadoBox = document.getElementById('ecp-estado');
             if (dif < 0.01) {
@@ -7914,7 +7947,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 if (tieneDatosAnteriores) {
                     const movAnt = getMovimientosPorCuentaAcumulado(periodoAnteriorKey);
                     const erAnt = calcularEstadoResultados(movAnt);
-                    const esAnt = calcularEstadoSituacion(movAnt, erAnt.utilidad);
+                    const esAnt = estadoSituacionAl(periodoAnteriorKey, erAnt.utilidad);
                     const ratiosAnt = calcularRatiosFinancieros(movAnt, erAnt, esAnt);
 
                     const difUtilidad = erAcum.utilidad - erAnt.utilidad;
@@ -7962,7 +7995,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
 
             const movAcum = getMovimientosPorCuentaAcumulado(periodoHasta);
             const erAcum = calcularEstadoResultados(movAcum);
-            const esAcum = calcularEstadoSituacion(movAcum, erAcum.utilidad);
+            const esAcum = estadoSituacionAl(periodoHasta, erAcum.utilidad);
             const ratios = calcularRatiosFinancieros(movAcum, erAcum, esAcum);
             const recomendaciones = generarRecomendaciones(erAcum, esAcum, ratios);
             const conclusiones = generarConclusiones(erAcum, esAcum, ratios, periodoHasta);
@@ -8236,9 +8269,9 @@ function mensajeCuentaNoImputable(codigo, origen) {
 
         // ============ EXPORTAR SITUACIÓN FINANCIERA (periodo activo) ============
         async function exportarSituacionFinancieraExcel() {
-            const mov = getMovimientosPorCuenta();
+            const mov = getMovimientosPorCuentaAcumulado(config.periodoActivo); // (2026-11-24) antes: solo los movimientos del mes
             const { utilidad } = calcularEstadoResultados(mov);
-            const s = calcularEstadoSituacion(mov, utilidad);
+            const s = estadoSituacionAl(config.periodoActivo, utilidad);
             const periodoTxt = formatPeriodoLabel(config.periodoActivo);
             await descargarHojaUnica('Situacion Financiera', `Situacion_Financiera_${config.ruc}_${config.periodoActivo}.xlsx`, ws => {
                 ws.columns = [{ width: 44 }, { width: 16 }, { width: 6 }, { width: 44 }, { width: 16 }];
@@ -8269,6 +8302,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 ws.getCell(rowP, 4).value = 'TOTAL PASIVO'; ws.getCell(rowP, 4).font = { bold: true }; ws.getCell(rowP, 5).value = s.totalPasivo; fmtMoneda(ws.getCell(rowP, 5)); ws.getCell(rowP, 5).font = { bold: true }; rowP += 2;
                 ws.getCell(rowP, 4).value = 'Patrimonio'; ws.getCell(rowP, 4).font = { bold: true }; rowP++;
                 detalleFor('patrimonio').forEach(d => { ws.getCell(rowP, 4).value = `  ${d.cta} - ${getAccountName(d.cta)}`; ws.getCell(rowP, 5).value = d.valor; fmtMoneda(ws.getCell(rowP, 5)); rowP++; });
+                if (Math.abs(s.resultadosAnteriores || 0) > 0.005) { ws.getCell(rowP, 4).value = '  Resultados de ejercicios anteriores (sin cierre)'; ws.getCell(rowP, 5).value = s.resultadosAnteriores; fmtMoneda(ws.getCell(rowP, 5)); rowP++; }
                 ws.getCell(rowP, 4).value = '  Utilidad (Pérdida) del Ejercicio'; ws.getCell(rowP, 5).value = utilidad; fmtMoneda(ws.getCell(rowP, 5)); if (utilidad < 0) ws.getCell(rowP, 5).font = { color: { argb: COLOR_BAD } }; rowP++;
                 ws.getCell(rowP, 4).value = 'Total Patrimonio'; ws.getCell(rowP, 4).font = { bold: true }; ws.getCell(rowP, 5).value = s.totalPatrimonio; fmtMoneda(ws.getCell(rowP, 5)); ws.getRow(rowP).border = { top: { style: 'thin' } }; rowP++;
                 ws.getCell(rowP, 4).value = 'TOTAL PASIVO Y PATRIMONIO'; ws.getCell(rowP, 4).font = { bold: true, size: 11 }; ws.getCell(rowP, 5).value = s.totalPasivoPatrimonio; fmtMoneda(ws.getCell(rowP, 5)); ws.getCell(rowP, 5).font = { bold: true, size: 11 };
@@ -8292,7 +8326,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             const movAcum = getMovimientosPorCuentaAcumulado(periodoHasta);
             const erMes = calcularEstadoResultados(getMovimientosPorCuenta());
             const erAcum = calcularEstadoResultados(movAcum);
-            const esAcum = calcularEstadoSituacion(movAcum, erAcum.utilidad);
+            const esAcum = estadoSituacionAl(periodoHasta, erAcum.utilidad);
             const ratios = calcularRatiosFinancieros(movAcum, erAcum, esAcum);
             const recomendaciones = generarRecomendaciones(erAcum, esAcum, ratios);
 
@@ -8451,7 +8485,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             const movAcum = getMovimientosPorCuentaAcumulado(periodoHasta);
             const erMes = calcularEstadoResultados(movMes);
             const erAcum = calcularEstadoResultados(movAcum);
-            const esAcum = calcularEstadoSituacion(movAcum, erAcum.utilidad);
+            const esAcum = estadoSituacionAl(periodoHasta, erAcum.utilidad);
             const ratios = calcularRatiosFinancieros(movAcum, erAcum, esAcum);
             const recomendaciones = generarRecomendaciones(erAcum, esAcum, ratios);
 
@@ -8975,7 +9009,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             const er = calcularEstadoResultados(mov);
             const movAcum = getMovimientosPorCuentaAcumulado(periodoHasta);
             const erAcum = calcularEstadoResultados(movAcum);
-            const es = calcularEstadoSituacion(movAcum, erAcum.utilidad);
+            const es = estadoSituacionAl(periodoHasta, erAcum.utilidad);
             return { mov, er, movAcum, erAcum, es, periodoMes, periodoHasta, rango: detectado && detectado.tipo === 'rango' };
         }
 
