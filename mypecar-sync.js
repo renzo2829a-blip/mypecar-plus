@@ -1268,7 +1268,16 @@ var LZString = {
     },
     async listarMias() {
       requiereSupabase();
-      const { data, error } = await supabaseClient.from('empresas').select('*').order('nombre_comercial');
+      // Doble candado (2026-11-24): además de la regla de la base de datos, se pide EXPLÍCITAMENTE solo las empresas
+      // donde este usuario es miembro (por su user_id), en vez de pedir "todas" y confiar solo en la regla.
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) throw new Error('MypecarSync: no hay una sesión iniciada.');
+      const { data: miembro, error: errM } = await supabaseClient.from('empresa_usuarios')
+        .select('empresa_id').eq('user_id', user.id);
+      if (errM) throw errM;
+      const ids = (miembro || []).map(m => m.empresa_id);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabaseClient.from('empresas').select('*').in('id', ids).order('nombre_comercial');
       if (error) throw error;
       return data;
     },
@@ -1472,16 +1481,20 @@ var LZString = {
       if (error) throw error;
       return data || [];
     },
-    async actualizarAppsInvitacionPendiente(invitacionId, appsPermitidas) {
+    // (2026-11-24) Toda operación sobre una invitación lleva TAMBIÉN el empresa_id de la empresa activa: una invitación
+    // de otra empresa no se puede tocar aunque se conozca su id.
+    async actualizarAppsInvitacionPendiente(invitacionId, appsPermitidas, empresaId) {
       requiereSupabase();
+      const emp = empresaId || requiereEmpresaActiva();
       const { error } = await supabaseClient.from('invitaciones_pendientes')
-        .update({ apps_permitidas: appsPermitidas }).eq('id', invitacionId);
+        .update({ apps_permitidas: appsPermitidas }).eq('id', invitacionId).eq('empresa_id', emp);
       if (error) throw error;
     },
-    async cancelarInvitacionPendiente(invitacionId) {
+    async cancelarInvitacionPendiente(invitacionId, empresaId) {
       requiereSupabase();
+      const emp = empresaId || requiereEmpresaActiva();
       const { error } = await supabaseClient.from('invitaciones_pendientes')
-        .delete().eq('id', invitacionId);
+        .delete().eq('id', invitacionId).eq('empresa_id', emp);
       if (error) throw error;
     },
     // Co-dueño(a): para que la administración de accesos no dependa de una
