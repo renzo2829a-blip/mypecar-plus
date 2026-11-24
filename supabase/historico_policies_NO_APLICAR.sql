@@ -1,4 +1,13 @@
 -- =====================================================================================================
+-- ⛔ NO APLICAR ESTE ARCHIVO.  (2026-11-24)
+-- Es solo un registro histórico. Supabase YA tiene reglas de acceso (RLS) más estrictas, aplicadas el 20-nov y reforzadas el
+-- 24-nov (ver supabase/ESTADO_ACTUAL.md): exigen además que la empresa esté AUTORIZADA y con licencia vigente. Este archivo
+-- borra esas reglas y las reemplaza por unas más débiles (sin el control de empresa autorizada), así que pegarlo ABRIRÍA la
+-- puerta. Por eso empieza con un freno que aborta todo si alguien lo ejecuta.
+-- =====================================================================================================
+do $$ begin raise exception 'NO APLICAR: este archivo es historico y debilitaria la seguridad. Ver supabase/ESTADO_ACTUAL.md'; end $$;
+
+-- =====================================================================================================
 -- MYPECAR PLUS — reglas de acceso (RLS) de todas las tablas que usa el sistema.      2026-11-24
 -- Este archivo ES el arreglo: se pega ENTERO en Supabase → SQL Editor → Run. Es seguro repetirlo.
 --

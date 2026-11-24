@@ -1,7 +1,7 @@
 #!/bin/bash
-# Comprueba policies.sql en un PostgreSQL LOCAL (no toca Supabase). Uso:
+# (HISTÓRICO) Comprobaba el antiguo policies.sql en un PostgreSQL LOCAL. Ese archivo ya no se aplica (ver supabase/ESTADO_ACTUAL.md); queda solo como referencia. Uso:
 #   crea la base:  psql -c "create database t" ; psql -d t -f supabase/tests/esquema_de_prueba.sql
-#   aplica:        psql -d t -f supabase/policies.sql ; psql -d t -f supabase/tests/datos_de_prueba.sql
+#   aplica:        psql -d t -f supabase/historico_policies_NO_APLICAR.sql (quitar antes su primera instrucción de freno) ; psql -d t -f supabase/tests/datos_de_prueba.sql
 #   prueba:        PGHOST=/tmp/pgt PGPORT=5544 bash supabase/tests/probar_reglas.sh
 # uso: q USUARIO ROL "SQL"   -> ejecuta como ese usuario (JWT simulado) y muestra resultado o error
 q(){ psql -d t -At -c "set role $2; select set_config('request.jwt.claim.sub','$1',false), set_config('request.jwt.claim.role','$2',false), set_config('request.jwt.claim.email','$4',false);" -c "$3" 2>&1 | grep -v "^set_config\|^SET\|^$\|^[|]*$" | grep -v "^|" | head -3 | tr '\n' ' '; }
