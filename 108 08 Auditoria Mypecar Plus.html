@@ -2127,7 +2127,10 @@ const MypecarPEVista = (function () {
             const conMontoInconsistente = comprasSujetas.filter(p => {
                 if (!p.tasaDetraccion || !p.montoDetraccion) return false;
                 const esperado = p.total * p.tasaDetraccion;
-                return Math.abs(esperado - p.montoDetraccion) > 0.05;
+                // (2026-11-24) Correcto si coincide con Total × Tasa (comprobantes antiguos, con decimales) o con ese monto
+                // redondeado a soles enteros (como exige SUNAT y como se registra ahora).
+                const enteroSunat = Math.round(parseFloat(esperado.toPrecision(12)));
+                return Math.abs(esperado - p.montoDetraccion) > 0.05 && Math.abs(enteroSunat - p.montoDetraccion) > 0.005;
             });
 
             const detalleHtml = `<div class="grid grid-cols-3 gap-3 text-xs text-center">
