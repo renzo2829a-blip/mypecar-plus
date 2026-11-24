@@ -5380,7 +5380,11 @@ const MypecarPEVista = (function () {
                     if (Math.abs(netCash) < 0.005) return; // transferencia entre cuentas propias de efectivo: no es entrada/salida real
 
                     const lineasNoEfectivo = asiento.lineas.filter(l => !CUENTAS_EFECTIVO.includes(l.cuenta));
-                    const totalNoEfectivo = lineasNoEfectivo.reduce((s, l) => s + Math.abs(l.debe - l.haber), 0) || 1;
+                    // (2026-11-24) Cada línea aporta su PROPIO efecto en caja (abono = entrada, cargo = salida). Antes el neto de
+                    // caja se repartía en proporción al tamaño de cada línea, y en el asiento mensual consolidado de Caja y Bancos
+                    // (planilla, tributos y préstamo juntos) la planilla pagada salía como ENTRADA (+1,033.55 en vez de −4,200).
+                    const sumaEfectos = lineasNoEfectivo.reduce((s, l) => s + ((l.haber || 0) - (l.debe || 0)), 0);
+                    const factor = Math.abs(sumaEfectos) > 0.005 ? netCash / sumaEfectos : 0; // 1 si el asiento cuadra
 
                     // Si el asiento ya tiene una línea de ingreso (venta) o de gasto/existencias (compra),
                     // el IGV de esa MISMA operación se agrupa junto con la cobranza/pago principal —
@@ -5388,11 +5392,11 @@ const MypecarPEVista = (function () {
                     // "Pago de Tributos" y "Pago de Remuneraciones" quedan reservados para desembolsos
                     // independientes (ej. pago del PDT 621, pago de planilla), sin una venta/compra en el mismo asiento.
                     const tieneIngreso = lineasNoEfectivo.some(l => getAccountGrupo(l.cuenta) === 'ingreso');
+                    const tienePagoIGV = lineasNoEfectivo.some(l => l.cuenta === '40111' && (l.debe || 0) > (l.haber || 0)) && lineasNoEfectivo.some(l => l.cuenta === '40112' && (l.haber || 0) > (l.debe || 0));
                     const tieneGastoOperativo = lineasNoEfectivo.some(l => { const g = getAccountGrupo(l.cuenta); return g === 'gasto' || l.cuenta === '421' || g === 'activo_corriente'; });
 
                     lineasNoEfectivo.forEach(l => {
-                        const monto = Math.abs(l.debe - l.haber);
-                        const asignado = netCash * (monto / totalNoEfectivo); // con signo: + entrada, - salida
+                        const asignado = ((l.haber || 0) - (l.debe || 0)) * factor; // con signo: + entrada, - salida
                         const cta = l.cuenta;
                         const grupo = getAccountGrupo(cta);
 
@@ -5402,10 +5406,14 @@ const MypecarPEVista = (function () {
                             if (asignado > 0) b.aporteCapital += asignado; else b.pagoDividendos += asignado;
                         } else if (cta.startsWith('45')) {
                             if (asignado > 0) b.obtencionPrestamos += asignado; else b.amortizacionPrestamos += asignado;
-                        } else if ((cta.startsWith('40') || cta.startsWith('41')) && tieneIngreso) {
+                        } else if (cta === '40111' && tieneIngreso) {
                             b.cobranzaClientes += asignado; // IGV de una venta: va junto con la cobranza
-                        } else if ((cta.startsWith('40') || cta.startsWith('41')) && tieneGastoOperativo) {
+                        } else if (cta === '40112' && tienePagoIGV && (l.haber || 0) > (l.debe || 0)) {
+                            b.pagoTributos += asignado; // crédito fiscal aplicado al pagar el IGV: es parte del pago del tributo
+                        } else if (cta === '40112' && tieneGastoOperativo) {
                             b.pagoProveedores += asignado; // IGV de una compra: va junto con el pago al proveedor
+                        } else if (cta.startsWith('40') && tieneIngreso && !tieneGastoOperativo) {
+                            b.cobranzaClientes += asignado; // otro tributo de una venta (ej. ICBPER): va con la cobranza
                         } else if (cta.startsWith('41')) {
                             b.pagoRemuneraciones += asignado; // pago de planilla independiente
                         } else if (cta.startsWith('40')) {
