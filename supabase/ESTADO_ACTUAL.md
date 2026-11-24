@@ -27,7 +27,21 @@ lote1 (funciones endurecidas) · lote2 (empresas y catálogo con membresía) · 
 admin_activacion_empresas · pagos_yape · acceso_provisional_48h · respaldo 24-nov · grupoA (empresa nueva siempre pendiente) ·
 grupoB (provisional a prueba de abuso) · prueba_gratis_14_dias · prueba_gratis_fin_de_prueba_al_pagar.
 
+## Revisión de seguridad (24-nov-2026)
+- Migración `quitar_permisos_peligrosos_go_maestro_decolecta`: se quitó TRUNCATE, TRIGGER y REFERENCES a `anon` y `authenticated` en
+  `go_maestro_diario` y `decolecta_cache` (con autorización expresa del dueño). RLS y "sin políticas" se mantienen. Reversible con GRANT.
+- Migración `minimo_permiso_tablas_internas`: `app_version_minima` queda solo lectura para usuarios con sesión; `app_config_respaldo` y
+  `keepalive_log` sin acceso desde el navegador. Ya estaban bloqueadas por RLS; ahora tampoco tienen el permiso.
+- Funciones `SECURITY DEFINER`: todas tienen `search_path` fijo. Las internas (disparadores, tareas programadas, Yape, renovar) NO las puede
+  ejecutar ni `anon` ni `authenticated`. Las 19 que puede ejecutar un usuario con sesión son las que usa la aplicación (14 vía `rpc`) o las
+  que usan las políticas de RLS (`es_miembro_de_empresa`, `empresa_autorizada`, `empresa_licencia_vigente`, `puedo_unirme_como_creador`,
+  `ping_db`). Cada una valida por dentro que el usuario sea miembro/dueño/administrador. No se deben revocar.
+- `ping_db()` (la única que puede ejecutar `anon`) solo devuelve `{ok, hora}`; no lee datos. Se deja como está por si algún monitor externo
+  la usa para mantener activo el proyecto Free.
+- Prueba con CLIENTE DEMO DOS (dueño con sesión): ve sus propios datos, lee la versión mínima y no puede escribirla.
+
 ## Pendientes conocidos
-- `go_maestro_diario` y `decolecta_cache`: el rol anónimo tiene permisos amplios (incluye TRUNCATE; RLS no los frena). No se tocan por
-  regla de la casa; decisión del dueño.
-- "Leaked password protection" apagado (se enciende en el panel: Auth → Passwords).
+- "Leaked password protection": no disponible en el plan Free (el panel pide plan Pro). Se activa en Auth → Sign In / Providers → Email si
+  algún día se pasa a Pro.
+- Sin respaldos automáticos (plan Free): solo existen las copias `respaldo_*` dentro de la misma base y la foto diaria `app_config_respaldo`.
+  Falta un respaldo externo periódico (decisión del dueño sobre dónde guardarlo).
