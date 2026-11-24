@@ -1,6 +1,7 @@
 # Cabeceras de seguridad para todo el sitio (Cloudflare Workers, archivos estáticos). 2026-11-24
 /*
   X-Content-Type-Options: nosniff
+  Cache-Control: no-cache
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=()

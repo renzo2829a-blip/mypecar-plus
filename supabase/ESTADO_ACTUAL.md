@@ -51,6 +51,12 @@ grupoB (provisional a prueba de abuso) · prueba_gratis_14_dias · prueba_gratis
 - Accesibilidad (mypecar-mobile.js): todo botón de solo ícono recibe nombre y tooltip; los campos sin etiqueta toman la de su
   costado o la de su columna (de ~300 sin etiqueta a 13).
 
+## Portal del administrador (24-nov-2026)
+- Migración `admin_portal_resumen_y_pagos`: funciones NUEVAS solo de lectura `admin_resumen_empresas()` (empresas con plan_nombre,
+  prueba gratis, usuarios y último pago reportado) y `admin_listar_pagos(p_dias)` (solicitudes y pagos Yape recibidos). Ambas exigen
+  `es_admin()`; `anon` sin permiso. `admin.html` las usa y, si fallan, vuelve a `admin_listar_empresas()`.
+- Versión mínima: `VERSION_SYNC` y `MYPECAR_APP_VERSION` = 2026-11-24; `app_version_minima` se sube a 2026-11-24 después de publicar.
+
 ## Pendientes conocidos
 - "Leaked password protection": no disponible en el plan Free (el panel pide plan Pro). Se activa en Auth → Sign In / Providers → Email si
   algún día se pasa a Pro.
