@@ -611,7 +611,7 @@ const MypecarPEVista = (function () {
                     <i class="fa-solid fa-gauge-high"></i> Panel General
                 </button>
                 <button id="btn-tab-shortcuts" onclick="switchTab('shortcuts')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
-                    <i class="fa-solid fa-circle-plus"></i> Registrar Asiento
+                    <i class="fa-solid fa-circle-plus"></i> Registrar Asiento <span id="bandeja-asientos-pendientes" class="hidden bg-amber-400 text-violet-950 text-[10px] font-black rounded-full px-1.5" title="Asientos por recibir de otros módulos">0</span>
                 </button>
                 <button id="btn-tab-diario" onclick="switchTab('diario')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all">
                     <i class="fa-solid fa-book"></i> Libro Diario
@@ -829,6 +829,15 @@ const MypecarPEVista = (function () {
                         <i class="fa-solid fa-upload"></i> Seleccionar archivo JSON
                     </button>
                 </div>
+            </div>
+            <!-- (2026-11-24) Asientos que llegan solos desde los otros módulos -->
+            <div id="bandeja-asientos-card" class="bg-white border border-violet-200 rounded-2xl p-4 mb-4 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <h4 class="font-bold text-violet-900 text-sm"><i class="fa-solid fa-inbox mr-1"></i> Asientos por recibir <span class="font-normal text-xs text-slate-500">— llegan solos desde Ventas, Compras, Caja, Personal y Activos Fijos</span></h4>
+                    <button type="button" onclick="actualizarBandejaAsientos()" class="text-xs font-bold text-violet-700 hover:underline"><i class="fa-solid fa-rotate"></i> Actualizar</button>
+                </div>
+                <div id="bandeja-asientos-lista" class="text-xs text-slate-600">Revisando…</div>
+                <p class="text-[10px] text-slate-400 mt-2">Pulsa <b>Cargar</b> para revisar el asiento en el formulario y guárdalo como siempre. Si el módulo de origen cambió después de que lo registraste, aparece <b>Actualizar</b>: se corrige el mismo asiento (no se duplica).</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -3477,6 +3486,7 @@ const MypecarPEVista = (function () {
         }
 
         function renderAll() {
+            try { if (typeof renderBandejaAsientos === 'function') renderBandejaAsientos(); } catch (e) { }
             renderControlCierre();
             updateDashboard();
             renderDiario();
@@ -4683,10 +4693,20 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 let data;
                 try { data = JSON.parse(e.target.result); }
                 catch (err) { showToast('El archivo no es un JSON válido.', 'error'); event.target.value = ''; return; }
+                importarAsientoDatos(data, {});
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
 
-                if (data.tipoDocumento !== 'asiento_resumen_libro_diario' || !Array.isArray(data.lineas) || data.lineas.length === 0) {
+        // (2026-11-24) Carga un asiento resumen en el formulario (desde archivo o desde la bandeja "Asientos por recibir").
+        // opciones.reemplazarId: el asiento ya registrado de ese origen se ACTUALIZA (mismo N°) en vez de crear otro.
+        function importarAsientoDatos(data, opciones) {
+            opciones = opciones || {};
+            {
+                if (!data || data.tipoDocumento !== 'asiento_resumen_libro_diario' || !Array.isArray(data.lineas) || data.lineas.length === 0) {
                     showToast('El archivo no tiene el formato esperado de asiento resumen.', 'error');
-                    event.target.value = ''; return;
+                    return false;
                 }
 
                 // (2026-10-18) El 04 es el catálogo maestro: aquí NO se crean cuentas solas desde otro libro
@@ -4713,12 +4733,13 @@ function mensajeCuentaNoImputable(codigo, origen) {
 
                 // Control de envíos: avisa si ya existe un asiento del mismo origen en este periodo —
                 // evita duplicar montos si el mismo libro se exportó e importó más de una vez.
-                const yaExiste = asientos.find(a => a.origen === data.origen);
+                const yaExiste = opciones.reemplazarId ? null : asientos.find(a => a.origen === data.origen);
                 if (yaExiste) {
                     const fechaAnterior = new Date(yaExiste.fechaRegistro || yaExiste.fecha).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
                     const continuar = confirm(`⚠ POSIBLE DUPLICADO\n\nYa existe un asiento de "${data.origen}" en este periodo — se registró el ${fechaAnterior}${yaExiste.preparadoPor ? ` (preparado por ${yaExiste.preparadoPor})` : ''}, con un total de S/ ${yaExiste.lineas.reduce((s, l) => s + l.debe, 0).toFixed(2)}.\n\nSi este archivo es una ACTUALIZACIÓN del mismo mes (no un asiento nuevo), primero elimina el asiento anterior en "Ver Asientos" — de lo contrario, al guardar este quedarán los dos y el monto se duplicará.\n\n¿Deseas continuar de todas formas?`);
-                    if (!continuar) { event.target.value = ''; return; }
+                    if (!continuar) return false;
                 }
+                if (opciones.reemplazarId) editarAsiento(opciones.reemplazarId); // modo edición: al guardar se actualiza ese mismo asiento
 
                 datosImportacionPendiente = { preparadoPor: data.preparadoPor || null, fechaExportacion: data.fechaExportacion || null, origen: data.origen || null };
 
@@ -4744,9 +4765,8 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 const quienPrepara = data.preparadoPor ? ` — preparado por ${data.preparadoPor}` : '';
                 showToast(`Asiento importado desde ${String(data.origen || '').startsWith('Resumen Ventas') ? 'Registro de Ventas' + (data.origen !== 'Resumen Ventas' ? ' (' + data.origen.split(' - ')[1] + ')' : '') : String(data.origen || '').startsWith('Resumen Compras') ? 'Registro de Compras' + (data.origen !== 'Resumen Compras' ? ' (' + data.origen.split(' - ')[1] + ')' : '') : 'archivo externo'}${quienPrepara}. Revisa y guarda.`);
                 document.getElementById('form-asiento').scrollIntoView({ behavior: 'smooth' });
-                event.target.value = '';
-            };
-            reader.readAsText(file);
+                return true;
+            }
         }
 
         // ==================================================================
@@ -9166,7 +9186,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             {
                 id: 'como_importar',
                 palabras: ['como importo', 'importar json', 'importar asiento', 'subir archivo desde'],
-                responder: () => `Para traer un asiento resumen desde Ventas, Compras, Caja-Bancos, Personal o Activos Fijos: en ese archivo exporta el asiento como JSON, y aquí en "Registrar Asiento" usa el botón "Importar JSON" y selecciona el archivo descargado.`
+                responder: () => `Los asientos resumen de Ventas, Compras, Caja-Bancos, Personal y Activos Fijos llegan solos: en "Registrar Asiento" mira el recuadro "Asientos por recibir" y pulsa "Cargar" (o "Actualizar" si cambió en el módulo de origen); luego guarda el asiento. Si no tienes internet, todavía puedes exportar el JSON en ese módulo y subirlo aquí con "Seleccionar archivo JSON".`
             },
             {
                 id: 'como_exportar_libro_completo',
@@ -9836,11 +9856,96 @@ window.mypecarConstruirSnapshots = function () {
 </script>
 
 <script>
+/* (2026-11-24) BANDEJA "ASIENTOS POR RECIBIR": los asientos resumen de Ventas, Compras, Caja y Bancos, Personal y
+   Activos Fijos llegan solos por la nube (antes: descargar un archivo y subirlo con "Importar JSON"). No se registran
+   solos: se cargan en el formulario con un clic y se guardan como siempre (con todas las validaciones del 04). */
+let bandejaAsientos = {}; // clave app|origen|periodo(|glosa) -> asiento resumen recibido
+const NOMBRE_APP_BANDEJA = { ventas: '01 Ventas', compras: '02 Compras', caja: '03 Caja y Bancos', personal: '05 Personal', activos: '06 Activos Fijos' };
+function claveBandeja(app, it) { return app + '|' + it.origen + '|' + it.periodo + (/^manual$/i.test(it.origen) ? '|' + (it.glosa || '') : ''); }
+async function cargarBandejaGuardada() {
+    try { const g = await storageGet('libro_diario_bandeja_asientos', {}); if (g && typeof g === 'object') bandejaAsientos = g; } catch (e) {}
+    renderBandejaAsientos();
+}
+async function recibirBandejaAsientos(app, payload) {
+    if (!payload || !Array.isArray(payload.items)) return;
+    Object.keys(bandejaAsientos).forEach(k => { if (k.indexOf(app + '|') === 0) delete bandejaAsientos[k]; }); // lo publicado reemplaza a lo anterior de ese módulo
+    payload.items.forEach(it => { if (it && it.origen && /^\d{4}-\d{2}$/.test(it.periodo || '')) bandejaAsientos[claveBandeja(app, it)] = Object.assign({}, it, { app }); });
+    await storageSet('libro_diario_bandeja_asientos', bandejaAsientos);
+    renderBandejaAsientos();
+}
+function asientosDelPeriodoBandeja(per) { return per === config.periodoActivo ? (asientos || []) : ((periodsData[per] || {}).asientos || []); }
+// Suma por cuenta sin las líneas de destino (Clase 9 / 791), que el 04 regenera solo al guardar.
+function sumaPorCuentaBandeja(lineas) {
+    const m = {};
+    (lineas || []).forEach(l => { const c = String(l.cuenta || ''); if (l.automatica || /^9/.test(c) || /^79/.test(c)) return; m[c] = (m[c] || 0) + Math.round((+l.debe || 0) * 100) - Math.round((+l.haber || 0) * 100); });
+    Object.keys(m).forEach(c => { if (m[c] === 0) delete m[c]; });
+    return JSON.stringify(Object.keys(m).sort().map(c => [c, m[c]]));
+}
+function estadoBandeja(it) {
+    const lista = asientosDelPeriodoBandeja(it.periodo).filter(a => a.origen === it.origen && (!/^manual$/i.test(it.origen) || a.glosa === it.glosa));
+    const vacio = !(it.lineas || []).length;
+    if (!lista.length) return vacio ? { estado: 'oculto' } : { estado: 'nuevo' };
+    if (vacio) return { estado: 'sin_montos', asiento: lista[0] };
+    if (lista.length > 1) return { estado: 'duplicado', asiento: lista[0], n: lista.length };
+    return sumaPorCuentaBandeja(lista[0].lineas) === sumaPorCuentaBandeja(it.lineas) ? { estado: 'registrado', asiento: lista[0] } : { estado: 'cambio', asiento: lista[0] };
+}
+function totalBandeja(it) { return (it.lineas || []).reduce((s, l) => s + (+l.debe || 0), 0); }
+function renderBandejaAsientos() {
+    const cont = document.getElementById('bandeja-asientos-lista'); if (!cont) return;
+    const filas = Object.keys(bandejaAsientos).map(k => ({ k, it: bandejaAsientos[k], e: estadoBandeja(bandejaAsientos[k]) })).filter(x => x.e.estado !== 'oculto')
+        .sort((a, b) => (b.it.periodo).localeCompare(a.it.periodo) || (a.e.estado === 'registrado') - (b.e.estado === 'registrado') || a.it.origen.localeCompare(b.it.origen));
+    const pend = filas.filter(x => x.e.estado !== 'registrado').length;
+    const badge = document.getElementById('bandeja-asientos-pendientes'); if (badge) { badge.textContent = pend; badge.classList.toggle('hidden', !pend); }
+    if (!filas.length) { cont.innerHTML = 'Todavía no llegó ningún asiento. Se envían solos cuando registras movimientos en Ventas, Compras, Caja y Bancos, Personal o Activos Fijos (con conexión a internet).'; return; }
+    const ETQ = {
+        nuevo: '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">Nuevo</span>',
+        cambio: '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold">Cambió en el origen</span>',
+        registrado: '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">Registrado ✓</span>',
+        sin_montos: '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold">El origen ya no tiene montos</span>',
+        duplicado: '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold">Registrado 2 o más veces</span>'
+    };
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    cont.innerHTML = '<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-left text-slate-500"><th class="p-1.5">Periodo</th><th class="p-1.5">Módulo</th><th class="p-1.5">Asiento</th><th class="p-1.5 text-right">Total S/</th><th class="p-1.5">Estado</th><th class="p-1.5"></th></tr></thead><tbody>' +
+        filas.map(x => {
+            const it = x.it, e = x.e;
+            const btn = e.estado === 'nuevo' ? `<button type="button" onclick="cargarDesdeBandeja('${encodeURIComponent(x.k)}')" class="bg-violet-600 hover:bg-violet-700 text-white font-bold px-3 py-1.5 rounded-lg">Cargar</button>`
+                : e.estado === 'cambio' ? `<button type="button" onclick="cargarDesdeBandeja('${encodeURIComponent(x.k)}')" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-lg">Actualizar</button>`
+                : e.asiento ? `<span class="text-slate-400">N° ${esc(e.asiento.numero)}</span>` : '';
+            const nota = e.estado === 'sin_montos' ? `<div class="text-[10px] text-rose-700">Revisa el asiento N° ${esc(e.asiento.numero)}: en el módulo de origen ya no hay montos para este mes.</div>`
+                : e.estado === 'duplicado' ? `<div class="text-[10px] text-rose-700">Hay ${e.n} asientos de este origen en el mes: revisa si sobra alguno.</div>` : '';
+            const adv = it.advertencia ? `<div class="text-[10px] text-amber-700">⚠ ${esc(it.advertencia)}</div>` : '';
+            return `<tr class="border-t border-slate-100"><td class="p-1.5 whitespace-nowrap">${esc(formatPeriodoLabel(it.periodo))}</td><td class="p-1.5 whitespace-nowrap">${esc(NOMBRE_APP_BANDEJA[it.app] || it.app)}</td><td class="p-1.5">${esc(it.glosa || it.origen)}${nota}${adv}</td><td class="p-1.5 text-right font-mono">${totalBandeja(it).toFixed(2)}</td><td class="p-1.5 whitespace-nowrap">${ETQ[e.estado] || ''}</td><td class="p-1.5 text-right">${btn}</td></tr>`;
+        }).join('') + '</tbody></table></div>';
+}
+async function cargarDesdeBandeja(kEnc) {
+    const it = bandejaAsientos[decodeURIComponent(kEnc)]; if (!it) return;
+    if (typeof asientoEnEdicionId !== 'undefined' && asientoEnEdicionId) { showToast('Primero termina o cancela la edición del asiento en curso.', 'error'); return; }
+    if (it.periodo !== config.periodoActivo) {
+        if (!confirm(`Este asiento es de ${formatPeriodoLabel(it.periodo)} y el periodo activo es ${formatPeriodoLabel(config.periodoActivo)}.\n\n¿Cambiar al periodo ${formatPeriodoLabel(it.periodo)} para cargarlo?`)) return;
+        if (!periodsData[it.periodo]) { periodsData[it.periodo] = { asientos: [] }; await storageSet(claveDePeriodo(it.periodo), periodsData[it.periodo]); }
+        await switchPeriod(it.periodo);
+    }
+    const e = estadoBandeja(it);
+    const data = { tipoDocumento: 'asiento_resumen_libro_diario', origen: it.origen, periodo: it.periodo, fecha: it.fecha, glosa: it.glosa,
+        preparadoPor: it.preparadoPor, fechaExportacion: it.fechaExportacion, nombres: it.nombres, lineas: it.lineas };
+    importarAsientoDatos(data, e.estado === 'cambio' && e.asiento ? { reemplazarId: e.asiento.id } : {});
+}
+async function actualizarBandejaAsientos() {
+    const cont = document.getElementById('bandeja-asientos-lista'); if (cont) cont.innerHTML = 'Revisando…';
+    try { if (window.__sincronizarBandejaAsientos) await window.__sincronizarBandejaAsientos(); } catch (e) {}
+    renderBandejaAsientos();
+}
+window.addEventListener('load', () => setTimeout(cargarBandejaGuardada, 1500));
+</script>
+
+<script>
 /* Enlace automático (2026-11-20): las facturas de Compras llegan solas desde la nube (sirven para verificar
    las facturas provisionadas; el mismo contenido que "Datos_Reportes_Compras.json"). */
 (function () {
-    const FUENTES = [{ app: 'compras', tipo: 'reportes', nombre: 'compras' }, { app: 'caja', tipo: 'reportes', nombre: 'cajabancos' }];
+    const FUENTES = [{ app: 'compras', tipo: 'reportes', nombre: 'compras' }, { app: 'caja', tipo: 'reportes', nombre: 'cajabancos' }]
+        .concat(['ventas', 'compras', 'caja', 'personal', 'activos'].map(a => ({ app: a, tipo: 'asientos', nombre: 'asientos_' + a })));
     async function alRecibir(app, tipo, archivo) {
+        if (tipo === 'asientos') { let p = null; try { p = JSON.parse(await archivo.text()); } catch (e) { return; } await recibirBandejaAsientos(app, p); return; }
         if (app === 'caja') {
             // Gastos Reparados automáticos desde Caja y Bancos (solo actúa si la opción está activa en 03).
             let payload = null; try { payload = JSON.parse(await archivo.text()); } catch (e) { return; }
@@ -9854,6 +9959,7 @@ window.mypecarConstruirSnapshots = function () {
         if (!window.MypecarSync || !window.MypecarSync.enlace) return setTimeout(iniciar, 1500);
         window.sincronizarGRDesdeCajaAhora = () => window.MypecarSync.enlace.sincronizar(FUENTES.filter(f => f.app === 'caja'), alRecibir, null, true);
         window.MypecarSync.enlace.automatico(FUENTES, alRecibir, null);
+        window.__sincronizarBandejaAsientos = () => window.MypecarSync.enlace.sincronizar(FUENTES.filter(f => f.tipo === 'asientos'), alRecibir, null, true);
     }
     window.addEventListener('load', () => setTimeout(iniciar, 2000));
 

@@ -4582,7 +4582,23 @@ window.mypecarConstruirSnapshots = function () {
         if (typeof periodsData === 'undefined' || !periodsData || !Object.keys(periodsData).length) return {};
         const pd = Object.assign({}, periodsData);
         pd[config.periodoActivo] = Object.assign({}, pd[config.periodoActivo] || {}, { movimientos: movimientos });
-        return { reportes: { tipo: 'cajabancos', version: 1, generadoEl: new Date().toISOString(), config: config, periodsData: pd, prestamos: listaPrestamos(null), pagosFacturas: pagosAFacturas(null) } };
+        // (2026-11-24) Asiento resumen del mes para el Libro Diario (bandeja "Asientos por recibir" del 04).
+        let fotoAsientos = null;
+        try {
+            const B = window.MypecarSync && MypecarSync.bandejaAsientos;
+            if (B && B.listo() && config.periodoActivo) {
+                try { generateAsientoResumen(); } catch (e) {}
+                const r = window._ultimoAsientoResumen;
+                const falt = window._faltantesDestinoUltimoResumen || [];
+                const [y, m] = String(config.periodoActivo).split('-'); const fin = `${y}-${m}-${String(new Date(+y, +m, 0).getDate()).padStart(2, '0')}`;
+                B.poner({ origen: 'Caja y Bancos', periodo: config.periodoActivo, fecha: fin,
+                    glosa: `Por el resumen del Libro de Caja y Bancos del periodo ${formatPeriodoLabel(config.periodoActivo)}`,
+                    preparadoPor: config.usuarioActivo || null, lineas: (r && r.lineas) || [],
+                    advertencia: falt.length ? `Falta el destino (Clase 9) de: ${falt.join(', ')} en Caja y Bancos` : '' });
+            }
+            fotoAsientos = B ? B.foto() : null;
+        } catch (e) { console.warn('Enlace: no se pudo armar el asiento para el Libro Diario:', e); }
+        return { ...(fotoAsientos ? { asientos: fotoAsientos } : {}), reportes: { tipo: 'cajabancos', version: 1, generadoEl: new Date().toISOString(), config: config, periodsData: pd, prestamos: listaPrestamos(null), pagosFacturas: pagosAFacturas(null) } };
     } catch (e) { console.warn('Enlace: no se pudo armar la foto de Caja y Bancos:', e); return {}; }
 };
 </script>

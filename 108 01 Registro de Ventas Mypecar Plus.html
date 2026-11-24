@@ -6529,7 +6529,22 @@ window.mypecarConstruirSnapshots = function () {
         const pd = Object.assign({}, periodsData);
         pd[config.periodoActivo] = Object.assign({}, pd[config.periodoActivo] || {}, { sales: sales });
         const empresa = { ruc: config.ruc, razonSocial: config.razonSocial, nombreComercial: config.nombreComercial };
+        // (2026-11-24) Asiento resumen del mes para el Libro Diario (bandeja "Asientos por recibir" del 04).
+        let fotoAsientos = null;
+        try {
+            const B = window.MypecarSync && MypecarSync.bandejaAsientos;
+            if (B && B.listo() && config.periodoActivo) {
+                try { generateAsientoResumen(); } catch (e) {}
+                const r = window._ultimoAsientoResumen;
+                const [y, m] = String(config.periodoActivo).split('-'); const fin = `${y}-${m}-${String(new Date(+y, +m, 0).getDate()).padStart(2, '0')}`;
+                B.poner({ origen: 'Resumen Ventas', periodo: config.periodoActivo, fecha: fin,
+                    glosa: `Por el resumen del Registro de Ventas del periodo ${formatPeriodoLabel(config.periodoActivo)}` + (cobrosDelPeriodo(config.periodoActivo).length ? ' (incluye cobros de ventas a crédito del mes)' : ''),
+                    preparadoPor: config.usuarioActivo || null, lineas: (r && r.lineas) || [] });
+            }
+            fotoAsientos = B ? B.foto() : null;
+        } catch (e) { console.warn('Enlace: no se pudo armar el asiento para el Libro Diario:', e); }
         return {
+            ...(fotoAsientos ? { asientos: fotoAsientos } : {}),
             reportes: { tipo: 'ventas', generadoEl: new Date().toISOString(), config: config, periodsData: pd, clientes: clientes, customAccounts: customAccounts },
             inventario: { tipo: 'movimientos_inventario', origen: 'ventas', generadoEl: new Date().toISOString(), empresa: empresa, puntosVenta: config.puntosVenta, productos: config.productos, movimientos: stockMovimientos }
         };

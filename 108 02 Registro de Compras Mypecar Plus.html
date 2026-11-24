@@ -8068,7 +8068,30 @@ window.mypecarConstruirSnapshots = function () {
             })) });
         });
         const empresa = { ruc: config.ruc, razonSocial: config.razonSocial, nombreComercial: config.nombreComercial };
+        // (2026-11-24) Asientos resumen del mes (uno por tipo) para el Libro Diario (bandeja "Asientos por recibir" del 04).
+        let fotoAsientos = null;
+        try {
+            const B = window.MypecarSync && MypecarSync.bandejaAsientos;
+            if (B && B.listo() && config.periodoActivo) {
+                try { generateAsientoResumen(); } catch (e) {}
+                const lista = window._asientosResumen || [];
+                const falt = window._faltantesDestinoUltimoResumen || [];
+                const [y, m] = String(config.periodoActivo).split('-'); const fin = `${y}-${m}-${String(new Date(+y, +m, 0).getDate()).padStart(2, '0')}`;
+                const vistos = new Set();
+                lista.forEach(a => {
+                    vistos.add(a.origen);
+                    B.poner({ origen: a.origen, periodo: config.periodoActivo, fecha: fin, glosa: a.glosa,
+                        nombres: Object.fromEntries((a.lineas || []).map(l => [l.cuenta, getAccountName(l.cuenta)])),
+                        preparadoPor: config.usuarioActivo || null, lineas: a.lineas || [],
+                        advertencia: falt.length ? `Falta el destino (Clase 9) de: ${falt.join(', ')} en Compras` : '' });
+                });
+                // Un tipo que ya no tiene comprobantes este mes se envía vacío (el 04 avisa que cambió).
+                Object.values(B._items || {}).forEach(it => { if (it.periodo === config.periodoActivo && !vistos.has(it.origen)) B.poner(Object.assign({}, it, { lineas: [] })); });
+            }
+            fotoAsientos = B ? B.foto() : null;
+        } catch (e) { console.warn('Enlace: no se pudo armar los asientos para el Libro Diario:', e); }
         return {
+            ...(fotoAsientos ? { asientos: fotoAsientos } : {}),
             reportes: { tipo: 'compras', version: 2, generadoEl: new Date().toISOString(), config: config, periodsData: periodsDataExport, proveedores: proveedores, customAccounts: customAccounts },
             inventario: { tipo: 'movimientos_inventario', origen: 'compras', generadoEl: new Date().toISOString(), empresa: empresa, puntosVenta: config.puntosVenta, productos: config.productos,
                 movimientos: stockMovimientos.map(m => m.cuenta ? m : Object.assign({}, m, { cuenta: cuentaDeMovimientoInventario(m) })) }
