@@ -1,4 +1,4 @@
-// Avisa al dueño (correo con Resend y/o WhatsApp con CallMeBot) cuando una empresa se registra o declara un pago.
+// Avisa al dueño (correo con Resend y/o WhatsApp con CallMeBot) cuando una empresa se registra, declara un pago o inicia su prueba gratuita.
 // Solo lo puede pedir un miembro de esa empresa, y cada aviso se envía una sola vez.
 // Secretos opcionales: RESEND_API_KEY, AVISO_EMAIL, RESEND_FROM, CALLMEBOT_PHONE, CALLMEBOT_APIKEY.
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
 
   let body: { tipo?: string; empresa_id?: string } = {};
   try { body = await req.json(); } catch (_) { /* vacío */ }
-  const tipo = body.tipo === "pago_reportado" ? "pago_reportado" : body.tipo === "registro" ? "registro" : null;
+  const tipo = body.tipo === "pago_reportado" ? "pago_reportado" : body.tipo === "registro" ? "registro" : body.tipo === "prueba_iniciada" ? "prueba_iniciada" : null;
   const empresaId = body.empresa_id;
   if (!tipo || !empresaId) return json({ error: "datos incompletos" }, 400);
 
@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
   const { data: miembro } = await sb.from("empresa_usuarios").select("user_id").eq("empresa_id", empresaId).eq("user_id", u.user.id).maybeSingle();
   if (!miembro) return json({ error: "no autorizado" }, 403);
 
-  const { data: emp } = await sb.from("empresas").select("ruc,razon_social,nombre_comercial,estado").eq("id", empresaId).maybeSingle();
+  const { data: emp } = await sb.from("empresas").select("ruc,razon_social,nombre_comercial,estado,plan_nombre,vence_en").eq("id", empresaId).maybeSingle();
   if (!emp) return json({ error: "empresa no encontrada" }, 404);
   const nombre = emp.nombre_comercial || emp.razon_social || "Empresa";
 
@@ -68,6 +68,11 @@ Deno.serve(async (req) => {
   if (tipo === "registro") {
     asunto = "MYPECAR: nueva empresa registrada";
     msg = `Nueva empresa registrada: ${nombre} (RUC ${emp.ruc}). Estado: ${emp.estado}. Si paga por Yape, se activará sola.`;
+  } else if (tipo === "prueba_iniciada") {
+    // Solo si la base de datos confirma que la empresa de verdad está en prueba (nadie puede inventar este aviso).
+    if (emp.plan_nombre !== "prueba") return json({ ok: true, enviado: false });
+    asunto = "MYPECAR: empezó una prueba gratuita";
+    msg = `Prueba gratuita de 14 días iniciada: ${nombre} (RUC ${emp.ruc}). Vence el ${emp.vence_en}.`;
   } else {
     const { data: sol } = await sb.from("solicitudes_pago").select("id,plan,monto,nombre_yape,estado,provisional").eq("empresa_id", empresaId).eq("estado", "esperando").order("creado_en", { ascending: false }).limit(1).maybeSingle();
     if (!sol) return json({ ok: true, enviado: false });

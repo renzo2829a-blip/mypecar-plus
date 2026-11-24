@@ -808,6 +808,7 @@
           if (r && r.ok) {
             decirP('¡Listo! Tienes ' + (r.dias || DIAS_PRUEBA) + ' días gratis. Entrando…', true);
             try { sessionStorage.removeItem('mps_quiere_prueba'); } catch (e) {}
+            global.MypecarSync.empresas.avisar(global.MypecarSync.empresas.activaId(), 'prueba_iniciada'); // aviso al administrador (una sola vez por empresa)
             setTimeout(() => window.location.reload(), 1200);
             return;
           }
