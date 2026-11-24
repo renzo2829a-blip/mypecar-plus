@@ -2163,12 +2163,15 @@
         // hace con Caja y Bancos (03) y Depreciación (06).
         function exportarAsientoJSON(fecha, glosa, origen, lineas) {
             const sumaDebe = lineas.reduce((s, l) => s + l.debe, 0), sumaHaber = lineas.reduce((s, l) => s + l.haber, 0);
+            // (2026-11-24) Modo captura: la bandeja de asientos del Libro Diario pide el asiento sin descargar archivo.
+            if (window.__capturaAsientos) { if (lineas.length && Math.abs(sumaDebe - sumaHaber) <= 0.02) window.__capturaAsientos.push({ fecha, glosa, origen, periodo: String(fecha || config.periodoActivo).slice(0, 7), lineas }); return; }
             if (lineas.length === 0) { showToast('No hay montos para generar el asiento en este periodo.', 'error'); return; }
             if (Math.abs(sumaDebe - sumaHaber) > 0.02) { showToast(`⚠ El asiento no cuadra (Debe S/ ${sumaDebe.toFixed(2)} vs Haber S/ ${sumaHaber.toFixed(2)}). Revisa los montos antes de exportar.`, 'error'); return; }
 
             if (!confirm(`Este asiento resume todo lo calculado en ${formatPeriodoLabel(config.periodoActivo)} hasta hoy — no solo lo nuevo desde tu última exportación.\n\nSi ya habías exportado este mismo periodo antes y el Contador guardó ese asiento en el Libro Diario, exportar y guardar este de nuevo DUPLICARÍA el monto. Exporta solo cuando el mes esté completo, o avisa al Contador que reemplace el asiento anterior.\n\n¿Deseas continuar con la exportación?`)) return;
 
             const payload = { tipoDocumento: 'asiento_resumen_libro_diario', fecha, glosa, origen, preparadoPor: config.usuarioActivo || 'Sin identificar', fechaExportacion: new Date().toISOString(), lineas };
+            try { const B = window.MypecarSync && MypecarSync.bandejaAsientos; if (B && B.poner(Object.assign({}, payload, { periodo: String(fecha || config.periodoActivo).slice(0, 7) }))) MypecarSync.enlace.programar(1000); } catch (e) {}
             const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `Asiento_${origen.replace(/\s+/g, '_')}_${config.periodoActivo}.json`;
@@ -5661,5 +5664,30 @@
             }
         }
     </script>
+<script>
+/* (2026-11-24) Enlace con el Libro Diario: los asientos del mes se envían solos a la bandeja "Asientos por recibir" del 04
+   (antes había que descargar un archivo y subirlo con "Importar JSON"). Los asientos ocasionales (CTS, gratificación,
+   liquidación, bajas) se envían cuando se generan con su botón. */
+window.mypecarConstruirSnapshots = function () {
+    try {
+        const B = window.MypecarSync && MypecarSync.bandejaAsientos;
+        if (!B) return {};
+        if (B.listo() && typeof config !== 'undefined' && config.periodoActivo) {
+            const cap = [], toastOrig = window.showToast, confirmOrig = window.confirm;
+            window.__capturaAsientos = cap; window.showToast = function () {}; window.confirm = function () { return true; };
+            try {
+                try { generarAsientoPlanilla(); } catch (e) {}
+                try { generarAsientoRxH(); } catch (e) {}
+            } finally { window.__capturaAsientos = null; window.showToast = toastOrig; window.confirm = confirmOrig; }
+            const vistos = new Set();
+            cap.forEach(p => { vistos.add(p.origen); B.poner(Object.assign({ preparadoPor: config.usuarioActivo || null }, p)); });
+            // Si un asiento automático ya no tiene montos este mes, se envía vacío (el 04 avisa que cambió).
+            ['Planilla', 'Recibos por Honorarios'].forEach(o => { if (!vistos.has(o)) { const prev = Object.values(B._items || {}).find(it => it.origen === o && it.periodo === config.periodoActivo); if (prev) B.poner(Object.assign({}, prev, { lineas: [] })); } });
+        }
+        const foto = B.foto();
+        return foto ? { asientos: foto } : {};
+    } catch (e) { console.warn('Enlace: no se pudo armar los asientos para el Libro Diario:', e); return {}; }
+};
+</script>
 </body>
 </html>

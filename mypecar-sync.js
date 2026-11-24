@@ -3086,6 +3086,66 @@ var LZString = {
     }
   };
 
+  // ------------------------------------------------------------------------
+  // (2026-11-24) BANDEJA DE ASIENTOS: cada libro de origen (Ventas, Compras, Caja, Personal, Activos Fijos)
+  // deja aquí sus asientos resumen por periodo, y se publican en la nube como la foto 'asientos'. El Libro
+  // Diario (04) los recibe solos y los muestra en "Asientos por recibir" (ya no hay que bajar/subir archivos).
+  // Para no perder meses anteriores, la bandeja NO publica nada hasta haber leído lo que ya estaba publicado.
+  // ------------------------------------------------------------------------
+  const bandejaAsientos = {
+    TIPO: 'asientos',
+    _items: null, _empresa: null, _cargando: false,
+    clave(p) {
+      const base = String(p.origen || '') + '|' + String(p.periodo || '');
+      return /^manual$/i.test(String(p.origen || '')) ? base + '|' + String(p.glosa || '') : base;
+    },
+    firmaLineas(lineas) {
+      return JSON.stringify((lineas || []).map(l => [String(l.cuenta), String(l.cc || ''), Math.round((+l.debe || 0) * 100), Math.round((+l.haber || 0) * 100)]));
+    },
+    listo() { return !!bandejaAsientos._items && bandejaAsientos._empresa === empresas.activaId(); },
+    async cargar() {
+      const empresaId = empresas.activaId();
+      if (!empresaId || !supabaseClient || !currentApp || bandejaAsientos._cargando) return false;
+      if (bandejaAsientos.listo()) return true;
+      bandejaAsientos._cargando = true;
+      try {
+        const { data, error } = await supabaseClient.from('app_config').select('valor')
+          .eq('empresa_id', empresaId).eq('app', currentApp).eq('clave', enlace.PREFIJO + bandejaAsientos.TIPO).maybeSingle();
+        if (error) { warn('bandejaAsientos.cargar:', error.message); return false; } // sin certeza: no se publica nada
+        const items = {};
+        const lista = data && data.valor && Array.isArray(data.valor.items) ? data.valor.items : [];
+        lista.forEach(it => { if (it && it.periodo && it.origen) items[bandejaAsientos.clave(it)] = it; });
+        bandejaAsientos._items = items; bandejaAsientos._empresa = empresaId;
+        return true;
+      } catch (e) { warn('bandejaAsientos.cargar:', e && e.message); return false; }
+      finally { bandejaAsientos._cargando = false; }
+    },
+    // Guarda (o actualiza) un asiento del periodo. Si las líneas no cambiaron, conserva su fecha de envío.
+    poner(payload) {
+      if (!payload || !payload.periodo || !payload.origen || !bandejaAsientos.listo()) return false;
+      const k = bandejaAsientos.clave(payload);
+      const previo = bandejaAsientos._items[k];
+      const lineas = (payload.lineas || []).filter(l => (+l.debe || 0) !== 0 || (+l.haber || 0) !== 0);
+      if (!lineas.length && !previo) return false; // nada que enviar (y nunca se envió nada de ese mes)
+      const firma = bandejaAsientos.firmaLineas(lineas);
+      if (previo && previo.firma === firma && (previo.advertencia || '') === (payload.advertencia || '')) return false;
+      bandejaAsientos._items[k] = {
+        tipoDocumento: 'asiento_resumen_libro_diario', app: currentApp,
+        origen: payload.origen, periodo: payload.periodo, fecha: payload.fecha || '', glosa: payload.glosa || '',
+        nombres: payload.nombres || null, preparadoPor: payload.preparadoPor || null,
+        advertencia: payload.advertencia || '', lineas, firma,
+        fechaExportacion: new Date().toISOString()
+      };
+      return true;
+    },
+    // La foto que se publica (null si todavía no se pudo leer lo publicado antes).
+    foto() {
+      if (!bandejaAsientos.listo()) { bandejaAsientos.cargar().then(ok => { if (ok) enlace.programar(1500); }); return null; }
+      const items = Object.values(bandejaAsientos._items).sort((a, b) => (a.periodo + a.origen).localeCompare(b.periodo + b.origen));
+      return { tipo: 'asientos', app: currentApp, items };
+    }
+  };
+
   global.MypecarSync = {
     init, getEstado, onEstadoCambio, appActual,
     auth, empresas,
@@ -3103,7 +3163,9 @@ var LZString = {
     // 2026-10-15b
     seguridad,
     // 2026-11-20
-    enlace
+    enlace,
+    // 2026-11-24
+    bandejaAsientos
   };
 
   // Se instala apenas carga este archivo (antes de que cualquier app lea o escriba): a partir
