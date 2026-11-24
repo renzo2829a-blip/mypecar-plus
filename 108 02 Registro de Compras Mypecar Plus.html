@@ -4261,7 +4261,7 @@
             const totalTexto = document.getElementById('compra-total').value.replace(/[^\d.]/g, '');
             const total = (parseFloat(totalTexto) || 0) * tipoCambio; // la detracción siempre se deposita en soles
             const tasa = obtenerTasaDetraccionActual();
-            const monto = total * tasa;
+            const monto = Math.round(parseFloat((total * tasa).toPrecision(12))); // soles enteros (SUNAT)
             document.getElementById('compra-monto-detraccion').value = `S/ ${monto.toFixed(2)}`;
             actualizarCuotasCompra();
         }
@@ -4818,7 +4818,8 @@
             const sujetaDetraccion = document.getElementById('compra-sujeta-detraccion').checked;
             const tasaDetraccion = sujetaDetraccion ? obtenerTasaDetraccionActual() : 0;
             const codigoDetraccion = sujetaDetraccion ? obtenerCodigoDetraccionActual() : '';
-            const montoDetraccion = sujetaDetraccion ? round2((total) * tasaDetraccion) : 0;
+            // (2026-11-24) SUNAT: la detracción se deposita en soles ENTEROS (132.60 -> 133; la mitad sube).
+            const montoDetraccion = sujetaDetraccion ? Math.round(parseFloat((total * tasaDetraccion).toPrecision(12))) : 0;
             const constanciaDetraccion = sujetaDetraccion ? document.getElementById('compra-constancia-detraccion').value.trim() : '';
             const fechaDepositoDetraccion = sujetaDetraccion ? document.getElementById('compra-fecha-detraccion').value : '';
 
