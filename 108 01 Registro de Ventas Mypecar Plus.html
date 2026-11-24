@@ -2833,9 +2833,7 @@
             msg.textContent = '';
             try {
                 const tipo = valor.length === 8 ? 'dni' : 'ruc';
-                const { data, error } = await cliente.functions.invoke('consulta-documento', {
-                    body: { tipo, numero: valor, empresa_id: empresaId }
-                });
+                const { data, error } = await window.mypecarConsultarDocumento(cliente, { tipo, numero: valor, empresa_id: empresaId });
                 let res = data;
                 if (error) { try { res = await error.context.json(); } catch (e) { res = null; } }
                 if (!res || !res.nombre) {

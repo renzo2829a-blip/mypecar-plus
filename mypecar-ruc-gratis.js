@@ -3,6 +3,16 @@
 // de Supabase y se llenan solos la razón social y, en proveedores, el estado y la condición del
 // domicilio. No se envía el RUC a ningún servicio de terceros distinto de ese. Se usa en
 // 01 Ventas (Clientes) y 02 Compras (Proveedores). Si algo falla, se escribe a mano como siempre.
+// (2026-11-24) Consulta de RUC/DNI: primero la función "ruc-dni" (exige sesión iniciada, valida el formato y limita el
+// uso). Si todavía no está desplegada en el servidor (404), se usa "consulta-documento" como hasta ahora.
+window.mypecarConsultarDocumento = async function (cliente, body) {
+  const r = await cliente.functions.invoke('ruc-dni', { body });
+  const status = r.error && r.error.context && r.error.context.status;
+  const noExiste = r.error && (status === 404 || /not.?found|FunctionsFetchError/i.test(String(r.error.name || '') + String(r.error.message || '')));
+  if (noExiste) return cliente.functions.invoke('consulta-documento', { body });
+  return r;
+};
+
 (function () {
   'use strict';
   const CAMPOS = [
@@ -60,9 +70,7 @@
       decir(cfg, 'Buscando en SUNAT…', 'info');
       try {
         const empresaId = sync.empresas && sync.empresas.activaId ? sync.empresas.activaId() : null;
-        const { data, error } = await cliente.functions.invoke('consulta-documento', {
-          body: { tipo: esRuc ? 'ruc' : 'dni', numero, empresa_id: empresaId }
-        });
+        const { data, error } = await window.mypecarConsultarDocumento(cliente, { tipo: esRuc ? 'ruc' : 'dni', numero, empresa_id: empresaId });
         res = data;
         if (error) { try { res = await error.context.json(); } catch (e) { res = null; } }
       } catch (e) { res = null; }
