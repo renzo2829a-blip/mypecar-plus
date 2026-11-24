@@ -2657,16 +2657,121 @@ var LZString = {
     },
     // Respaldo completo de la empresa activa a un archivo .json en el equipo (lo usa el menú de la empresa).
     // Devuelve { nombre, registros, apps } y recuerda la fecha para el aviso de "hace X días sin respaldar".
-    async respaldoCompleto() {
+    async respaldoCompleto(prefijo) {
       requiereSupabase();
       const empresaId = requiereEmpresaActiva();
       if (!navigator.onLine) throw new Error('Sin internet: el respaldo se descarga desde la nube.');
       const datos = await empresas.obtenerDatos(empresaId);
       const filas = await seguridad.leerFilasEmpresa(empresaId);
       if (!filas.length) throw new Error('Esta empresa aún no tiene datos guardados en la nube.');
-      const nombre = seguridad.descargarRespaldo(empresaId, datos, filas);
+      const nombre = seguridad.descargarRespaldo(empresaId, datos, filas, prefijo);
       lsSet('mypecar_respaldo_' + empresaId, { fecha: new Date().toISOString(), registros: filas.length });
       return { nombre, registros: filas.length, apps: Object.keys(seguridad.resumirFilas(filas).porApp).length };
+    },
+    // =====================================================================================================
+    // RESTAURAR UN RESPALDO (2026-11-24) — solo el dueño, solo el respaldo de ESTA MISMA empresa.
+    // =====================================================================================================
+    APPS_VALIDAS_RESPALDO: ['ventas', 'compras', 'caja', 'diario', 'personal', 'activos', 'reportes', 'auditoria', 'inventario'],
+    // Revisa el contenido del archivo ANTES de tocar nada. Devuelve { ok:true, resumen } o { ok:false, motivo }.
+    validarRespaldo(obj, empresaId, datosEmpresa) {
+      const no = (motivo) => ({ ok: false, motivo });
+      if (!obj || typeof obj !== 'object' || obj.tipo !== 'respaldo_mypecar_plus') return no('Este archivo no es un respaldo de MYPECAR PLUS (debe llamarse MYPECAR_respaldo_RUC_fecha.json y haberse descargado desde el menú de la empresa).');
+      if (!Array.isArray(obj.filas) || obj.filas.length === 0) return no('El respaldo está vacío o dañado: no trae registros.');
+      if (obj.filas.length > 200000) return no('El respaldo es demasiado grande para restaurarlo desde aquí.');
+      const de = obj.empresa || {};
+      const nombreDe = (de.razonSocial || 'otra empresa') + (de.ruc ? ' (RUC ' + de.ruc + ')' : '');
+      // LA REGLA CLAVE: el respaldo debe ser de la empresa activa (mismo identificador), y si ambos traen RUC, el mismo RUC.
+      if (!de.id || String(de.id) !== String(empresaId)) {
+        return no('⛔ Este respaldo es de OTRA empresa: ' + nombreDe + '. No se puede restaurar en la empresa activa' +
+          (datosEmpresa && datosEmpresa.ruc ? ' (RUC ' + datosEmpresa.ruc + ')' : '') + '. Cambia a esa empresa desde "Sede contable" si quieres restaurarlo allá.');
+      }
+      if (de.ruc && datosEmpresa && datosEmpresa.ruc && String(de.ruc).trim() !== String(datosEmpresa.ruc).trim()) {
+        return no('⛔ El RUC del respaldo (' + de.ruc + ') no coincide con el de la empresa activa (' + datosEmpresa.ruc + '). No se restaura.');
+      }
+      const prohibidas = ['sb-', 'snap_', 'mps_', 'mypecar_', '_meta_'];
+      const vistas = new Set(); const porApp = {};
+      for (let i = 0; i < obj.filas.length; i++) {
+        const f = obj.filas[i];
+        if (!f || typeof f !== 'object') return no('El respaldo está dañado (registro ' + (i + 1) + ' inválido).');
+        if (typeof f.app !== 'string' || seguridad.APPS_VALIDAS_RESPALDO.indexOf(f.app) === -1) return no('El respaldo trae un módulo desconocido ("' + String(f.app).slice(0, 30) + '"): no se restaura.');
+        if (typeof f.clave !== 'string' || !f.clave || f.clave.length > 200) return no('El respaldo está dañado (clave inválida en el registro ' + (i + 1) + ').');
+        if (prohibidas.some(pr => f.clave.indexOf(pr) === 0)) return no('El respaldo trae un registro interno que no se puede restaurar ("' + f.clave.slice(0, 40) + '").');
+        if (f.valor === undefined) return no('El respaldo está dañado (registro sin contenido: ' + f.clave.slice(0, 40) + ').');
+        const id = f.app + '\u0001' + f.clave;
+        if (vistas.has(id)) return no('El respaldo está dañado (registro repetido: ' + f.clave.slice(0, 40) + ').');
+        vistas.add(id);
+        porApp[f.app] = (porApp[f.app] || 0) + 1;
+      }
+      return { ok: true, resumen: { registros: obj.filas.length, porApp, generadoEl: obj.generadoEl || null, empresa: de } };
+    },
+    // Restaura. Pasos: (1) valida, (2) DESCARGA un respaldo de lo que hay ahora (si falla, NO se restaura), (3) sube el
+    // respaldo, (4) opcionalmente quita lo registrado después, (5) limpia la copia local y avisa a las otras pestañas.
+    async restaurarRespaldo(obj, opciones) {
+      requiereSupabase();
+      opciones = opciones || {};
+      const progreso = typeof opciones.alProgreso === 'function' ? opciones.alProgreso : function () {};
+      const empresaId = requiereEmpresaActiva();
+      if (!navigator.onLine) throw new Error('Sin internet: para restaurar hace falta conexión.');
+      if (!(await empresas.esOwner(empresaId))) throw new Error('Solo el dueño de la empresa puede restaurar un respaldo.');
+      const datos = await empresas.obtenerDatos(empresaId);
+      const val = seguridad.validarRespaldo(obj, empresaId, datos);
+      if (!val.ok) throw new Error(val.motivo);
+
+      // (2) Respaldo automático de lo que hay ahora, por si te equivocas. Sin él, no se restaura.
+      progreso('Descargando un respaldo de lo que hay ahora (por seguridad)…');
+      let previo = null, actualesCantidad = 0;
+      try { previo = await seguridad.respaldoCompleto('ANTES_DE_RESTAURAR_'); actualesCantidad = previo.registros; }
+      catch (e) {
+        if (/aún no tiene datos/.test(String(e && e.message))) { previo = null; }
+        else throw new Error('No se pudo descargar el respaldo de seguridad previo, así que NO se restauró nada. Detalle: ' + ((e && e.message) || e));
+      }
+
+      // (3) A partir de aquí esta página no guarda nada en paralelo (evita que lo que tiene en memoria pise lo restaurado).
+      escriturasBloqueadasPorReinicio = true;
+      let userId = null;
+      try { const ses = await auth.sesionActual(); userId = ses && ses.user ? ses.user.id : null; } catch (e) {}
+      const ahora = new Date().toISOString();
+      const filas = obj.filas.map(f => ({ empresa_id: empresaId, app: f.app, clave: f.clave, valor: (f.valor === null ? MARCADOR_VALOR_NULO : f.valor), actualizado_por: userId, actualizado_en: ahora }));
+      const LOTE = 15;
+      for (let i = 0; i < filas.length; i += LOTE) {
+        const lote = filas.slice(i, i + LOTE);
+        const { error } = await supabaseClient.from('app_config').upsert(lote, { onConflict: 'empresa_id,app,clave' });
+        if (error) {
+          throw new Error('Se cortó la restauración en el registro ' + (i + 1) + ' de ' + filas.length + ': ' + error.message +
+            '. Tu información de antes está en el archivo ANTES_DE_RESTAURAR_… que se descargó; vuelve a intentar o restaura ese archivo.');
+        }
+        progreso('Restaurando… ' + Math.min(i + LOTE, filas.length) + ' de ' + filas.length);
+      }
+
+      // (4) Opcional: quitar lo registrado DESPUÉS del respaldo, para volver exactamente a como estaba.
+      let eliminados = 0;
+      if (opciones.eliminarPosteriores) {
+        progreso('Quitando lo registrado después del respaldo…');
+        const enRespaldo = new Set(obj.filas.map(f => f.app + '\u0001' + f.clave));
+        const actuales = await seguridad.leerFilasEmpresa(empresaId); // ya sin snap_
+        const sobrantes = actuales.filter(f => !enRespaldo.has(f.app + '\u0001' + f.clave) && String(f.clave).indexOf('sb-') !== 0);
+        const porApp = {};
+        sobrantes.forEach(f => { (porApp[f.app] = porApp[f.app] || []).push(f.clave); });
+        for (const app of Object.keys(porApp)) {
+          for (let i = 0; i < porApp[app].length; i += 50) {
+            const claves = porApp[app].slice(i, i + 50);
+            const { error } = await supabaseClient.from('app_config').delete().eq('empresa_id', empresaId).eq('app', app).in('clave', claves);
+            if (error) throw new Error('No se pudo quitar lo posterior al respaldo: ' + error.message + '. Lo restaurado quedó en su lugar.');
+            eliminados += claves.length;
+          }
+        }
+      }
+
+      // (5) Limpieza local: copia de este equipo, pendientes de subida, versiones recordadas y marcadores de enlace.
+      purgarDatosLocalesDeEmpresa(empresaId);
+      try {
+        const m = lsGet(VERSIONES_KEY, {});
+        if (m && typeof m === 'object') { Object.keys(m).forEach(k => { if (k.indexOf(empresaId + '|') === 0) delete m[k]; }); lsSet(VERSIONES_KEY, m); }
+        clavesFisicasReales().forEach(f => { if (f.indexOf('mypecar_enlace_' + empresaId + '_') === 0) { try { STO.remove.call(LS, f); } catch (e) {} } });
+      } catch (e) { /* no crítico */ }
+      // Las otras pestañas de este equipo con esta empresa se recargan solas (mismo mecanismo que "reiniciar empresa").
+      lsSet(REINICIO_SENAL_KEY, { empresaId, marca: 'restauracion-' + Date.now(), en: Date.now() });
+      return { restaurados: filas.length, eliminados, respaldoPrevio: previo ? previo.nombre : null, registrosAntes: actualesCantidad };
     },
     // Días desde el último respaldo descargado de esta empresa (null si nunca) y cuándo se vio por primera vez.
     estadoRespaldo(empresaId) {
@@ -2690,11 +2795,11 @@ var LZString = {
       });
       return { conDatos, porApp };
     },
-    descargarRespaldo(empresaId, empresaDatos, filas) {
+    descargarRespaldo(empresaId, empresaDatos, filas, prefijo) {
       const ahora = new Date();
       const p2 = n => String(n).padStart(2, '0');
       const sello = ahora.getFullYear() + '-' + p2(ahora.getMonth() + 1) + '-' + p2(ahora.getDate()) + '_' + p2(ahora.getHours()) + p2(ahora.getMinutes());
-      const nombre = 'MYPECAR_respaldo_' + ((empresaDatos && empresaDatos.ruc) || 'empresa') + '_' + sello + '.json';
+      const nombre = (prefijo || '') + 'MYPECAR_respaldo_' + ((empresaDatos && empresaDatos.ruc) || 'empresa') + '_' + sello + '.json';
       const contenido = {
         tipo: 'respaldo_mypecar_plus',
         generadoEl: ahora.toISOString(),
