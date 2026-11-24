@@ -1397,6 +1397,54 @@
         // puede pisar los datos de otro.
         const PREFIJO_CLAVE_PERIODO = 'comprapollo_periods__';
         function claveDePeriodo(periodo) { return PREFIJO_CLAVE_PERIODO + periodo; }
+
+        // (2026-11-24) Cada periodo numera sus compras desde 1: "compraId" solo NO identifica una compra (la N.° 3 de junio y
+        // la N.° 3 de julio comparten compraId). Antes, eliminar o editar una borraba también los movimientos de inventario
+        // de la otra. Ahora cada movimiento guarda su periodo (compraPeriodo); los antiguos se reconocen por su comprobante.
+        function movEsDeCompra(m, c, periodo) {
+            if (!m || !c || m.compraId !== c.id) return false;
+            if (m.compraPeriodo) return m.compraPeriodo === periodo;
+            return !m.comprobante || m.comprobante === `${c.tipoDoc} ${c.serie}-${c.numero}`;
+        }
+        function movimientosDeLineasCompra(c, periodo) {
+            return (c.cuentas || []).filter(l => l.sujetoInventario && l.productoCodigo && l.cantidad > 0).filter(l => {
+                const p = getProducto(l.productoCodigo); return !(p && p.controlaStock === false);
+            }).map(l => ({
+                fecha: c.fechaEmision, tipo: 'entrada', origen: 'compra', compraId: c.id, compraPeriodo: periodo,
+                comprobante: `${c.tipoDoc} ${c.serie}-${c.numero}`,
+                puntoVenta: c.puntoVenta || ((config.puntosVenta && config.puntosVenta[0]) ? config.puntosVenta[0].codigo : 'PV1'),
+                productoCodigo: l.productoCodigo, productoNombre: l.productoNombre, cuenta: l.cuenta || '',
+                unidad: l.unidad, cantidad: l.cantidad, costoUnitario: Math.round((l.monto / l.cantidad) * 1e6) / 1e6,
+                registradoPor: c.registradoPor || config.usuarioActivo || 'Sin identificar', fechaRegistro: new Date().toISOString()
+            }));
+        }
+        // Reparación automática: si un guardado se cortó a la mitad y una compra con productos de inventario quedó SIN sus
+        // movimientos de entrada, se regeneran desde la propia compra. Nunca borra.
+        async function reconciliarMovimientosCompras() {
+            try {
+                if (!periodsData || !Object.keys(periodsData).length || !Array.isArray(stockMovimientos)) return 0;
+                let reparadas = 0, etiquetadas = 0;
+                Object.keys(periodsData).forEach(per => {
+                    const lista = (per === config.periodoActivo ? purchases : (periodsData[per] && periodsData[per].purchases)) || [];
+                    lista.forEach(c => {
+                        const esperados = movimientosDeLineasCompra(c, per);
+                        if (!esperados.length) return;
+                        const existentes = stockMovimientos.filter(m => movEsDeCompra(m, c, per));
+                        existentes.forEach(m => { if (!m.compraPeriodo) { m.compraPeriodo = per; etiquetadas++; } });
+                        if (existentes.length >= esperados.length) return;
+                        stockMovimientos = stockMovimientos.filter(m => !movEsDeCompra(m, c, per));
+                        esperados.forEach(e => { e.id = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1; stockMovimientos.push(e); });
+                        reparadas++;
+                    });
+                });
+                if (reparadas || etiquetadas) {
+                    localStorage.setItem('comprapollo_stock_movimientos', JSON.stringify(stockMovimientos));
+                    if (reparadas) console.warn(`Se repararon los movimientos de inventario de ${reparadas} compra(s) que habían quedado sin ellos.`);
+                }
+                return reparadas;
+            } catch (e) { console.warn('No se pudo revisar la coherencia compras / inventario:', e); return 0; }
+        }
+        window.addEventListener('load', () => setTimeout(reconciliarMovimientosCompras, 6000));
         let periodsData = {};
         let papeleraCompras = [];  // compras eliminadas, recuperables (guarda periodoOrigen para restaurar al periodo correcto)
         let bitacora = [];         // { accion, entidad, detalle, usuario, fecha } — historial de cambios, más reciente primero
@@ -4650,7 +4698,7 @@
         // ==================================================================
         // ENVÍO DE FORMULARIO DE COMPRA
         // ==================================================================
-        document.getElementById('form-compra').addEventListener('submit', function(e) {
+        document.getElementById('form-compra').addEventListener('submit', async function(e) {
             e.preventDefault();
 
             const fechaEmision = document.getElementById('compra-fecha-emision').value;
@@ -4763,9 +4811,13 @@
 
             let mensajeFinal;
             let compraIdFinal;
+            const _copiaCompras = purchases.map(x => ({ ...x })); // por si el guardado falla: se vuelve a como estaba
+            const _copiaMovs = stockMovimientos.slice();
+            const _edicionPrevia = compraEnEdicionId;
             if (compraEnEdicionId) {
                 const idx = purchases.findIndex(c => c.id === compraEnEdicionId);
                 if (idx === -1) { showToast('La compra que estabas editando ya no existe — puede haber sido eliminada.', 'error'); return; }
+                const compraPrevia = purchases[idx];
                 purchases[idx] = {
                     ...purchases[idx], ...datosCompra,
                     editadoPor: config.usuarioActivo || 'Sin identificar', fechaEdicion: new Date().toISOString()
@@ -4777,7 +4829,7 @@
                 document.getElementById('form-compra-modo-edicion').classList.add('hidden');
                 // Los montos/cantidades pudieron cambiar — se descartan los movimientos
                 // anteriores de esta compra y se regeneran desde cero con los datos actuales.
-                stockMovimientos = stockMovimientos.filter(m => m.compraId !== compraIdFinal);
+                stockMovimientos = stockMovimientos.filter(m => !movEsDeCompra(m, compraPrevia, config.periodoActivo));
             } else {
                 const nextId = purchases.length > 0 ? Math.max(...purchases.map(c => c.id)) + 1 : 1;
                 purchases.push({
@@ -4798,7 +4850,7 @@
                 const nextMovId = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1;
                 stockMovimientos.push({
                     id: nextMovId, fecha: fechaEmision, tipo: 'entrada', origen: 'compra',
-                    compraId: compraIdFinal, comprobante: `${tipoDoc} ${serie}-${numero}`,
+                    compraId: compraIdFinal, compraPeriodo: config.periodoActivo, comprobante: `${tipoDoc} ${serie}-${numero}`,
                     puntoVenta, productoCodigo: c.productoCodigo, productoNombre: c.productoNombre,
                     cuenta: c.cuenta || '', // (2026-10-11) para el Grupo contable automático en 09 Inventario
                     unidad: c.unidad, cantidad: c.cantidad, costoUnitario: Math.round((c.monto / c.cantidad) * 1e6) / 1e6 /* 6 decimales: 09 valoriza cantidad × costo unitario */, monto: c.monto,
@@ -4806,8 +4858,18 @@
                 });
             });
 
-            persistActivePeriod();
-            persistAll();
+            // (2026-11-24) Si el guardado falla a la mitad, NO se limpia el formulario ni se dice "registrada": se avisa y se
+            // vuelve a como estaba. La reparación automática (reconciliarMovimientosCompras) recompone movimientos faltantes.
+            try {
+                await persistActivePeriod();
+                await persistAll();
+            } catch (errGuardado) {
+                console.error('Error al guardar la compra:', errGuardado);
+                purchases = _copiaCompras; stockMovimientos = _copiaMovs; compraEnEdicionId = _edicionPrevia;
+                if (periodsData[config.periodoActivo]) periodsData[config.periodoActivo].purchases = purchases;
+                showToast('⚠ No se pudo guardar por completo. Revisa tu conexión o el espacio del equipo y vuelve a pulsar Registrar: lo escrito sigue en pantalla.', 'error');
+                return;
+            }
             verificarDetraccionesPendientes();
             actualizarBadgeAlertas();
 
@@ -4837,8 +4899,8 @@
             purchases = purchases.filter(c => c.id !== id);
             // Los movimientos de inventario de esta compra viajan CON ella a la Papelera —
             // así, si se restaura, el stock vuelve a reflejar exactamente lo mismo.
-            const movimientosDeEstaCompra = stockMovimientos.filter(m => m.compraId === id);
-            stockMovimientos = stockMovimientos.filter(m => m.compraId !== id);
+            const movimientosDeEstaCompra = stockMovimientos.filter(m => movEsDeCompra(m, compra, config.periodoActivo));
+            stockMovimientos = stockMovimientos.filter(m => !movEsDeCompra(m, compra, config.periodoActivo));
             papeleraCompras.push({ ...compra, _movimientosInventario: movimientosDeEstaCompra, periodoOrigen: config.periodoActivo, eliminadoPor: config.usuarioActivo || 'Sin identificar', fechaEliminacion: new Date().toISOString() });
             // ARREGLO (2026-09-18): mismo límite que ya tiene la Bitácora (500
             // registros) -- la Papelera no tenía ningún techo y, tras meses de uso
@@ -4959,8 +5021,8 @@
         function clearAllPurchases() {
             if(!confirm(`¿Eliminar de forma irreversible todas las compras del periodo activo (${formatPeriodoLabel(config.periodoActivo)})? Esta acción NO pasa por la Papelera — no se puede deshacer.`)) return;
             registrarBitacora('eliminar_permanente', 'periodo_completo', `Se vaciaron ${purchases.length} compra(s) de ${formatPeriodoLabel(config.periodoActivo)} de forma irreversible`);
-            const idsEliminados = purchases.map(c => c.id);
-            stockMovimientos = stockMovimientos.filter(m => !idsEliminados.includes(m.compraId));
+            const comprasEliminadas = purchases.slice();
+            stockMovimientos = stockMovimientos.filter(m => !comprasEliminadas.some(c => movEsDeCompra(m, c, config.periodoActivo)));
             purchases = [];
             persistActivePeriod();
             persistAll();
@@ -6986,14 +7048,14 @@
         }
         // Regenera los movimientos de entrada de UNA compra (reemplaza los anteriores: nunca duplica).
         function generarMovimientosDeCompra(compra, resumenInv) {
-            stockMovimientos = stockMovimientos.filter(m => m.compraId !== compra.id);
+            stockMovimientos = stockMovimientos.filter(m => !movEsDeCompra(m, compra, config.periodoActivo));
             (compra.cuentas || []).filter(c => c.sujetoInventario && c.productoCodigo && c.cantidad > 0).forEach(c => {
                 const producto = getProducto(c.productoCodigo);
                 if (producto && producto.controlaStock === false) return;
                 const nextMovId = stockMovimientos.length > 0 ? Math.max(...stockMovimientos.map(m => m.id)) + 1 : 1;
                 stockMovimientos.push({
                     id: nextMovId, fecha: compra.fechaEmision, tipo: 'entrada', origen: 'compra',
-                    compraId: compra.id, comprobante: `${compra.tipoDoc} ${compra.serie}-${compra.numero}`,
+                    compraId: compra.id, compraPeriodo: config.periodoActivo, comprobante: `${compra.tipoDoc} ${compra.serie}-${compra.numero}`,
                     puntoVenta: compra.puntoVenta || ((config.puntosVenta && config.puntosVenta[0]) ? config.puntosVenta[0].codigo : 'PV1'),
                     productoCodigo: c.productoCodigo, productoNombre: c.productoNombre,
                     unidad: c.unidad, cantidad: c.cantidad, costoUnitario: Math.round((c.monto / c.cantidad) * 1e6) / 1e6 /* 6 decimales: 09 valoriza cantidad × costo unitario */, monto: c.monto,
