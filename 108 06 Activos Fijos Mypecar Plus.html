@@ -1724,7 +1724,16 @@ window.mypecarConstruirSnapshots = function () {
             ['Depreciación'].forEach(o => { if (!vistos.has(o)) { const prev = Object.values(B._items || {}).find(it => it.origen === o && it.periodo === config.periodoActivo); if (prev) B.poner(Object.assign({}, prev, { lineas: [] })); } });
         }
         const foto = B.foto();
-        return foto ? { asientos: foto } : {};
+        // (2026-11-25) Resumen para el Asistente.
+        let resumen = null;
+        try {
+            const per = config.periodoActivo, corte = ultimoDiaMes(per);
+            const vivos = activos.filter(a => !['baja', 'vendido'].includes(String(a.estado || '').toLowerCase()));
+            let costo = 0, acum = 0, neto = 0, mes = 0;
+            vivos.forEach(a => { try { const d = calcularDepreciacionMes(a, per); costo += a.costo || 0; acum += d.depreAcumulada || 0; neto += d.valorNeto || 0; mes += d.depreDelMes || 0; } catch (e) {} });
+            resumen = { tipo: 'activos_resumen', generadoEl: new Date().toISOString(), periodo: per, cantidad: vivos.length, costoTotal: Math.round(costo * 100) / 100, depreciacionAcumulada: Math.round(acum * 100) / 100, valorNeto: Math.round(neto * 100) / 100, depreciacionDelMes: Math.round(mes * 100) / 100 };
+        } catch (e) { console.warn('Enlace: no se pudo armar el resumen de Activos:', e); }
+        return Object.assign({}, foto ? { asientos: foto } : {}, resumen ? { resumen } : {});
     } catch (e) { console.warn('Enlace: no se pudo armar los asientos para el Libro Diario:', e); return {}; }
 };
 </script>

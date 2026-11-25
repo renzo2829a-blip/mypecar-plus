@@ -117,11 +117,12 @@
 
   // ---------------------------------------------------------------- datos de la empresa (fotos de la nube)
   const cache = {};
-  async function foto(app) {
+  async function foto(app, tipo) {
     const S = window.MypecarSync; if (!S || !S.enlace) return null;
-    const hit = cache[app]; if (hit && Date.now() - hit.t < 45000) return hit.v;
-    let v = null; try { v = await S.enlace.leer(app, 'reportes'); } catch (e) {}
-    cache[app] = { t: Date.now(), v }; return v;
+    tipo = tipo || 'reportes'; const k = app + '|' + tipo;
+    const hit = cache[k]; if (hit && Date.now() - hit.t < 45000) return hit.v;
+    let v = null; try { v = await S.enlace.leer(app, tipo); } catch (e) {}
+    cache[k] = { t: Date.now(), v }; return v;
   }
   function datosPeriodo(f, clave, periodo) { const pd = f && f.payload && f.payload.periodsData; const x = pd && pd[periodo] && pd[periodo][clave]; return Array.isArray(x) ? x : []; }
   const num = x => { const n = parseFloat(x); return isFinite(n) ? n : 0; };
@@ -149,7 +150,7 @@
     datosPeriodo(fv, 'sales', p).forEach(v => igvV += num(v.igv) * (v.tipoDoc === '07' ? -1 : 1));
     datosPeriodo(fc, 'purchases', p).forEach(c => igvC += num(c.igv) * (c.tipoDoc === '07' ? -1 : 1));
     const dif = igvV - igvC;
-    return { html: `IGV de <b>${etiquetaPeriodo(p)}</b> (aproximado): ventas ${soles(igvV)} − compras ${soles(igvC)} = <b>${dif >= 0 ? soles(dif) + ' por pagar' : soles(-dif) + ' a favor (crédito fiscal)'}</b>.<br>El cálculo oficial para tu declaración, con saldos anteriores y Renta, está en Impuestos del Libro Diario.`, a: [{ mod: '04', tab: 'impuestos', label: 'Abrir Impuestos' }] };
+    return { html: `IGV de <b>${etiquetaPeriodo(p)}</b> (aproximado): ventas ${soles(igvV)} − compras ${soles(igvC)} = <b>${dif >= 0 ? soles(dif) + ' por pagar' : soles(-dif) + ' a favor (crédito fiscal)'}</b>.<br><b>⚠ Es solo un cálculo aproximado.</b> Para declarar, usa el cálculo oficial en <b>Impuestos</b> del Libro Diario.`, a: [{ mod: '04', tab: 'impuestos', label: 'Abrir Impuestos' }] };
   }
   async function datosPorCobrar() {
     const f = await foto('ventas'); if (!f) return { html: SIN_DATOS(MODULOS[0]), a: [{ mod: '07', tab: 'cxc', label: 'Abrir Cuentas por Cobrar' }] };
@@ -167,7 +168,29 @@
     const top = Object.entries(provs).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => `• ${esc(e[0])}: ${soles(e[1])}`).join('<br>');
     return { html: `Debes aproximadamente <b>${soles(tot)}</b> en ${n} comprobante${n === 1 ? '' : 's'} pendiente${n === 1 ? '' : 's'} de pago.<br>Los que más debes:<br>${top}<br><i>Datos guardados ${hace(f)}.</i>`, a: [{ mod: '07', tab: 'cxp', label: 'Abrir Cuentas por Pagar' }] };
   }
+  async function datosPersonal() {
+    const f = await foto('personal', 'resumen'); const r = f && f.payload;
+    if (!r) return { html: 'Todavía no veo datos de <b>Personal y Planilla</b> en la nube. Abre el módulo 05 una vez (con tus trabajadores registrados), espera unos segundos y vuelve a preguntarme.', a: [{ mod: '05', label: 'Ir a Personal y Planilla' }] };
+    const pl = r.planilla || {};
+    return { html: `Tienes <b>${r.trabajadoresActivos}</b> trabajador${r.trabajadoresActivos === 1 ? '' : 'es'} activo${r.trabajadoresActivos === 1 ? '' : 's'}.<br>Planilla de <b>${etiquetaPeriodo(r.periodo)}</b> (${r.trabajadoresEnPlanilla} en planilla): ingresos ${soles(pl.ingresos)}, descuentos ${soles(pl.descuentos)}, <b>neto a pagar ${soles(pl.neto)}</b>. Costo total para la empresa: ${soles(pl.costoEmpleador)}.<br><i>Datos guardados ${hace(f)}.</i>`, a: [{ mod: '05', tab: 'planilla', label: 'Abrir Planilla Mensual' }] };
+  }
+  async function datosActivos() {
+    const f = await foto('activos', 'resumen'); const r = f && f.payload;
+    if (!r) return { html: 'Todavía no veo datos de <b>Activos Fijos</b> en la nube. Abre el módulo 06 una vez (con tus activos registrados), espera unos segundos y vuelve a preguntarme.', a: [{ mod: '06', label: 'Ir a Activos Fijos' }] };
+    return { html: `Tienes <b>${r.cantidad}</b> activo${r.cantidad === 1 ? '' : 's'} fijo${r.cantidad === 1 ? '' : 's'}: costo ${soles(r.costoTotal)}, depreciación acumulada ${soles(r.depreciacionAcumulada)}, <b>valor neto ${soles(r.valorNeto)}</b>.<br>Depreciación de ${etiquetaPeriodo(r.periodo)}: <b>${soles(r.depreciacionDelMes)}</b>.<br><i>Datos guardados ${hace(f)}.</i>`, a: [{ mod: '06', tab: 'depreciacion', label: 'Abrir Depreciación Mensual' }] };
+  }
+  async function datosInventario(soloBajos) {
+    const f = await foto('inventario', 'resumen'); const r = f && f.payload;
+    if (!r) return { html: 'Todavía no veo datos de <b>Inventario</b> en la nube. Abre el módulo 09 una vez (con tus productos), espera unos segundos y vuelve a preguntarme.', a: [{ mod: '09', label: 'Ir a Inventario' }] };
+    const bajos = (r.bajoMinimo || []).map(b => `• ${esc(b.nombre)}: ${b.stock} ${esc(b.unidad)} (mínimo ${b.minimo})`).join('<br>');
+    const aviso = bajos ? `<br><b>Con poco stock:</b><br>${bajos}` : '<br>Ningún producto está por debajo de su stock mínimo.';
+    return { html: (soloBajos ? '' : `Tu inventario vale <b>${soles(r.valorTotal)}</b> (método ${esc(r.metodo)}), con ${r.productos} producto${r.productos === 1 ? '' : 's'}.`) + aviso + `<br><i>Datos guardados ${hace(f)}.</i>`, a: [{ mod: '09', tab: 'kardex', label: 'Abrir Kardex' }] };
+  }
   const INTENCIONES_DATOS = [
+    { id: 'personal', k: ['cuantos trabajadores', 'mis trabajadores', 'cuanto pago de planilla', 'planilla del mes', 'cuanto cuesta mi planilla', 'cuanto pago a mis trabajadores', 'total de planilla', 'cuantos empleados'], f: () => datosPersonal() },
+    { id: 'activos', k: ['cuanto valen mis activos', 'mis activos', 'valor de mis activos', 'depreciacion del mes', 'cuanto deprecio', 'cuantos activos'], f: () => datosActivos() },
+    { id: 'inventario', k: ['valor de mi inventario', 'cuanto vale mi inventario', 'valor del inventario', 'mi inventario', 'valor de mi stock'], f: () => datosInventario(false) },
+    { id: 'stockbajo', k: ['poco stock', 'stock bajo', 'productos por agotarse', 'que debo reponer', 'que reponer', 'stock minimo', 'se me acaba'], f: () => datosInventario(true) },
     { id: 'porcobrar', k: ['quien me debe', 'me deben', 'clientes me deben', 'cuanto me deben', 'por cobrar', 'pendiente de cobro', 'pendientes de cobro'], f: () => datosPorCobrar() },
     { id: 'porpagar', k: ['cuanto debo a', 'debo a proveedores', 'por pagar', 'pendiente de pago', 'pendientes de pago', 'le debo'], f: () => datosPorPagar() },
     { id: 'igv', k: ['cuanto debo de igv', 'igv a pagar', 'cuanto igv', 'pagar de igv', 'mi igv', 'el igv'], f: p => datosIgv(p) },
@@ -287,7 +310,7 @@
     lista = panel.querySelector('#mpa-lista'); input = panel.querySelector('#mpa-input');
     panel.querySelector('header button').onclick = cerrar;
     panel.querySelector('#mpa-form').addEventListener('submit', e => { e.preventDefault(); enviar(input.value); });
-    const sug = ['¿Cuánto vendí este mes?', '¿Quién me debe?', '¿Cuánto debo de IGV?', '¿Dónde calculo la CTS?', '¿Cómo registro una compra?'];
+    const sug = ['¿Cuánto vendí este mes?', '¿Quién me debe?', '¿Cuánto debo de IGV?', '¿Cuánto pago de planilla?', '¿Qué productos tienen poco stock?'];
     const cont = panel.querySelector('#mpa-sug'); sug.forEach(s => { const b = document.createElement('button'); b.type = 'button'; b.textContent = s; b.onclick = () => enviar(s); cont.appendChild(b); });
     btn.onclick = () => {
       const abierto = panel.style.display === 'flex'; panel.style.display = abierto ? 'none' : 'flex'; btn.setAttribute('aria-expanded', String(!abierto));

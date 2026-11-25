@@ -5663,7 +5663,15 @@ window.mypecarConstruirSnapshots = function () {
             ['Planilla', 'Recibos por Honorarios'].forEach(o => { if (!vistos.has(o)) { const prev = Object.values(B._items || {}).find(it => it.origen === o && it.periodo === config.periodoActivo); if (prev) B.poner(Object.assign({}, prev, { lineas: [] })); } });
         }
         const foto = B.foto();
-        return foto ? { asientos: foto } : {};
+        // (2026-11-25) Resumen SIN datos personales (sin nombres, DNI ni sueldos individuales) para el Asistente.
+        let resumen = null;
+        try {
+            const per = config.periodoActivo, delP = trabajadoresDelPeriodo(per);
+            let ing = 0, desc = 0, neto = 0, costo = 0;
+            delP.forEach(t => { try { const c = calcularLineaPlanilla(t, planillaMes.find(p => p.trabajadorId === t.id) || {}, per); ing += c.totalIngresos || 0; desc += c.totalDescuentos || 0; neto += c.netoPagar || 0; costo += c.costoEmpleador || 0; } catch (e) {} });
+            resumen = { tipo: 'personal_resumen', generadoEl: new Date().toISOString(), periodo: per, trabajadoresActivos: trabajadores.filter(t => t.estado === 'activo').length, trabajadoresEnPlanilla: delP.length, planilla: { ingresos: Math.round(ing * 100) / 100, descuentos: Math.round(desc * 100) / 100, neto: Math.round(neto * 100) / 100, costoEmpleador: Math.round(costo * 100) / 100 } };
+        } catch (e) { console.warn('Enlace: no se pudo armar el resumen de Personal:', e); }
+        return Object.assign({}, foto ? { asientos: foto } : {}, resumen ? { resumen } : {});
     } catch (e) { console.warn('Enlace: no se pudo armar los asientos para el Libro Diario:', e); return {}; }
 };
 </script>
