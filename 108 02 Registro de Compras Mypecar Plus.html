@@ -584,7 +584,7 @@
                             <select id="prov-categoria" onchange="onCategoriaProveedorChange()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-amber-500 focus:border-amber-500">
                                 <option value="">— Sin categoría —</option>
                             </select>
-                            <input type="text" id="prov-cuenta-input" list="cuenta-datalist" autocomplete="off" placeholder="Ej: 60111 - Compra de Pollos" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-amber-500 focus:border-amber-500">
+                            <input type="text" id="prov-cuenta-input" list="cuenta-datalist" autocomplete="off" placeholder="Ej: 6011 - Mercaderías" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-amber-500 focus:border-amber-500">
                             <p class="text-[10px] text-slate-500 mt-1">Ayuda a sugerir la cuenta contable con más certeza que solo el nombre del proveedor.</p>
                             <p class="text-[10px] text-slate-500 mt-1">Se sugerirá automáticamente al registrar una compra de este proveedor.</p>
                         </div>
@@ -720,7 +720,7 @@
                         <ol class="list-decimal list-inside text-slate-700 mt-1 space-y-0.5">
                             <li>Llena el formulario de "Registrar Compra" (a la derecha) con los datos que usas seguido.</li>
                             <li>Haz clic en el botón <b>"Guardar estos datos como atajo nuevo"</b> que aparece debajo del formulario.</li>
-                            <li>Escribe un nombre para reconocerlo (ej: "Compra de pollo semanal").</li>
+                            <li>Escribe un nombre para reconocerlo (ej: "Compra semanal de mercadería").</li>
                             <li>¡Listo! El botón aparecerá aquí arriba, junto a los demás atajos.</li>
                         </ol>
                     </div>
@@ -850,7 +850,7 @@
 
                         <div>
                             <label class="block font-semibold text-slate-600 mb-1">Concepto / Glosa</label>
-                            <input type="text" id="compra-concepto" required placeholder="Ej: Compra de 100 pollos crudos para brasa" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-amber-500 focus:border-amber-500">
+                            <input type="text" id="compra-concepto" required placeholder="Ej: Compra de mercadería para la venta" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-amber-500 focus:border-amber-500">
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
@@ -1149,12 +1149,12 @@
 
                     <div class="border-t pt-4">
                         <h4 class="font-bold text-slate-800 flex items-center gap-2 mb-2"><i class="fa-solid fa-box text-amber-600"></i> Catálogo de Productos / Insumos (para Inventario)</h4>
-                        <p class="text-xs text-slate-500 mb-3">Los insumos que compras (pollo, papa, carbón, etc.), con su unidad de medida. Al marcar una línea de la compra como "Sujeta a Inventario", eliges de aquí qué y cuánto entró — usa el MISMO nombre que en 01 Ventas para que 09 INVENTARIO pueda cruzar entradas y salidas. Si un insumo no debe sumar stock, desmarca "Controla stock" al agregarlo.</p>
+                        <p class="text-xs text-slate-500 mb-3">Los insumos que compras (arroz, aceite, azúcar, etc.), con su unidad de medida. Al marcar una línea de la compra como "Sujeta a Inventario", eliges de aquí qué y cuánto entró — usa el MISMO nombre que en 01 Ventas para que 09 INVENTARIO pueda cruzar entradas y salidas. Si un insumo no debe sumar stock, desmarca "Controla stock" al agregarlo.</p>
                         <div id="productos-lista-container" class="space-y-1.5 mb-3"></div>
                         <div class="grid grid-cols-12 gap-2 items-end">
                             <div class="col-span-4">
                                 <label class="block text-[10px] text-slate-500 mb-1">Nombre</label>
-                                <input type="text" id="producto-nuevo-nombre" placeholder="Ej. Pollo crudo (kg)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs">
+                                <input type="text" id="producto-nuevo-nombre" placeholder="Ej. Arroz extra (kg)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs">
                             </div>
                             <div class="col-span-2">
                                 <label class="block text-[10px] text-slate-500 mb-1">Unidad</label>
@@ -1346,9 +1346,9 @@
 
     <footer class="bg-white border-t border-slate-200 py-6 mt-12 no-print">
         <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-2">
-            <p id="footer-copyright">© 2026 CompraPollo - MYPECAR PLUS. Diseñado bajo las especificaciones de la SUNAT peruana.</p>
+            <p id="footer-copyright">© 2026 MYPECAR PLUS. Diseñado bajo las especificaciones de la SUNAT peruana.</p>
             <p>Soporte contable para Régimen MYPE Tributario. IGV de compras a la tasa general del 18%. Centralización automatizada al Libro Diario.</p>
-            <p id="footer-version-archivo" class="text-[10px] text-slate-400">Versión de este archivo: 2026-09-18 · incluye la corrección "no perder compras importadas al cerrar y reabrir". Si tienes varias copias descargadas de este archivo, verifica que estés abriendo esta versión (compara esta fecha) antes de registrar información.</p>
+            <p id="footer-version-archivo" class="text-[10px] text-slate-400">MYPECAR PLUS · sistema en constante actualización.</p>
         </div>
     </footer>
 
@@ -2199,7 +2199,7 @@
             try { aplicarLogoCliente(); } catch (e) { console.error('Error al aplicar el logo del cliente:', e); }
             try {
                 const pieEl = document.getElementById('footer-copyright');
-                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} CompraPollo - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
+                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} MYPECAR PLUS - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
             } catch (e) { console.error('Error al actualizar el pie de página:', e); }
             // El <title> de la pestaña también debe reflejar la empresa activa — antes
             // quedaba fijo en el nombre de la empresa de ejemplo con la que se armó el
@@ -3113,7 +3113,7 @@
                 <div class="mt-1.5">
                     <label class="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 cursor-pointer">
                         <input type="checkbox" class="linea-inventario-check" ${sujetoInventario ? 'checked' : ''} onchange="toggleLineaInventario('${id}')">
-                        Sujeto a control de Inventario (insumo con stock — ej. pollo, papas, carbón, gaseosas)
+                        Sujeto a control de Inventario (insumo con stock — ej. arroz, aceite, azúcar, gaseosas)
                     </label>
                     <div class="linea-inventario-campos grid grid-cols-12 gap-2 mt-1.5 ${sujetoInventario ? '' : 'hidden'}">
                         <div class="col-span-6">
@@ -4418,7 +4418,7 @@
             document.querySelectorAll('#cuentas-compra-container > div').forEach(row => {
                 cuentas.push({ cuenta: row.querySelector('.linea-cuenta-compra').value, monto: row.querySelector('.linea-monto-compra').value });
             });
-            const nombre = prompt('Ponle un nombre corto a este atajo (ej: "Compra de pollo semanal"):', concepto.slice(0, 30));
+            const nombre = prompt('Ponle un nombre corto a este atajo (ej: "Compra semanal de mercadería"):', concepto.slice(0, 30));
             if (!nombre || !nombre.trim()) return;
 
             const campos = {

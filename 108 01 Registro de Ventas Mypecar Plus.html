@@ -629,7 +629,7 @@
 
                         <div>
                             <label class="block font-semibold text-slate-600 mb-1">Concepto / Glosa</label>
-                            <input type="text" id="venta-concepto" required placeholder="Ej: Venta de menú pollo a la brasa (2 personas)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-emerald-500 focus:border-emerald-500">
+                            <input type="text" id="venta-concepto" required placeholder="Ej: Venta de mercadería al por menor" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
 
                         <div class="bg-teal-50 border border-teal-200 rounded-xl p-3">
@@ -1148,7 +1148,7 @@
                         <div class="grid grid-cols-12 gap-2 items-end">
                             <div class="col-span-4">
                                 <label class="block text-[10px] text-slate-500 mb-1">Nombre</label>
-                                <input type="text" id="producto-nuevo-nombre" placeholder="Ej. Pollo a la brasa (unidad)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs">
+                                <input type="text" id="producto-nuevo-nombre" placeholder="Ej. Arroz extra 50 kg (saco)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs">
                             </div>
                             <div class="col-span-2">
                                 <label class="block text-[10px] text-slate-500 mb-1">Unidad</label>
@@ -1319,9 +1319,9 @@
 
     <footer class="bg-white border-t border-slate-200 py-6 mt-12 no-print">
         <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-2">
-            <p id="footer-copyright">© 2026 VendePollo - MYPECAR PLUS. Diseñado bajo las especificaciones de la SUNAT peruana.</p>
+            <p id="footer-copyright">© 2026 MYPECAR PLUS. Diseñado bajo las especificaciones de la SUNAT peruana.</p>
             <p id="txt-footer-igv">Soporte contable para Régimen MYPE Tributario. IGV de ventas propias a la tasa especial del 10.5% (Ley 31556/32219/32387). Centralización automatizada al Libro Diario.</p>
-            <p id="footer-version-archivo" class="text-[10px] text-slate-400">Versión de este archivo: 2026-09-18b · incluye la corrección REAL y verificada del "0 al reabrir tras importar" (la pantalla ya no espera a la nube para pintar tus datos). Si tienes varias copias descargadas de este archivo, verifica que estés abriendo esta versión (compara esta fecha) antes de registrar información.</p>
+            <p id="footer-version-archivo" class="text-[10px] text-slate-400">MYPECAR PLUS · sistema en constante actualización.</p>
         </div>
     </footer>
 
@@ -1368,10 +1368,10 @@
             ultimoRespaldoFecha: null,   // fecha ISO del último export de respaldo
             // Categorías de "Tipo de Venta" — editable en Ajustes, para adaptar el sistema a
             // cualquier rubro (ej. "Tienda"/"Online" en retail, "Mostrador"/"Reparto" en
-            // ferretería). Por defecto trae las de una pollería (Salón/Delivery).
+            // ferretería). Por defecto trae Tienda/En línea (editables).
             tiposVenta: [
-                { codigo: 'SALON', nombre: 'Salón' },
-                { codigo: 'DELIVERY', nombre: 'Delivery' }
+                { codigo: 'TIENDA', nombre: 'Tienda' },
+                { codigo: 'ONLINE', nombre: 'En línea' }
             ],
             // Puntos de Venta / locales / almacenes desde donde se emite el comprobante —
             // editable en Ajustes. Es el dato que permitirá a INVENTARIO (app 09) llevar
@@ -1886,7 +1886,7 @@
             try { aplicarLogoCliente(); } catch (e) { console.error('Error al aplicar el logo del cliente:', e); }
             try {
                 const pieEl = document.getElementById('footer-copyright');
-                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} VendePollo - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
+                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} MYPECAR PLUS - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
             } catch (e) { console.error('Error al actualizar el pie de página:', e); }
             // El <title> de la pestaña también debe reflejar la empresa activa — antes
             // quedaba fijo en el nombre de la empresa de ejemplo con la que se armó el

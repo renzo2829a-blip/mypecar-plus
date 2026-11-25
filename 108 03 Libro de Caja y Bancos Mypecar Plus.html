@@ -1006,7 +1006,7 @@
 
     <footer class="bg-white border-t border-slate-200 py-6 mt-12 no-print">
         <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-2">
-            <p id="footer-copyright">© 2026 CajaBancos - MYPECAR PLUS. Diseñado bajo las especificaciones de la SUNAT peruana.</p>
+            <p id="footer-copyright">© 2026 MYPECAR PLUS. Diseñado bajo las especificaciones de la SUNAT peruana.</p>
             <p>Soporte contable para Régimen MYPE Tributario. Exporta el asiento resumen del mes directamente al LibroDiario.</p>
         </div>
     </footer>
@@ -1706,7 +1706,7 @@
             try { aplicarLogoCliente(); } catch (e) { console.error('Error al aplicar el logo del cliente:', e); }
             try {
                 const pieEl = document.getElementById('footer-copyright');
-                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} CajaBancos - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
+                if (pieEl) pieEl.innerText = `© ${Number(hoyPeru().slice(0, 4))} MYPECAR PLUS - ${(config.nombreComercial || config.razonSocial || '').trim()}. Diseñado bajo las especificaciones de la SUNAT peruana.`;
             } catch (e) { console.error('Error al actualizar el pie de página:', e); }
             // El <title> de la pestaña también debe reflejar la empresa activa — antes
             // quedaba fijo en el nombre de la empresa de ejemplo con la que se armó el
