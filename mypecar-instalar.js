@@ -30,7 +30,7 @@
   window.addEventListener('appinstalled', function () { poner('mpi', 'instalada', 365); cerrar(); });
 
   function cerrar() { var c = document.getElementById('mpi-aviso'); if (c) c.remove(); }
-  function hayOtroAviso() { return !!document.querySelector('#mps-login, .mps-overlay, [id^="mps-"][role="dialog"], #mpa-panel[style*="flex"]'); }
+  function hayOtroAviso() { return !!document.querySelector('#mps-login, .mps-overlay, [id^="mps-"][role="dialog"], #mpa-panel[style*="flex"], #mpn-aviso'); }
 
   function mostrar() {
     if (document.getElementById('mpi-aviso') || document.visibilityState !== 'visible') return;
