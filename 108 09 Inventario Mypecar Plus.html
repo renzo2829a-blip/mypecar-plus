@@ -2722,7 +2722,16 @@ window.mypecarConstruirSnapshots = function () {
     try {
         if (typeof calcularStockActual !== 'function' || typeof config === 'undefined') return {};
         const items = calcularStockActual(config.metodoValorizacion || 'PROMEDIO').map(g => ({ productoCodigo: g.productoCodigo, puntoVenta: g.puntoVenta, cantidad: g.cantidad }));
-        return { stock: { tipo: 'stock_actual', origen: 'inventario', generadoEl: new Date().toISOString(), items } };
+        // (2026-11-25) Resumen para el Asistente: valor del inventario y productos bajo su stock mínimo.
+        let resumen = null;
+        try {
+            const grupos = calcularStockActual(config.metodoValorizacion || 'PROMEDIO');
+            const porProd = {}; let valorTotal = 0;
+            grupos.forEach(g => { valorTotal += g.valor || 0; porProd[g.productoCodigo] = (porProd[g.productoCodigo] || 0) + (g.cantidad || 0); });
+            const bajos = (config.productos || []).filter(p => p.controlaStock !== false && (p.stockMinimo || 0) > 0 && (porProd[p.codigo] || 0) < p.stockMinimo).slice(0, 15).map(p => ({ nombre: p.nombre, unidad: p.unidad || '', stock: Math.round((porProd[p.codigo] || 0) * 100) / 100, minimo: p.stockMinimo }));
+            resumen = { tipo: 'inventario_resumen', generadoEl: new Date().toISOString(), metodo: config.metodoValorizacion || 'PROMEDIO', productos: (config.productos || []).length, valorTotal: Math.round(valorTotal * 100) / 100, bajoMinimo: bajos };
+        } catch (e) { console.warn('Enlace: no se pudo armar el resumen de Inventario:', e); }
+        return Object.assign({ stock: { tipo: 'stock_actual', origen: 'inventario', generadoEl: new Date().toISOString(), items } }, resumen ? { resumen } : {});
     } catch (e) { console.warn('Enlace: no se pudo armar la foto de stock:', e); return {}; }
 };
 </script>
