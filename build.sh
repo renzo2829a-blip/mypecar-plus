@@ -3,7 +3,7 @@
 set -e
 rm -rf dist
 mkdir dist
-cp ./*.html ./*.js ./_headers ./manifest.webmanifest dist/
+cp ./*.html ./*.js ./_headers ./manifest.webmanifest ./novedades.json dist/
 cp -r fonts dist/fonts
 cp -r img dist/img
 cp -r videos dist/videos

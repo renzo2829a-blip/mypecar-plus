@@ -81,3 +81,8 @@ grupoB (provisional a prueba de abuso) · prueba_gratis_14_dias · prueba_gratis
   algún día se pasa a Pro.
 - Sin respaldos automáticos (plan Free): solo existen las copias `respaldo_*` dentro de la misma base y la foto diaria `app_config_respaldo`.
   Falta un respaldo externo periódico (decisión del dueño sobre dónde guardarlo).
+
+## Aviso de novedades (25-nov-2026)
+- `novedades.json` + `mypecar-novedades.js` (cargado en `modulos.html` y los 9 módulos): aviso pequeño con botón «Aceptar» que cada cliente ve una vez por actualización (cookie `mpn` con la versión vista).
+- **Al publicar algo que el cliente note:** editar `novedades.json` (cambiar `version`, p. ej. `2026-12-01.1`, y la lista `items`, máx. 5 líneas cortas). Si no se cambia `version`, nadie vuelve a ver el aviso.
+- Invitación para instalar la app en el celular: `mypecar-instalar.js` + `manifest.webmanifest` + `sw.js` (cookie `mpi`).
