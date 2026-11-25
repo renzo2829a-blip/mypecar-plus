@@ -234,6 +234,10 @@
     if (/^(hola|buenas|buen dia|buenos dias|buenas tardes|buenas noches|hey)\b/.test(txt) && txt.split(' ').length <= 4) return { html: '¡Hola! Soy el asistente de MYPECAR PLUS. Pregúntame dónde está algo en cualquier módulo, o por los números de tu empresa (ventas, compras, IGV, quién te debe).' };
     if (/^(gracias|muchas gracias|ok gracias|listo gracias|genial|perfecto)\b/.test(txt)) return { html: '¡Con gusto! Aquí estoy si necesitas algo más.' };
 
+    if (/\b(datos|data)\b.*\b(ejemplo|demo|prueba)\b|\b(ejemplo|demo)\b.*\bdatos\b/.test(txt) && window.MypecarDemo) {
+      if (/\b(quita|quitar|borra|borrar|saca|sacar|elimina|eliminar|sin)\b/.test(txt)) return { html: 'Con este botón se quitan los datos de ejemplo de esta empresa. No se borra nada tuyo: los ejemplos nunca se guardaron.', a: [{ demo: 'quitar', label: 'Quitar datos de ejemplo' }] };
+      return { html: 'Puedo mostrarte datos de ejemplo (ficticios) en los módulos que estén vacíos, solo en pantalla: no se guardan ni afectan tu contabilidad, y los quitas con un clic.', a: [{ demo: 'activar', label: 'Cargar datos de ejemplo' }] };
+    }
     // 1) Datos de la empresa
     let mejor = null, mp = 0; INTENCIONES_DATOS.forEach(i => i.k.forEach(k => { const p = frasePresente(k, r); if (p > mp) { mp = p; mejor = i; } }));
     if (mejor && mp >= 4) { ultima = { id: mejor.id, texto: textoOriginal }; return await mejor.f(periodo); }
@@ -264,6 +268,7 @@
   function abrir(a) {
     const actual = moduloActual();
     if (a.url) { location.href = a.url; return; }
+    if (a.demo && window.MypecarDemo) { window.MypecarDemo[a.demo](); return; }
     if (!a.mod || a.mod === actual) { if (a.tab && typeof window.switchTab === 'function') { try { window.switchTab(a.tab); cerrar(); } catch (e) {} } return; }
     const m = MODULOS.find(x => x.n === a.mod); if (!m) return;
     location.href = encodeURI(m.archivo) + (a.tab ? '?tab=' + a.tab : '');
