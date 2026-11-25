@@ -67,6 +67,22 @@
     '  header .no-print.flex:not(.mpm-tabs) { flex-wrap: wrap !important; gap: 6px !important; }',
     '  header .no-print.flex > div { padding: 3px 8px !important; }',
     '  header select { min-height: 34px; font-size: 14px !important; }',
+    /* 4b-bis. (2026-11-25) ENCABEZADO IGUAL EN LOS 9 MÓDULOS: fila 1 = logo + título a la izquierda; debajo, recuadros del mismo tamaño en 2 columnas (Sede, RUC, Periodo, Nube); luego las pestañas. */
+    '  header { position: static !important; }',
+    '  header .max-w-7xl > div:first-child, header > div > div:first-child { align-self: flex-start !important; width: 100% !important; justify-content: flex-start !important; text-align: left !important; }',
+    '  header #header-logo-circulo { flex: none !important; }',
+    '  header img:not(#header-logo-cliente), header svg:not(#header-logo-generico):not(i svg) { display: none !important; }',
+    '  header #header-logo-circulo img, header #header-logo-circulo svg { display: block !important; }',
+    '  header #header-logo-cliente.hidden { display: none !important; }',
+    '  header h1 { text-align: left !important; justify-content: flex-start !important; }',
+    '  header h1 > span, header h1 ~ p { display: none !important; }',
+    '  header .mps-derecha { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 6px !important; width: 100% !important; margin: 0 !important; align-items: stretch !important; }',
+    '  header .mps-derecha > * { box-sizing: border-box !important; min-width: 0 !important; width: auto !important; max-width: none !important; margin: 0 !important; min-height: 46px !important; padding: 5px 10px !important; border-radius: 10px !important; border: 1px solid rgba(255,255,255,.28) !important; background: rgba(0,0,0,.22) !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: flex-start !important; text-align: left !important; overflow: hidden; }',
+    '  header .mps-derecha > * small, header .mps-derecha > * > p:first-child { font-size: 9px !important; line-height: 1.1 !important; letter-spacing: .04em; text-transform: uppercase; opacity: .85; margin: 0 !important; }',
+    '  header .mps-derecha > * b, header .mps-derecha > * > p + *, header .mps-derecha > * select { font-size: 13px !important; line-height: 1.25 !important; font-weight: 700 !important; }',
+    '  header .mps-derecha select { background: transparent !important; border: 0 !important; padding: 0 !important; min-height: 0 !important; width: 100% !important; color: #fde047; }',
+    '  header .mps-derecha > select { padding: 0 10px !important; min-height: 46px !important; color: #fde047 !important; background: rgba(0,0,0,.22) !important; border: 1px solid rgba(255,255,255,.28) !important; border-radius: 10px !important; }',
+    '  header .mps-derecha > [id^="badge-"] { display: none !important; }',
     /* 4c. Campos de filtro con ancho fijo: que usen todo el ancho disponible */
     '  .mpm-ancho, div:has(> .mpm-ancho) { width: 100% !important; max-width: 100% !important; }',
     /* 4d. Enlaces sueltos (pie de página): zona de toque más grande */
@@ -137,6 +153,11 @@
     }
   }
 
+  function marcarRecuadros() {
+    var sync = document.getElementById('sync-status-cont');
+    var c = sync && sync.parentElement;
+    if (c && !c.classList.contains('mps-derecha') && c.closest('header')) c.classList.add('mps-derecha');
+  }
   function marcarPestañas() {
     var btn = document.querySelector('[id^="btn-tab-"]');
     if (!btn) return;
@@ -185,6 +206,7 @@
     marcarPestañas();
     marcarCamposAnchos();
     marcarTablas();
+    marcarRecuadros();
     nombrarControles();
 
     // Las tablas se dibujan con JavaScript: re-marcar cuando cambia el contenido.
@@ -192,7 +214,7 @@
       var pend = false;
       new MutationObserver(function () {
         if (pend) return; pend = true;
-        setTimeout(function () { pend = false; marcarTablas(); marcarCamposAnchos(); nombrarControles(); }, 200);
+        setTimeout(function () { pend = false; marcarTablas(); marcarCamposAnchos(); marcarRecuadros(); nombrarControles(); }, 200);
       }).observe(document.body, { childList: true, subtree: true });
     }
 
