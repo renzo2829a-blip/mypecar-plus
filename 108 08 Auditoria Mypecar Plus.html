@@ -1542,7 +1542,7 @@ const MypecarPEVista = (function () {
             'Razón de Endeudamiento': 'Qué porcentaje de todo lo que tiene el negocio (activos) está financiado con deuda de terceros, en vez de con capital propio.',
             'Deuda / Patrimonio': 'Compara cuánto debes frente a cuánto es realmente tuyo (patrimonio). Un valor alto indica alta dependencia de financiamiento externo.',
             'Autonomía Financiera': 'Qué porcentaje de los activos del negocio están financiados con capital propio (patrimonio), sin depender de deuda.',
-            'Margen Bruto': 'De cada sol vendido, cuánto queda después de pagar el costo directo de los insumos (pollo, carbón, etc.), antes de gastos operativos.',
+            'Margen Bruto': 'De cada sol vendido, cuánto queda después de pagar el costo directo de los insumos (mercaderías, insumos, etc.), antes de gastos operativos.',
             'Margen Operativo': 'De cada sol vendido, cuánto queda después de cubrir el costo de ventas y los gastos administrativos y de ventas, antes de gastos financieros.',
             'Margen Neto': 'De cada sol vendido, cuánto queda realmente como ganancia después de todos los gastos e impuestos a cuenta del periodo.',
             'ROA (Rentabilidad del Activo)': 'Por cada sol invertido en los activos del negocio (caja, equipos, etc.), cuánta utilidad neta se genera.',
@@ -1996,7 +1996,7 @@ const MypecarPEVista = (function () {
                 if (Math.abs(variacion) > params.umbralMargen) {
                     hallazgos.push(nuevoHallazgo('Análisis de Márgenes', 'medio',
                         `El margen bruto varió ${variacion >= 0 ? '+' : ''}${variacion.toFixed(1)} puntos porcentuales respecto a ${formatPeriodoLabel(periodoAnt)} (de ${margenAnt.toFixed(1)}% a ${margenMes.toFixed(1)}%), superando el umbral de ${params.umbralMargen} puntos configurado.`,
-                        variacion < 0 ? 'Investigar si hubo aumento en el costo de insumos (precio del pollo, carbón, etc.), mermas, o si se otorgaron descuentos no reflejados correctamente.' : 'Confirmar que el aumento del margen sea real (ej. ajuste de precios) y no producto de compras no registradas o costo de ventas subestimado.'));
+                        variacion < 0 ? 'Investigar si hubo aumento en el costo de insumos (precio de la mercadería o de los insumos), mermas, o si se otorgaron descuentos no reflejados correctamente.' : 'Confirmar que el aumento del margen sea real (ej. ajuste de precios) y no producto de compras no registradas o costo de ventas subestimado.'));
                 }
             } else {
                 detalleHtml += `<p class="text-xs text-slate-400 mt-2 italic">No hay un mes anterior con datos en el mismo año para comparar la tendencia.</p>`;
