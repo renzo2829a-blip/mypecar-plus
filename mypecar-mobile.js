@@ -61,7 +61,7 @@
     '  header #header-logo-circulo { width: 40px !important; height: 40px !important; padding: 4px !important; }',
     '  header h1 { font-size: 1.05rem !important; line-height: 1.2 !important; }',
     '  header h1 + p { display: -webkit-box !important; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }',
-    '  header .no-print.flex { flex-wrap: wrap !important; gap: 6px !important; }',
+    '  header .no-print.flex:not(.mpm-tabs) { flex-wrap: wrap !important; gap: 6px !important; }',
     '  header .no-print.flex > div { padding: 3px 8px !important; }',
     '  header select { min-height: 34px; font-size: 14px !important; }',
     /* 4c. Campos de filtro con ancho fijo: que usen todo el ancho disponible */
