@@ -76,6 +76,19 @@
         .dash-imprimible .dash-snap { display: block !important; width: 100%; height: 100%; object-fit: contain; }
     }
     .dash-snap { display: none; }
+    /* Informe Gerencial (2026-11-25): impresión limpia, solo la hoja y sin cortes feos */
+    @media print {
+        #informe-gerencial-hoja { font-size: 10px; border-radius: 0 !important; }
+        #informe-gerencial-hoja > div { break-inside: auto !important; }
+        #informe-gerencial-hoja .ig-sec { break-inside: avoid; page-break-inside: avoid; }
+        #informe-gerencial-hoja table { font-size: 9.5px; }
+        #informe-gerencial-hoja svg { max-height: 130px; }
+        #informe-gerencial-hoja .p-6, #informe-gerencial-hoja .md\\:p-8 { padding: 14px 20px !important; }
+        #informe-gerencial-hoja .space-y-7 > * + * { margin-top: 12px !important; }
+        #informe-gerencial-hoja td, #informe-gerencial-hoja th { padding-top: 3px !important; padding-bottom: 3px !important; }
+        #informe-gerencial-hoja tr { break-inside: avoid; }
+        #informe-gerencial-hoja .grid.grid-cols-2 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
 </style>
 <script>
 // ==================================================================
@@ -1384,128 +1397,36 @@ const MypecarPEVista = (function () {
             </div>
         </section>
 
-        <!-- ================= PESTAÑA: INFORME GERENCIAL ================= -->
+        <!-- ================= PESTAÑA: INFORME GERENCIAL (rediseñado 2026-11-25: comparativos y tendencias) ================= -->
         <section id="tab-informe" class="tab-content hidden space-y-6">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                <div>
-                    <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fa-solid fa-file-lines text-violet-600"></i> Informe Gerencial</h3>
-                    <p class="text-xs text-slate-500 mt-1">Mismo cálculo que el Informe Gerencial del Libro Diario, pero armado con los datos consolidados que importaste aquí.</p>
-                </div>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <select id="ig-periodo" onchange="renderInformeGerencial()" class="bg-slate-50 border border-slate-200 text-xs rounded-lg p-2"></select>
-                    <button onclick="exportarInformeGerencialExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
-                        <i class="fa-solid fa-file-excel"></i> Exportar Excel (.xlsx)
-                    </button>
-                    <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
-                        <i class="fa-solid fa-print"></i> Imprimir / Guardar como PDF
-                    </button>
+            <div class="no-print bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4">
+                    <div class="max-w-xl">
+                        <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fa-solid fa-file-lines text-violet-600"></i> Informe Gerencial</h3>
+                        <p class="text-xs text-slate-500 mt-1">Resumen para gerentes y dueños: cómo le fue al negocio en el mes, cómo se compara con el mes anterior y con los últimos meses, y qué conviene hacer. Sale del Libro Diario importado.</p>
+                    </div>
+                    <div class="flex items-end gap-2 flex-wrap">
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mes a informar</label>
+                            <select id="ig-periodo" onchange="renderInformeGerencial()" class="bg-slate-50 border border-slate-200 text-xs rounded-lg p-2"></select></div>
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Preparado por</label>
+                            <input id="ig-preparado" onchange="guardarPreparadoPorIG()" class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs w-52"></div>
+                        <button onclick="exportarInformeGerencialExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-file-excel"></i> Exportar Excel (.xlsx)
+                        </button>
+                        <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-print"></i> Imprimir / Guardar como PDF
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div id="informe-gerencial-hoja" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden informe-print-area">
-                <div class="bg-gradient-to-r from-indigo-800 to-violet-700 text-white px-8 py-6">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-200">Informe Gerencial</p>
-                    <h2 class="text-2xl font-black" id="ig-titulo">EMPRESA</h2>
-                    <p class="text-xs text-indigo-200 mt-1" id="ig-subtitulo">RUC: — · Periodo: —</p>
-                </div>
+            <div id="ig-sin-datos" class="hidden no-print bg-white p-10 rounded-2xl shadow-sm border border-slate-200 text-center text-slate-400">
+                <i class="fa-solid fa-inbox text-3xl mb-2"></i>
+                <p class="text-sm">Importa primero el archivo del Libro Diario (04 → "Exportar Datos para REPORTES").</p>
+            </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200">
-                    <div class="bg-sky-50 p-5 text-center">
-                        <p class="text-[10px] font-bold text-sky-700 uppercase">Ventas Netas (Acum.)</p>
-                        <p class="text-xl font-black text-sky-800 mt-1" id="ig-kpi-ventas">S/ 0.00</p>
-                    </div>
-                    <div class="bg-emerald-50 p-5 text-center">
-                        <p class="text-[10px] font-bold text-emerald-700 uppercase">Utilidad Neta (Acum.)</p>
-                        <p class="text-xl font-black text-emerald-800 mt-1" id="ig-kpi-utilidad">S/ 0.00</p>
-                    </div>
-                    <div class="bg-violet-50 p-5 text-center">
-                        <p class="text-[10px] font-bold text-violet-700 uppercase">Margen Neto</p>
-                        <p class="text-xl font-black text-violet-800 mt-1" id="ig-kpi-margen">0.0%</p>
-                    </div>
-                    <div class="bg-amber-50 p-5 text-center">
-                        <p class="text-[10px] font-bold text-amber-700 uppercase">Total Activo</p>
-                        <p class="text-xl font-black text-amber-800 mt-1" id="ig-kpi-activo">S/ 0.00</p>
-                    </div>
-                </div>
-
-                <div class="p-8 space-y-8">
-                    <div>
-                        <h4 class="font-bold text-indigo-800 text-sm uppercase tracking-wide mb-3 flex items-center gap-2"><i class="fa-solid fa-chart-simple"></i> Análisis del Periodo</h4>
-                        <ul id="ig-analisis-periodo" class="text-sm text-slate-700 space-y-1.5 list-disc list-inside"></ul>
-                    </div>
-
-                    <div>
-                        <h4 class="font-bold text-indigo-800 text-sm uppercase tracking-wide mb-3 flex items-center gap-2"><i class="fa-solid fa-receipt"></i> Análisis de Gastos</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                            <div class="h-56"><canvas id="ig-chart-gastos"></canvas></div>
-                            <table class="w-full text-xs">
-                                <thead><tr class="text-left text-slate-500 border-b"><th class="py-1.5">Categoría</th><th class="py-1.5 text-right">Monto</th><th class="py-1.5 text-right">%</th></tr></thead>
-                                <tbody id="ig-gastos-body" class="divide-y divide-slate-100"></tbody>
-                            </table>
-                        </div>
-                        <p id="ig-aviso-sincc" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5 mt-3 hidden"></p>
-                    </div>
-
-                    <div>
-                        <h4 class="font-bold text-indigo-800 text-sm uppercase tracking-wide mb-1 flex items-center gap-2"><i class="fa-solid fa-chart-line"></i> KPIs de Negocio</h4>
-                        <p class="text-[11px] text-slate-500 mb-3">Indicadores operativos, más allá de los ratios financieros — pensados para saber de un vistazo cómo va el negocio y qué hacer al respecto.</p>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-xs border-collapse">
-                                <thead>
-                                    <tr class="bg-slate-100 text-[10px] text-slate-600 uppercase border-b border-slate-300">
-                                        <th class="p-2 text-left">KPI</th>
-                                        <th class="p-2 text-right">Resultado</th>
-                                        <th class="p-2 text-left">¿Qué significa?</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ig-kpis-negocio" class="divide-y divide-slate-100"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 class="font-bold text-indigo-800 text-sm uppercase tracking-wide mb-1 flex items-center gap-2"><i class="fa-solid fa-gauge"></i> Ratios Financieros</h4>
-                        <p class="text-[11px] text-slate-500 mb-3">🟢 Óptimo &nbsp; 🟡 Aceptable, requiere seguimiento &nbsp; 🔴 Requiere atención inmediata</p>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-xs border-collapse">
-                                <thead>
-                                    <tr class="bg-slate-100 text-[10px] text-slate-600 uppercase border-b border-slate-300">
-                                        <th class="p-2 text-center w-10"></th>
-                                        <th class="p-2 text-left">Ratio</th>
-                                        <th class="p-2 text-right">Valor</th>
-                                        <th class="p-2 text-left">¿Qué mide?</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ig-ratios" class="divide-y divide-slate-100"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 class="font-bold text-indigo-800 text-sm uppercase tracking-wide mb-3 flex items-center gap-2"><i class="fa-solid fa-flag-checkered"></i> Conclusiones</h4>
-                        <div class="space-y-3">
-                            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                                <p class="text-xs font-bold text-slate-500 uppercase mb-1">Situación Actual <span id="ig-conclusion-badge" class="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold"></span></p>
-                                <p id="ig-conclusion-situacion" class="text-sm text-slate-700"></p>
-                            </div>
-                            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                                <p class="text-xs font-bold text-slate-500 uppercase mb-1">Tendencia Financiera</p>
-                                <p id="ig-conclusion-tendencia" class="text-sm text-slate-700"></p>
-                            </div>
-                            <div id="ig-conclusion-seguimiento-wrap" class="bg-slate-50 border border-slate-200 rounded-xl p-4 hidden">
-                                <p class="text-xs font-bold text-slate-500 uppercase mb-1">Seguimiento a Recomendaciones Anteriores</p>
-                                <p id="ig-conclusion-seguimiento" class="text-sm text-slate-700"></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 class="font-bold text-white text-sm uppercase tracking-wide mb-3 flex items-center gap-2 bg-emerald-800 px-3 py-2 rounded-lg"><i class="fa-solid fa-lightbulb"></i> Recomendaciones</h4>
-                        <div id="ig-recomendaciones" class="space-y-2"></div>
-                    </div>
-
-                    <p class="text-[10px] text-slate-400 italic border-t pt-3" id="ig-pie">Generado automáticamente. Herramienta de apoyo a la gestión; no reemplaza el análisis del contador.</p>
-                </div>
+            <div id="informe-gerencial-hoja" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden informe-print-area">
+                <div id="ig-contenido"></div>
             </div>
         </section>
 
@@ -6604,125 +6525,626 @@ function renderAnalisisCuenta() {
         }
 
         // ==================================================================
-        // RENDER: INFORME GERENCIAL
+        // RENDER: INFORME GERENCIAL (rediseñado 2026-11-25)
+        // Antes mostraba solo cifras acumuladas del mes elegido. Ahora compara el mes
+        // contra el anterior y contra los últimos meses (para que se vean tendencias),
+        // explica en lenguaje simple qué cambió y por qué, y propone qué hacer.
+        // Un solo modelo (construirInformeGerencial) alimenta la pantalla, la impresión y el Excel.
         // ==================================================================
-        let igChart = null;
-        function renderInformeGerencial() {
-            if (!diarioImport) { showToast('Importa los Datos del Libro Diario primero.', 'error'); return; }
-            const periodoHasta = document.getElementById('ig-periodo').value;
-            if (!periodoHasta) return;
-            const [anioSel, mesSelStr] = periodoHasta.split('-');
-            const mesSel = parseInt(mesSelStr, 10);
+        const IG_MESES_SERIE = 6;
 
+        const IG_GRUPOS_RATIOS = [
+            { titulo: 'Liquidez · ¿puedo pagar lo que debo en el corto plazo?', nombres: ['Razón Corriente', 'Prueba Ácida', 'Capital de Trabajo'] },
+            { titulo: 'Deuda · ¿cuánto del negocio depende de préstamos y proveedores?', nombres: ['Razón de Endeudamiento', 'Deuda / Patrimonio', 'Autonomía Financiera'] },
+            { titulo: 'Rentabilidad · ¿cuánto gana el negocio?', nombres: ['Margen Bruto', 'Margen Operativo', 'Margen Neto', 'ROA (Rentabilidad del Activo)', 'ROE (Rentabilidad del Patrimonio)'] }
+        ];
+        const IG_AYUDA_RATIOS = {
+            'Razón Corriente': 'Soles disponibles en el corto plazo por cada sol que se debe en el corto plazo. De 1.5 para arriba es cómodo.',
+            'Prueba Ácida': 'Lo mismo, pero sin contar la mercadería. De 1 para arriba es sano.',
+            'Capital de Trabajo': 'Lo que queda en soles después de pagar las deudas de corto plazo. Si es negativo, hay riesgo de quedarse sin caja.',
+            'Razón de Endeudamiento': 'Qué parte de lo que tiene el negocio se financió con deudas. Hasta 50% es cómodo.',
+            'Deuda / Patrimonio': 'Cuánto se debe por cada sol propio. Hasta 1 es sano.',
+            'Autonomía Financiera': 'Qué parte del negocio es realmente de los dueños. De 50% para arriba es sólido.',
+            'Margen Bruto': 'De cada sol vendido, cuánto queda después de pagar insumos o mercadería.',
+            'Margen Operativo': 'Lo que queda después de pagar también los gastos de administración y de ventas.',
+            'Margen Neto': 'La ganancia final de cada sol vendido.',
+            'ROA (Rentabilidad del Activo)': 'Utilidad que generan los bienes y el dinero del negocio, por cada sol invertido en ellos.',
+            'ROE (Rentabilidad del Patrimonio)': 'Utilidad que ganan los dueños por cada sol propio puesto en el negocio.'
+        };
+
+        // ---------- formato ----------
+        function igEsc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+        function igS(n) { const v = Math.round(Number(n) || 0); return (v < 0 ? '−S/ ' : 'S/ ') + Math.abs(v).toLocaleString('es-PE'); }
+        function igN(n) { return Math.round(Number(n) || 0).toLocaleString('es-PE'); }
+        function igPct(x, dec) { return (x === null || x === undefined || !isFinite(x)) ? '—' : (x * 100).toFixed(dec === undefined ? 1 : dec) + '%'; }
+        function igNombreCuenta(c) { const s = String(getAccountName(c) || c).toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); }
+        function igCompacto(n) {
+            const a = Math.abs(n), s = n < 0 ? '−' : '';
+            if (a >= 1e6) return s + (a / 1e6).toFixed(1) + ' M';
+            if (a >= 1e3) return s + (a / 1e3).toFixed(1).replace(/\.0$/, '') + ' mil';
+            return s + Math.round(a);
+        }
+        function igFmtValor(v, fmt) {
+            if (v === null || v === undefined || !isFinite(v)) return '—';
+            if (fmt === 'p') return igPct(v);
+            if (fmt === 'n') return igN(v);
+            if (fmt === 's2') return 'S/ ' + v.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (fmt === 'dias') return Math.round(v) + ' días';
+            if (fmt === 'S') return igS(v);
+            return igN(v);
+        }
+
+        // ---------- comparaciones ----------
+        // esPct = true cuando el valor ya es un porcentaje: el cambio se expresa en puntos.
+        // bueno: true si subir es bueno, false si subir es malo, null si no se juzga.
+        function igCambio(act, ref, bueno, esPct) {
+            if (act === null || act === undefined || ref === null || ref === undefined || !isFinite(act) || !isFinite(ref)) return null;
+            const dif = act - ref;
+            const rel = (!esPct && Math.abs(ref) > 0.5) ? dif / Math.abs(ref) : null;
+            const umbral = esPct ? 0.0005 : (Math.abs(ref) > 0.5 ? Math.abs(ref) * 0.005 : 0.5);
+            const dir = Math.abs(dif) <= umbral ? 0 : (dif > 0 ? 1 : -1);
+            let tono = 'neutro';
+            if (dir !== 0 && bueno !== null && bueno !== undefined) tono = ((dir > 0) === bueno) ? 'bueno' : 'malo';
+            return { dif, rel, dir, tono, esPct: !!esPct };
+        }
+        const IG_TONO_CLASE = { bueno: 'text-emerald-700', malo: 'text-rose-700', neutro: 'text-slate-500' };
+        // opt.monto = true muestra la diferencia en soles en vez del porcentaje (útil para utilidades).
+        function igCambioTxt(c, opt) {
+            if (!c) return '—';
+            if (c.dir === 0) return '► igual';
+            const flecha = c.dir > 0 ? '▲' : '▼', signo = c.dir > 0 ? '+' : '−';
+            if (c.esPct) return `${flecha} ${signo}${Math.abs(c.dif * 100).toFixed(1)} pts`;
+            if (c.rel !== null && !(opt && opt.monto)) return `${flecha} ${signo}${Math.abs(c.rel * 100).toFixed(1)}%`;
+            return `${flecha} ${signo}${igS(Math.abs(c.dif))}`;
+        }
+        function igCambioHtml(c, opt) {
+            if (!c) return '<span class="text-slate-400">—</span>';
+            return `<span class="font-semibold whitespace-nowrap ${IG_TONO_CLASE[c.tono]}">${igCambioTxt(c, opt)}</span>`;
+        }
+        function igPromedios(arr) {
+            const claves = ['ventas', 'costoVentas', 'utilidadBruta', 'gastosOper', 'gastosOtros', 'utilidad', 'margenNeto', 'margenBruto', 'costoPct', 'operPct', 'otrosPct', 'comprobantes', 'ticket', 'pe', 'msPct'];
+            const o = {};
+            claves.forEach(k => {
+                const v = arr.map(m => m[k]).filter(x => x !== null && x !== undefined && isFinite(x));
+                o[k] = v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+            });
+            return o;
+        }
+        // Pendiente de la recta que mejor se ajusta a la serie, como % del promedio por mes.
+        function igTendencia(serie, key) {
+            const pts = serie.map((m, i) => ({ x: i, y: m[key] })).filter(p => p.y !== null && p.y !== undefined && isFinite(p.y));
+            if (pts.length < 3) return null;
+            const n = pts.length, mx = pts.reduce((s, p) => s + p.x, 0) / n, my = pts.reduce((s, p) => s + p.y, 0) / n;
+            let num = 0, den = 0;
+            pts.forEach(p => { num += (p.x - mx) * (p.y - my); den += (p.x - mx) * (p.x - mx); });
+            const pend = den ? num / den : 0;
+            const rel = Math.abs(my) > 0.5 ? pend / Math.abs(my) : 0;
+            return { pendiente: pend, relMes: rel, dir: rel > 0.02 ? 1 : (rel < -0.02 ? -1 : 0) };
+        }
+
+        // ---------- datos por mes ----------
+        function igPeriodosConDatos(hasta) {
+            if (!diarioImport) return [];
+            return todosLosPeriodosDiario().filter(k => k <= hasta && ((diarioImport.periodsData[k] || {}).asientos || []).length > 0);
+        }
+        function igDatosMes(p) {
+            const [a, m] = p.split('-').map(Number);
+            const mov = getMovimientosDelMes(p);
+            const er = calcularEstadoResultados(mov);
+            const v = er.ventasNetas;
+            const base = v > 0.005 ? v : null;
+            const gastosOper = er.gastosAdmin + er.gastosVentas;
+            const gastosOtros = er.gastosFinancieros + er.gastosSinCC;
+            let comprobantes = 0, ventasBrutas = 0;
+            const sales = (ventasImport && ventasImport.periodsData && ventasImport.periodsData[p] && ventasImport.periodsData[p].sales) || [];
+            sales.forEach(s => { if (String(s.tipoDoc) === '07') return; comprobantes++; ventasBrutas += Number(s.total) || 0; });
+            return {
+                periodo: p, anio: a, mes: m, etiqueta: `${MESES_ABREV[m]} ${String(a).slice(2)}`, nombre: `${MESES_NOMBRE[m]} ${a}`,
+                mov, er, ventas: v, costoVentas: er.costoVentas, utilidadBruta: er.utilidadBruta,
+                gastosAdmin: er.gastosAdmin, gastosVentas: er.gastosVentas, gastosOper, gastosFin: er.gastosFinancieros, gastosSinCC: er.gastosSinCC, gastosOtros,
+                utilidadOperativa: er.utilidadOperativa, utilidad: er.utilidad,
+                margenBruto: base ? er.utilidadBruta / base : null, margenNeto: base ? er.utilidad / base : null,
+                costoPct: base ? er.costoVentas / base : null, operPct: base ? gastosOper / base : null, otrosPct: base ? gastosOtros / base : null,
+                comprobantes: comprobantes > 0 ? comprobantes : null, ticket: comprobantes > 0 ? ventasBrutas / comprobantes : null,
+                efectivo: getSaldoEfectivoAlCierre(p), pe: null, msPct: null, ventasPE: null
+            };
+        }
+        // Punto de equilibrio mes a mes: mismo cálculo que la pestaña Punto de Equilibrio,
+        // así los dos informes no muestran números distintos.
+        function igSeriePE(hasta) {
+            const out = {};
+            try {
+                if (typeof MypecarPE === 'undefined') return out;
+                MypecarPE.serieMensual(opcionesPEReportes(hasta, 'mes'), 36).forEach(s => { out[s.periodo] = s; });
+            } catch (e) { console.error('Informe Gerencial: no se pudo calcular el punto de equilibrio mensual', e); }
+            return out;
+        }
+        function igCuentasGasto(mov) {
+            const o = {};
+            Object.keys(mov).forEach(c => { if (getAccountGrupo(c) === 'gasto') o[c] = mov[c].debe - mov[c].haber; });
+            return o;
+        }
+        function igSemaforoKpi(clave, v) {
+            if (v === null || v === undefined || !isFinite(v)) return null;
+            if (clave === 'costoPct') return v > 0.40 ? '🔴' : (v > 0.35 ? '🟡' : '🟢');
+            if (clave === 'msPct') return v < 0 ? '🔴' : (v < 0.10 ? '🟡' : '🟢');
+            if (clave === 'dias') return v > 30 ? '🔴' : (v > 15 ? '🟡' : '🟢');
+            return null;
+        }
+
+        // ---------- modelo ----------
+        function construirInformeGerencial(periodoHasta) {
+            const cfg = (diarioImport && diarioImport.config) || {};
+            const periodos = igPeriodosConDatos(periodoHasta);
+            if (periodos[periodos.length - 1] !== periodoHasta) periodos.push(periodoHasta);
+            const serie = periodos.slice(-IG_MESES_SERIE).map(igDatosMes);
+            const peMap = igSeriePE(periodoHasta);
+            serie.forEach(m => {
+                const s = peMap[m.periodo];
+                if (s && s.valido) { m.pe = s.pe; m.msPct = s.msPct; m.ventasPE = s.ventas; }
+            });
+            const cur = serie[serie.length - 1];
+            const prev = serie.length > 1 ? serie[serie.length - 2] : null;
+            const previos = serie.slice(0, -1);
+            const previos3 = previos.slice(-3);
+            const prom3 = previos3.length >= 2 ? igPromedios(previos3) : null;
+            const promPrevios = previos.length >= 1 ? igPromedios(previos) : null;
+
+            const pMismo = `${cur.anio - 1}-${String(cur.mes).padStart(2, '0')}`;
+            const mismoMes = igPeriodosConDatos(pMismo).includes(pMismo) ? igDatosMes(pMismo) : null;
+
+            // Acumulado enero-mes (base de balance y ratios)
             const movAcum = getMovimientosAcumulado(periodoHasta);
             const erAcum = calcularEstadoResultados(movAcum);
             const esAcum = estadoSituacionAl(periodoHasta, erAcum.utilidad);
             const ratios = calcularRatiosFinancieros(movAcum, erAcum, esAcum);
-            const kpisNegocio = calcularKPIsNegocio(periodoHasta, erAcum);
-            const recomendaciones = generarRecomendaciones(erAcum, esAcum, ratios, kpisNegocio);
+            const kpisNeg = calcularKPIsNegocio(periodoHasta, erAcum);
+            let prevAcum = null;
+            if (prev && prev.anio === cur.anio) {
+                const m = getMovimientosAcumulado(prev.periodo), e = calcularEstadoResultados(m), s = estadoSituacionAl(prev.periodo, e.utilidad);
+                prevAcum = { er: e, es: s, ratios: calcularRatiosFinancieros(m, e, s), kpis: calcularKPIsNegocio(prev.periodo, e) };
+            }
             const conclusiones = generarConclusiones(erAcum, esAcum, ratios, periodoHasta);
-            const cfg = diarioImport.config || {};
 
-            document.getElementById('ig-titulo').innerText = (cfg.nombreComercial || cfg.razonSocial || 'EMPRESA').toUpperCase();
-            document.getElementById('ig-subtitulo').innerText = `RUC: ${cfg.ruc || '-'}  ·  Periodo: ${MESES_NOMBRE[mesSel]} ${anioSel} (acumulado desde enero)`;
+            // Qué explica el cambio de utilidad frente al mes anterior
+            let efectos = null, gastosSubieron = [];
+            if (prev) {
+                efectos = [
+                    { clave: 'ventas', valor: cur.ventas - prev.ventas },
+                    { clave: 'costo', valor: -(cur.costoVentas - prev.costoVentas) },
+                    { clave: 'oper', valor: -(cur.gastosOper - prev.gastosOper) },
+                    { clave: 'otros', valor: -(cur.gastosOtros - prev.gastosOtros) }
+                ];
+                const a = igCuentasGasto(cur.mov), b = igCuentasGasto(prev.mov);
+                const umbral = Math.max(30, 0.005 * Math.max(cur.ventas, 0));
+                const codigos = Object.keys(Object.assign({}, a, b));
+                gastosSubieron = codigos.map(c => ({ cuenta: c, nombre: igNombreCuenta(c), actual: a[c] || 0, anterior: b[c] || 0, dif: (a[c] || 0) - (b[c] || 0) }))
+                    .filter(x => x.dif > umbral).sort((x, y) => y.dif - x.dif).slice(0, 5);
+            }
 
-            document.getElementById('ig-kpi-ventas').innerText = `S/ ${erAcum.ventasNetas.toFixed(2)}`;
-            document.getElementById('ig-kpi-utilidad').innerText = `S/ ${erAcum.utilidad.toFixed(2)}`;
-            document.getElementById('ig-kpi-utilidad').className = 'text-xl font-black mt-1 ' + (erAcum.utilidad >= 0 ? 'text-emerald-800' : 'text-rose-700');
-            const margenNeto = erAcum.ventasNetas !== 0 ? (erAcum.utilidad / erAcum.ventasNetas) * 100 : 0;
-            document.getElementById('ig-kpi-margen').innerText = `${margenNeto.toFixed(1)}%`;
-            document.getElementById('ig-kpi-activo').innerText = `S/ ${esAcum.totalActivo.toFixed(2)}`;
+            const M = {
+                cfg, periodo: periodoHasta, serie, cur, prev, previos, previos3, prom3, promPrevios, mismoMes,
+                erAcum, esAcum, ratios, kpisNeg, prevAcum, conclusiones, efectos, gastosSubieron,
+                acumLabel: cur.mes === 1 ? 'Acumulado del año' : `Acum. ${MESES_ABREV[1].toLowerCase()}–${MESES_ABREV[cur.mes].toLowerCase()}`,
+                efectivoComparable: !!(prev && prev.anio === cur.anio),
+                tendVentas: igTendencia(serie, 'ventas'), tendUtilidad: igTendencia(serie, 'utilidad')
+            };
 
-            const margenBrutoPct = erAcum.ventasNetas !== 0 ? (erAcum.utilidadBruta / erAcum.ventasNetas) * 100 : 0;
-            const bullets = [
-                `Ventas netas acumuladas de S/ ${erAcum.ventasNetas.toFixed(2)}, con un costo de ventas de S/ ${erAcum.costoVentas.toFixed(2)} (${erAcum.ventasNetas !== 0 ? ((erAcum.costoVentas / erAcum.ventasNetas) * 100).toFixed(1) : '0'}% de las ventas).`,
-                `Utilidad bruta de S/ ${erAcum.utilidadBruta.toFixed(2)} (margen bruto de ${margenBrutoPct.toFixed(1)}%).`,
-                `Gastos administrativos y de ventas acumulados: S/ ${(erAcum.gastosAdmin + erAcum.gastosVentas).toFixed(2)}.`,
-                `Resultado neto del periodo: ${erAcum.utilidad >= 0 ? 'utilidad' : 'pérdida'} de S/ ${Math.abs(erAcum.utilidad).toFixed(2)}.`
+            // Indicadores del negocio (este mes vs mes anterior)
+            const dc = k => { const f = k.find(x => x.nombre === 'Días Promedio de Cobro'); return f ? f.valor : null; };
+            M.kpiFilas = [
+                { nombre: 'Clientes atendidos', ayuda: 'Cantidad de ventas (comprobantes) registradas en el mes.', fmt: 'n', bueno: true, actual: cur.comprobantes, anterior: prev ? prev.comprobantes : null },
+                { nombre: 'Ticket promedio', ayuda: 'Lo que deja, en promedio, cada venta. Si baja mientras sube el número de clientes, revisa descuentos o el tipo de producto que más se vende.', fmt: 's2', bueno: true, actual: cur.ticket, anterior: prev ? prev.ticket : null },
+                { nombre: 'Costo de ventas sobre ventas', ayuda: 'De cada S/ 100 vendidos, cuántos se van en insumos o mercadería. Mientras más bajo, mejor.', fmt: 'p', bueno: false, clave: 'costoPct', actual: cur.costoPct, anterior: prev ? prev.costoPct : null },
+                { nombre: 'Punto de equilibrio mensual', ayuda: 'Lo mínimo que hay que vender en el mes para no perder. Es el mismo cálculo de la pestaña Punto de Equilibrio.', fmt: 'S', bueno: false, actual: cur.pe, anterior: prev ? prev.pe : null },
+                { nombre: 'Margen de seguridad', ayuda: 'Cuánto pueden bajar las ventas antes de entrar en pérdida.', fmt: 'p', bueno: true, clave: 'msPct', actual: cur.msPct, anterior: prev ? prev.msPct : null },
+                { nombre: 'Días promedio de cobro', ayuda: 'Días que tardas en cobrar lo que vendes a crédito. Mientras más bajo, mejor (dato acumulado del año).', fmt: 'dias', bueno: false, clave: 'dias', actual: dc(kpisNeg), anterior: prevAcum ? dc(prevAcum.kpis) : null },
+                { nombre: 'Efectivo en caja y bancos', ayuda: 'Saldo disponible al cierre del mes.', fmt: 'S', bueno: true, actual: cur.efectivo, anterior: (prev && M.efectivoComparable) ? prev.efectivo : null }
             ];
-            document.getElementById('ig-analisis-periodo').innerHTML = bullets.map(b => `<li>${b}</li>`).join('');
 
-            const gastoCategorias = [
-                { nombre: 'Costo de Ventas', valor: erAcum.costoVentas, color: '#F59E0B' },
-                { nombre: 'Gastos Administrativos', valor: erAcum.gastosAdmin, color: '#6366F1' },
-                { nombre: 'Gastos de Ventas', valor: erAcum.gastosVentas, color: '#0EA5E9' },
-                { nombre: 'Gastos Financieros', valor: erAcum.gastosFinancieros, color: '#EF4444' }
-            ].filter(g => g.valor > 0.005);
-            const totalGastos = gastoCategorias.reduce((s, g) => s + g.valor, 0) || 1;
-            document.getElementById('ig-gastos-body').innerHTML = gastoCategorias
-                .slice().sort((a, b) => b.valor - a.valor)
-                .map(g => `<tr><td class="py-1.5 flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full inline-block" style="background:${g.color}"></span>${g.nombre}</td><td class="py-1.5 text-right font-mono">S/ ${g.valor.toFixed(2)}</td><td class="py-1.5 text-right font-mono">${((g.valor / totalGastos) * 100).toFixed(1)}%</td></tr>`)
-                .join('') || `<tr><td colspan="3" class="py-3 text-center text-slate-400">Sin gastos registrados en el periodo.</td></tr>`;
+            M.titulares = igTitulares(M);
+            // Recomendaciones: primero las que salen de la tendencia, luego las de siempre; las urgentes arriba.
+            const orden = { alerta: 0, atencion: 1, positivo: 2 };
+            const base = generarRecomendaciones(erAcum, esAcum, ratios, kpisNeg).filter(r => !/^Necesitas vender al menos/.test(r.texto));
+            M.recomendaciones = igAlertas(M).concat(base).sort((x, y) => orden[x.tipo] - orden[y.tipo]).slice(0, 9);
 
-            const avisoSinCC = document.getElementById('ig-aviso-sincc');
-            if (erAcum.gastosSinCC && Math.abs(erAcum.gastosSinCC) > 0.5) {
-                avisoSinCC.innerText = `⚠ Hay S/ ${erAcum.gastosSinCC.toFixed(2)} en gastos sin Centro de Costo asignado. Revisa esas líneas en el Libro Diario para un análisis 100% exacto.`;
-                avisoSinCC.classList.remove('hidden');
-            } else {
-                avisoSinCC.classList.add('hidden');
+            // Avisos de calidad del dato
+            M.avisos = [];
+            const cierre = cfg.cierrePorLibro && cfg.cierrePorLibro[periodoHasta];
+            if (cfg.cierrePorLibro) {
+                const pend = LIBROS_CIERRE_REPORTES.filter(l => !(cierre && cierre[l] && cierre[l].cerrado));
+                if (pend.length) M.avisos.push({ tipo: 'atencion', texto: `${cur.nombre} todavía no figura como cerrado en: ${pend.join(', ')}. Las cifras pueden cambiar hasta el cierre.` });
             }
+            if (serie.length === 1) M.avisos.push({ tipo: 'info', texto: 'Solo hay un mes con información en el Libro Diario. Las comparaciones y tendencias aparecen desde el segundo mes.' });
+            if (prev && prev.anio === cur.anio && cur.mes - prev.mes > 1) M.avisos.push({ tipo: 'info', texto: `No hay información de ${MESES_NOMBRE[prev.mes + 1]}${cur.mes - prev.mes > 2 ? ' a ' + MESES_NOMBRE[cur.mes - 1] : ''}; el mes anterior con datos es ${prev.nombre}.` });
+            if (cur.gastosSinCC && Math.abs(cur.gastosSinCC) > 0.5) M.avisos.push({ tipo: 'atencion', texto: `Hay ${igS(cur.gastosSinCC)} de gastos del mes sin Centro de Costo asignado. Revisa esas líneas en el Libro Diario para que la separación entre costo de ventas y gastos sea exacta.` });
+            return M;
+        }
 
-            const ctx = document.getElementById('ig-chart-gastos');
-            if (igChart) igChart.destroy();
-            if (ctx && gastoCategorias.length > 0 && typeof Chart !== 'undefined') {
-                igChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: { labels: gastoCategorias.map(g => g.nombre), datasets: [{ data: gastoCategorias.map(g => g.valor), backgroundColor: gastoCategorias.map(g => g.color), borderWidth: 2, borderColor: '#fff' }] },
-                    options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }, animation: false }
-                });
-            }
+        // ---------- textos ----------
+        function igFraseCambio(act, ref) {
+            const c = igCambio(act, ref, true);
+            if (!c) return null;
+            if (c.dir === 0) return 'prácticamente igual';
+            return c.rel !== null ? `${c.dir > 0 ? '+' : '−'}${Math.abs(c.rel * 100).toFixed(1)}%` : `${c.dir > 0 ? '+' : '−'}${igS(Math.abs(c.dif))}`;
+        }
+        const IG_EFECTO_TXT = {
+            ventas: { pos: 'ventas más altas', neg: 'ventas más bajas' },
+            costo: { pos: 'un costo de ventas menor', neg: 'un costo de ventas mayor' },
+            oper: { pos: 'menos gastos de administración y ventas', neg: 'más gastos de administración y ventas' },
+            otros: { pos: 'menos gastos financieros y otros', neg: 'más gastos financieros y otros' }
+        };
+        function igTitulares(M) {
+            const { cur, prev, prom3, previos3, mismoMes } = M;
+            const t = [];
 
-            document.getElementById('ig-kpis-negocio').innerHTML = kpisNegocio.map(kp => {
-                let valorTxt, colorClase = 'text-slate-800';
-                if (kp.valor === null) { valorTxt = 'N/A'; }
-                else if (kp.fmt === 'soles') { valorTxt = 'S/ ' + kp.valor.toFixed(2); }
-                else if (kp.fmt === 'pct') { valorTxt = (kp.valor * 100).toFixed(1) + '%'; }
-                else if (kp.fmt === 'dias') { valorTxt = kp.valor.toFixed(0) + ' días'; }
-                else if (kp.fmt === 'numero') { valorTxt = kp.valor.toLocaleString('es-PE'); }
-                else if (kp.fmt === 'pct_signed') {
-                    valorTxt = (kp.valor >= 0 ? '+' : '') + (kp.valor * 100).toFixed(1) + '%';
-                    colorClase = kp.valor >= 0 ? 'text-emerald-700' : 'text-rose-700';
+            // Ventas
+            let tx = `En ${cur.nombre} se vendió ${igS(cur.ventas)}.`;
+            let tono = 'neutro';
+            if (!prev) tx += ' Es el primer mes con información, todavía no hay con qué compararlo.';
+            else {
+                const c = igCambio(cur.ventas, prev.ventas, true);
+                tono = c ? c.tono : 'neutro';
+                if (c && c.dir === 0) tx += ` Es casi lo mismo que en ${prev.nombre} (${igS(prev.ventas)}).`;
+                else if (c) tx += ` Es ${c.rel !== null ? Math.abs(c.rel * 100).toFixed(1) + '%' : igS(Math.abs(c.dif))} ${c.dir > 0 ? 'más' : 'menos'} que en ${prev.nombre} (${igS(prev.ventas)}).`;
+                if (prom3) {
+                    const f = igFraseCambio(cur.ventas, prom3.ventas);
+                    tx += ` Contra el promedio de los ${previos3.length} meses anteriores (${igS(prom3.ventas)}) la variación es ${f}.`;
                 }
-                const explicacion = KPI_EXPLICACIONES[kp.nombre] || '';
-                return `<tr class="align-top">
-                    <td class="p-2 font-bold text-slate-700 whitespace-nowrap">${kp.nombre}</td>
-                    <td class="p-2 text-right font-mono font-bold whitespace-nowrap ${colorClase}">${valorTxt}</td>
-                    <td class="p-2 text-slate-500">${explicacion}</td>
-                </tr>`;
-            }).join('');
+                if (mismoMes) {
+                    const f = igFraseCambio(cur.ventas, mismoMes.ventas);
+                    tx += ` En ${mismoMes.nombre} se había vendido ${igS(mismoMes.ventas)} (${f}).`;
+                }
+            }
+            t.push({ titulo: 'Ventas', texto: tx, tono });
 
-            document.getElementById('ig-ratios').innerHTML = ratios.map(rt => {
-                const valorTxt = rt.valor === null ? 'N/A' : (rt.fmt === 'pct' ? (rt.valor * 100).toFixed(1) + '%' : rt.fmt === 'soles' ? 'S/ ' + rt.valor.toFixed(2) : rt.valor.toFixed(2) + 'x');
-                const explicacion = RATIO_EXPLICACIONES[rt.nombre] || '';
-                return `<tr class="align-top">
-                    <td class="p-2 text-center text-base">${rt.semaforo}</td>
-                    <td class="p-2 font-bold text-slate-700 whitespace-nowrap">${rt.nombre}</td>
-                    <td class="p-2 text-right font-mono font-bold text-slate-800 whitespace-nowrap">${valorTxt}</td>
-                    <td class="p-2 text-slate-500">${explicacion}</td>
-                </tr>`;
-            }).join('');
+            // Utilidad
+            const mg = cur.margenNeto;
+            tx = cur.utilidad >= 0
+                ? `Después de restar el costo de ventas y los gastos quedó una utilidad de ${igS(cur.utilidad)}${mg !== null ? `, que equivale a ${igPct(mg)} de lo vendido` : ''}.`
+                : `El mes cerró con una pérdida de ${igS(-cur.utilidad)}${mg !== null ? `: por cada S/ 100 vendidos se perdieron S/ ${Math.abs(mg * 100).toFixed(1)}` : ''}.`;
+            tono = cur.utilidad >= 0 ? 'bueno' : 'malo';
+            if (prev) tx += ` En ${prev.nombre} ${prev.utilidad >= 0 ? 'se había ganado' : 'se había perdido'} ${igS(Math.abs(prev.utilidad))}${prev.margenNeto !== null ? ` (${igPct(prev.margenNeto)} de las ventas)` : ''}.`;
+            t.push({ titulo: 'Utilidad del mes', texto: tx, tono });
 
-            const badgeClaseMap = { positivo: 'bg-emerald-100 text-emerald-800', atencion: 'bg-amber-100 text-amber-800', alerta: 'bg-rose-100 text-rose-800' };
-            const badge = document.getElementById('ig-conclusion-badge');
-            badge.innerText = conclusiones.etiquetaSituacion;
-            badge.className = 'ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold ' + badgeClaseMap[conclusiones.colorSituacion];
-            document.getElementById('ig-conclusion-situacion').innerText = conclusiones.situacionActual;
-            document.getElementById('ig-conclusion-tendencia').innerText = conclusiones.tendencia;
-            const wrapSeguimiento = document.getElementById('ig-conclusion-seguimiento-wrap');
-            if (conclusiones.aplicacionRecomendaciones) {
-                wrapSeguimiento.classList.remove('hidden');
-                document.getElementById('ig-conclusion-seguimiento').innerText = conclusiones.aplicacionRecomendaciones;
-            } else {
-                wrapSeguimiento.classList.add('hidden');
+            // Qué explica el cambio
+            if (prev && M.efectos) {
+                const dU = cur.utilidad - prev.utilidad;
+                const ef = M.efectos.filter(e => Math.abs(e.valor) >= 1);
+                const mejor = ef.filter(e => e.valor > 0).sort((a, b) => b.valor - a.valor)[0];
+                const peor = ef.filter(e => e.valor < 0).sort((a, b) => a.valor - b.valor)[0];
+                const frase = (e) => `${IG_EFECTO_TXT[e.clave][e.valor > 0 ? 'pos' : 'neg']} (${e.valor > 0 ? '+' : '−'}${igS(Math.abs(e.valor))})`;
+                if (Math.abs(dU) < 1) tx = `La utilidad quedó igual que en ${prev.nombre}.`;
+                else {
+                    tx = `La utilidad ${dU > 0 ? 'subió' : 'bajó'} ${igS(Math.abs(dU))} frente a ${prev.nombre}.`;
+                    if (dU > 0) { if (mejor) tx += ` Lo que más ayudó: ${frase(mejor)}.`; if (peor) tx += ` En contra: ${frase(peor)}.`; }
+                    else { if (peor) tx += ` Lo que más pesó: ${frase(peor)}.`; if (mejor) tx += ` A favor: ${frase(mejor)}.`; }
+                }
+                t.push({ titulo: 'Qué explica el cambio', texto: tx, tono: dU > 0 ? 'bueno' : (dU < 0 ? 'malo' : 'neutro') });
             }
 
-            const iconoTipo = { positivo: '✅', atencion: '⚠️', alerta: '🔴' };
-            const colorTipo = { positivo: 'bg-emerald-50 border-emerald-200 text-emerald-900', atencion: 'bg-amber-50 border-amber-200 text-amber-900', alerta: 'bg-rose-50 border-rose-200 text-rose-900' };
-            document.getElementById('ig-recomendaciones').innerHTML = recomendaciones.map(rec =>
-                `<div class="border rounded-xl p-3 text-sm flex items-start gap-2.5 ${colorTipo[rec.tipo]}"><span class="text-base leading-none">${iconoTipo[rec.tipo]}</span><span>${rec.texto}</span></div>`
-            ).join('');
+            // Gastos que subieron
+            if (prev && M.gastosSubieron.length) {
+                t.push({ titulo: 'Gastos que más subieron', texto: `Frente a ${prev.nombre}: ${M.gastosSubieron.slice(0, 3).map(g => `${g.nombre} (+${igS(g.dif)})`).join('; ')}.`, tono: 'neutro' });
+            }
 
-            document.getElementById('ig-pie').innerText = `Generado automáticamente el ${new Date().toLocaleDateString('es-PE')} desde REPORTES. Herramienta de apoyo a la gestión; no reemplaza el análisis del contador.`;
+            // Punto de equilibrio
+            if (cur.pe !== null) {
+                tx = `El punto de equilibrio del mes es ${igS(cur.pe)}: lo mínimo que había que vender para no perder.`;
+                if (cur.msPct !== null) {
+                    tx += cur.msPct >= 0
+                        ? ` Se superó con un margen de seguridad de ${igPct(cur.msPct)}; es decir, las ventas podían caer ese porcentaje y el negocio seguía sin perder.`
+                        : ` No se llegó: faltaron ${igS(cur.pe - cur.ventasPE)} de ventas para cubrir los costos y gastos.`;
+                }
+                if (prev && prev.msPct !== null) tx += ` El mes anterior el margen de seguridad fue ${igPct(prev.msPct)}.`;
+                t.push({ titulo: 'Punto de equilibrio', texto: tx, tono: cur.msPct === null ? 'neutro' : (cur.msPct < 0 ? 'malo' : (cur.msPct < 0.10 ? 'neutro' : 'bueno')) });
+            }
+
+            // Caja
+            if (Math.abs(cur.efectivo) >= 0.5) {
+                tx = `Se cerró ${cur.nombre} con ${igS(cur.efectivo)} entre caja y bancos`;
+                let tn = 'neutro';
+                if (M.efectivoComparable) {
+                    const d = cur.efectivo - prev.efectivo;
+                    tx += Math.abs(d) < 1 ? `, igual que en ${prev.nombre}` : ` (${d > 0 ? '+' : '−'}${igS(Math.abs(d))} frente a ${prev.nombre})`;
+                    tn = d > 0.5 ? 'bueno' : (d < -0.5 ? 'malo' : 'neutro');
+                }
+                t.push({ titulo: 'Caja y bancos', texto: tx + '.', tono: tn });
+            }
+            return t;
+        }
+
+        function igAlertas(M) {
+            const out = [], s = M.serie, cur = M.cur;
+            if (cur.pe !== null && cur.msPct !== null) {
+                if (cur.msPct < 0) out.push({ tipo: 'alerta', texto: `Las ventas del mes quedaron ${igS(cur.pe - cur.ventasPE)} por debajo del punto de equilibrio (${igS(cur.pe)}). Con esa venta el negocio no alcanza a cubrir sus costos y gastos del mes.` });
+                else if (cur.msPct < 0.10) out.push({ tipo: 'atencion', texto: `El margen de seguridad es de solo ${igPct(cur.msPct)}: una baja pequeña de ventas ya lleva el mes a pérdida. Conviene fijar una meta de ventas claramente por encima de ${igS(cur.pe)}.` });
+                else out.push({ tipo: 'positivo', texto: `Las ventas superan el punto de equilibrio con un margen de seguridad de ${igPct(cur.msPct)}. Mientras ese margen se mantenga, una baja moderada de ventas no lleva a pérdida.` });
+            }
+            if (s.length >= 3) {
+                const u = s.slice(-3);
+                const cae = k => u.every(m => m[k] !== null) && u[0][k] > u[1][k] && u[1][k] > u[2][k];
+                const sube = k => u.every(m => m[k] !== null) && u[0][k] < u[1][k] && u[1][k] < u[2][k];
+                if (cae('ventas')) out.push({ tipo: 'alerta', texto: `Las ventas vienen bajando tres meses seguidos (${u.map(m => igS(m.ventas)).join(' → ')}). Antes de que se vuelva costumbre, revisa si es temporada, competencia, precios o atención al cliente.` });
+                else if (sube('ventas')) out.push({ tipo: 'positivo', texto: `Las ventas subieron tres meses seguidos (${u.map(m => igS(m.ventas)).join(' → ')}). Verifica que el personal, los insumos y la caja alcancen para sostener ese ritmo.` });
+                if (cae('margenNeto')) out.push({ tipo: 'atencion', texto: `El margen neto bajó tres meses seguidos (${u.map(m => igPct(m.margenNeto)).join(' → ')}). Mira si pesan más los insumos o los gastos fijos.` });
+                if (sube('costoPct')) out.push({ tipo: 'atencion', texto: `El costo de ventas pesa cada mes más sobre las ventas (${u.map(m => igPct(m.costoPct)).join(' → ')}). Revisa precios de proveedores, mermas y porciones.` });
+                if (u[1].utilidad < 0 && u[2].utilidad < 0) out.push({ tipo: 'alerta', texto: `Dos meses seguidos con pérdida (${igS(u[1].utilidad)} y ${igS(u[2].utilidad)}). Hay que revisar de inmediato el nivel de ventas y los gastos fijos.` });
+            }
+            if (M.promPrevios && M.promPrevios.operPct !== null && cur.operPct !== null && cur.operPct - M.promPrevios.operPct >= 0.02) {
+                out.push({ tipo: 'atencion', texto: `Los gastos de administración y ventas pesan ${igPct(cur.operPct)} de las ventas, ${((cur.operPct - M.promPrevios.operPct) * 100).toFixed(1)} puntos más que el promedio de los meses anteriores (${igPct(M.promPrevios.operPct)}). Revisa planilla, servicios y alquiler.` });
+            }
+            return out;
+        }
+
+        // ---------- piezas de HTML ----------
+        const IG_PUNTO_TONO = { bueno: 'bg-emerald-500', malo: 'bg-rose-500', neutro: 'bg-slate-400' };
+        function igTituloSeccion(icono, texto, sub) {
+            return `<h4 class="font-bold text-indigo-800 text-sm uppercase tracking-wide flex items-center gap-2"><i class="fa-solid ${icono}"></i> ${texto}</h4>${sub ? `<p class="text-[11px] text-slate-500 mt-0.5">${sub}</p>` : ''}<div class="mb-3"></div>`;
+        }
+        function igFmtRatio(rt) {
+            if (rt.valor === null || rt.valor === undefined) return 'N/A';
+            return rt.fmt === 'pct' ? (rt.valor * 100).toFixed(1) + '%' : rt.fmt === 'soles' ? igS(rt.valor) : rt.valor.toFixed(2) + 'x';
+        }
+        function igTarjeta(color, titulo, valor, valorClase, cambioHtml, sub) {
+            return `<div class="bg-${color}-50 p-4 text-center">
+                <p class="text-[10px] font-bold text-${color}-700 uppercase">${titulo}</p>
+                <p class="text-xl font-black mt-1 ${valorClase || 'text-' + color + '-800'}">${valor}</p>
+                <p class="text-[11px] mt-1">${cambioHtml}</p>
+                <p class="text-[10px] text-slate-500 mt-0.5">${sub}</p>
+            </div>`;
+        }
+        function igHtmlTarjetas(M) {
+            const { cur, prev } = M;
+            const vs = prev ? ` <span class="text-slate-400 font-normal">vs ${MESES_ABREV[prev.mes]}</span>` : '';
+            const sinComp = '<span class="text-slate-400">sin mes anterior</span>';
+            const c1 = prev ? igCambioHtml(igCambio(cur.ventas, prev.ventas, true)) + vs : sinComp;
+            const c2 = prev ? igCambioHtml(igCambio(cur.utilidad, prev.utilidad, true), { monto: true }) + vs : sinComp;
+            const c3 = prev ? igCambioHtml(igCambio(cur.margenNeto, prev.margenNeto, true, true)) + vs : sinComp;
+            const c4 = M.efectivoComparable ? igCambioHtml(igCambio(cur.efectivo, prev.efectivo, true), { monto: true }) + vs : '<span class="text-slate-400">—</span>';
+            const mgAcum = M.erAcum.ventasNetas > 0.005 ? M.erAcum.utilidad / M.erAcum.ventasNetas : null;
+            return `<div class="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200">
+                ${igTarjeta('sky', `Ventas de ${MESES_NOMBRE[cur.mes]}`, igS(cur.ventas), '', c1, `${M.acumLabel}: ${igS(M.erAcum.ventasNetas)}`)}
+                ${igTarjeta('emerald', 'Utilidad del mes', igS(cur.utilidad), cur.utilidad >= 0 ? 'text-emerald-800' : 'text-rose-700', c2, `${M.acumLabel}: ${igS(M.erAcum.utilidad)}`)}
+                ${igTarjeta('violet', 'Margen neto del mes', igPct(cur.margenNeto), '', c3, `${M.acumLabel}: ${igPct(mgAcum)}`)}
+                ${igTarjeta('amber', 'Caja y bancos al cierre', igS(cur.efectivo), '', c4, `Total activo: ${igS(M.esAcum.totalActivo)}`)}
+            </div>`;
+        }
+        function igSvgEvolucion(serie) {
+            const W = 680, H = 215, padL = 8, padR = 8, padT = 24, padB = 30, n = serie.length;
+            const vals = serie.reduce((a, m) => a.concat([m.ventas, m.utilidad]), []);
+            const max = Math.max(1, ...vals.map(v => Math.max(0, v))), min = Math.min(0, ...vals), rango = (max - min) || 1;
+            const y = v => padT + (max - v) / rango * (H - padT - padB), y0 = y(0);
+            const slot = (W - padL - padR) / n, bw = Math.min(34, slot * 0.34);
+            let g = '';
+            serie.forEach((m, i) => {
+                const cx = padL + slot * i + slot / 2, sel = i === n - 1;
+                if (sel) g += `<rect x="${(padL + slot * i).toFixed(1)}" y="0" width="${slot.toFixed(1)}" height="${H}" fill="#eef2ff"/>`;
+                [{ v: m.ventas, x: cx - bw - 2, c: sel ? '#4338ca' : '#a5b4fc' }, { v: m.utilidad, x: cx + 2, c: m.utilidad >= 0 ? (sel ? '#059669' : '#6ee7b7') : (sel ? '#e11d48' : '#fda4af') }].forEach(b => {
+                    const yy = y(b.v), top = Math.min(yy, y0), h = Math.max(1, Math.abs(yy - y0));
+                    g += `<rect x="${b.x.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${b.c}"/>`;
+                    g += `<text x="${(b.x + bw / 2).toFixed(1)}" y="${(b.v >= 0 ? top - 4 : top + h + 11).toFixed(1)}" text-anchor="middle" font-size="9.5" fill="#334155"${sel ? ' font-weight="700"' : ''}>${igCompacto(b.v)}</text>`;
+                });
+                g += `<text x="${cx.toFixed(1)}" y="${H - 9}" text-anchor="middle" font-size="10.5" fill="#475569"${sel ? ' font-weight="700"' : ''}>${igEsc(m.etiqueta)}</text>`;
+            });
+            g += `<line x1="${padL}" x2="${W - padR}" y1="${y0.toFixed(1)}" y2="${y0.toFixed(1)}" stroke="#94a3b8" stroke-width="1"/>`;
+            return `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="Ventas y utilidad de los últimos meses">${g}</svg>`;
+        }
+        const IG_FILAS_EVOLUCION = [
+            { etiqueta: 'Ventas', key: 'ventas', fmt: 's', bueno: true, fuerte: true },
+            { etiqueta: 'Costo de ventas', key: 'costoVentas', fmt: 's', bueno: false },
+            { etiqueta: 'Utilidad bruta', key: 'utilidadBruta', fmt: 's', bueno: true },
+            { etiqueta: 'Gastos de administración y ventas', key: 'gastosOper', fmt: 's', bueno: false },
+            { etiqueta: 'Gastos financieros y otros', key: 'gastosOtros', fmt: 's', bueno: false },
+            { etiqueta: 'Utilidad del mes', key: 'utilidad', fmt: 's', bueno: true, fuerte: true },
+            { etiqueta: 'Margen neto (% de las ventas)', key: 'margenNeto', fmt: 'p', bueno: true },
+            { etiqueta: 'Costo de ventas (% de las ventas)', key: 'costoPct', fmt: 'p', bueno: false },
+            { etiqueta: 'Clientes atendidos', key: 'comprobantes', fmt: 'n', bueno: true },
+            { etiqueta: 'Ticket promedio (S/)', key: 'ticket', fmt: 's2', bueno: true }
+        ];
+        function igFmtCelda(v, fmt) { return fmt === 's2' ? (v === null ? '—' : v.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : igFmtValor(v, fmt); }
+        function igHtmlEvolucion(M) {
+            const s = M.serie, n = s.length;
+            const hdrRef = M.previos.length === 1 ? `Frente a ${M.prev.etiqueta}` : 'Frente al promedio anterior';
+            let h = `<div class="overflow-x-auto"><table class="w-full text-xs border-collapse"><thead><tr class="bg-slate-100 text-[10px] text-slate-600 uppercase border-b border-slate-300">
+                <th class="p-2 text-left">Montos en soles</th>${s.map((m, i) => `<th class="p-2 text-right ${i === n - 1 ? 'bg-indigo-100 text-indigo-800' : ''}">${igEsc(m.etiqueta)}</th>`).join('')}<th class="p-2 text-right">${hdrRef}</th></tr></thead><tbody class="divide-y divide-slate-100">`;
+            IG_FILAS_EVOLUCION.filter(f => ['ventas', 'costoVentas', 'gastosOper', 'utilidad', 'margenNeto', 'comprobantes'].includes(f.key)).forEach(f => {
+                const ref = M.promPrevios ? M.promPrevios[f.key] : null;
+                const c = igCambio(M.cur[f.key], ref, f.bueno, f.fmt === 'p');
+                h += `<tr class="${f.fuerte ? 'font-bold bg-slate-50' : ''}"><td class="p-2 ${f.fuerte ? '' : 'text-slate-700'}">${f.etiqueta}</td>${s.map((m, i) => {
+                    const v = m[f.key];
+                    const neg = f.fmt === 's' && v < 0;
+                    return `<td class="p-2 text-right font-mono ${i === n - 1 ? 'bg-indigo-50 font-bold' : ''} ${neg ? 'text-rose-700' : ''}">${igFmtCelda(v, f.fmt)}</td>`;
+                }).join('')}<td class="p-2 text-right">${igCambioHtml(c, { monto: f.key === 'utilidad' })}</td></tr>`;
+            });
+            return h + '</tbody></table></div>';
+        }
+        function igHtmlPuente(M) {
+            const { cur, prev, efectos } = M;
+            const maxAbs = Math.max(1, ...efectos.map(e => Math.abs(e.valor)));
+            const nom = {
+                ventas: v => v >= 0 ? 'Se vendió más' : 'Se vendió menos',
+                costo: v => v >= 0 ? 'El costo de ventas bajó' : 'El costo de ventas subió',
+                oper: v => v >= 0 ? 'Bajaron los gastos de administración y ventas' : 'Subieron los gastos de administración y ventas',
+                otros: v => v >= 0 ? 'Bajaron los gastos financieros y otros' : 'Subieron los gastos financieros y otros'
+            };
+            const fila = (txt, monto, clase) => `<div class="flex items-center gap-3 py-1.5"><div class="w-60 text-xs ${clase || 'text-slate-700'}">${txt}</div><div class="flex-1"></div><div class="w-28 text-right font-mono text-xs ${clase || ''}">${monto}</div></div>`;
+            let h = `<div class="border border-slate-200 rounded-xl px-4 py-2 bg-white">`;
+            h += fila(`Utilidad de ${igEsc(prev.nombre)}`, igS(prev.utilidad), 'font-bold text-slate-800');
+            efectos.forEach(e => {
+                const pos = e.valor >= 0, w = Math.max(2, Math.abs(e.valor) / maxAbs * 100);
+                h += `<div class="flex items-center gap-3 py-1.5 border-t border-slate-100"><div class="w-60 text-xs text-slate-700">${nom[e.clave](e.valor)}</div>
+                    <div class="flex-1"><div class="h-3 rounded ${pos ? 'bg-emerald-400' : 'bg-rose-400'}" style="width:${w.toFixed(1)}%"></div></div>
+                    <div class="w-28 text-right font-mono text-xs font-semibold ${pos ? 'text-emerald-700' : 'text-rose-700'}">${pos ? '+' : '−'}${igS(Math.abs(e.valor))}</div></div>`;
+            });
+            h += `<div class="border-t-2 border-slate-300">${fila(`Utilidad de ${igEsc(cur.nombre)}`, igS(cur.utilidad), 'font-bold text-slate-800')}</div></div>`;
+            return h;
+        }
+        function igHtmlGastos(M, corto) {
+            const { cur, prev } = M;
+            const v = cur.ventas > 0.005 ? cur.ventas : null;
+            const partes = [
+                { n: 'Costo de ventas', val: cur.costoVentas, col: '#f59e0b' },
+                { n: 'Gastos de administración y ventas', val: cur.gastosOper, col: '#6366f1' },
+                { n: 'Gastos financieros y otros', val: cur.gastosOtros, col: '#ef4444' }
+            ];
+            let barra = '';
+            if (v) {
+                const u = Math.max(0, cur.utilidad);
+                const seg = partes.map(p => ({ ...p, pct: Math.max(0, p.val) / v * 100 })).concat([{ n: 'Utilidad', val: cur.utilidad, col: '#10b981', pct: u / v * 100 }]);
+                const tot = seg.reduce((s, x) => s + x.pct, 0) || 100;
+                barra = `<p class="text-xs text-slate-600 mb-1.5">De cada <b>S/ 100</b> que se vendieron en ${igEsc(cur.nombre)}:</p>
+                    <div class="flex w-full h-7 rounded-lg overflow-hidden border border-slate-200">${seg.filter(x => x.pct > 0.05).map(x => `<div style="width:${(x.pct / tot * 100).toFixed(2)}%;background:${x.col}" class="flex items-center justify-center text-[10px] font-bold text-white">${x.pct >= 6 ? x.pct.toFixed(0) : ''}</div>`).join('')}</div>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-[11px] text-slate-600">${seg.map(x => `<span><span class="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style="background:${x.col}"></span>${x.n}: S/ ${(x.n === 'Utilidad' ? x.val / v * 100 : x.pct).toFixed(1)}</span>`).join('')}</div>`;
+            }
+            if (corto) return barra;
+            const filas = [
+                { n: 'Costo de ventas', a: cur.costoVentas, b: prev && prev.costoVentas },
+                { n: 'Gastos administrativos', a: cur.gastosAdmin, b: prev && prev.gastosAdmin },
+                { n: 'Gastos de ventas', a: cur.gastosVentas, b: prev && prev.gastosVentas },
+                { n: 'Gastos financieros', a: cur.gastosFin, b: prev && prev.gastosFin }
+            ];
+            if (Math.abs(cur.gastosSinCC) > 0.5 || (prev && Math.abs(prev.gastosSinCC) > 0.5)) filas.push({ n: 'Gastos sin Centro de Costo', a: cur.gastosSinCC, b: prev && prev.gastosSinCC });
+            const tot = { n: 'Total costos y gastos', a: filas.reduce((s, f) => s + f.a, 0), b: prev ? filas.reduce((s, f) => s + f.b, 0) : null };
+            const tr = (f, fuerte) => {
+                const c = (prev && f.b !== null) ? igCambio(f.a, f.b, false) : null;
+                return `<tr class="${fuerte ? 'font-bold bg-slate-50' : ''}"><td class="p-2">${f.n}</td><td class="p-2 text-right font-mono">${igN(f.a)}</td><td class="p-2 text-right font-mono text-slate-500">${v ? igPct(f.a / v) : '—'}</td>
+                    <td class="p-2 text-right font-mono">${prev && f.b !== null ? igN(f.b) : '—'}</td><td class="p-2 text-right">${c ? igCambioHtml(c, { monto: true }) : '—'}</td></tr>`;
+            };
+            let lista = '';
+            if (prev) {
+                lista = M.gastosSubieron.length
+                    ? `<div class="mt-4"><p class="text-xs font-bold text-slate-700 mb-1.5">Gastos que más subieron frente a ${igEsc(prev.nombre)}</p>
+                        <table class="w-full text-xs"><thead><tr class="text-[10px] text-slate-500 uppercase border-b"><th class="py-1 text-left">Cuenta</th><th class="py-1 text-right">${igEsc(prev.etiqueta)}</th><th class="py-1 text-right">${igEsc(cur.etiqueta)}</th><th class="py-1 text-right">Subió</th></tr></thead><tbody class="divide-y divide-slate-100">
+                        ${M.gastosSubieron.map(g => `<tr><td class="py-1">${igEsc(g.nombre)} <span class="text-slate-400">(${igEsc(g.cuenta)})</span></td><td class="py-1 text-right font-mono">${igN(g.anterior)}</td><td class="py-1 text-right font-mono">${igN(g.actual)}</td><td class="py-1 text-right font-mono font-semibold text-rose-700">+${igN(g.dif)}</td></tr>`).join('')}</tbody></table></div>`
+                    : `<p class="mt-3 text-xs text-slate-500">Ninguna cuenta de gasto subió de forma relevante frente a ${igEsc(prev.nombre)}.</p>`;
+            }
+            return `${barra}<div class="overflow-x-auto mt-4"><table class="w-full text-xs border-collapse"><thead><tr class="bg-slate-100 text-[10px] text-slate-600 uppercase border-b border-slate-300">
+                <th class="p-2 text-left">Montos en soles</th><th class="p-2 text-right">${igEsc(cur.etiqueta)}</th><th class="p-2 text-right">% de las ventas</th><th class="p-2 text-right">${prev ? igEsc(prev.etiqueta) : 'Mes anterior'}</th><th class="p-2 text-right">Cambio</th></tr></thead>
+                <tbody class="divide-y divide-slate-100">${filas.map(f => tr(f, false)).join('')}${tr(tot, true)}</tbody></table></div>${lista}`;
+        }
+        function igHtmlKpis(M) {
+            const prevNom = M.prev ? M.prev.etiqueta : 'Mes ant.';
+            return `<div class="overflow-x-auto"><table class="w-full text-xs border-collapse"><thead><tr class="bg-slate-100 text-[10px] text-slate-600 uppercase border-b border-slate-300">
+                <th class="p-2 w-8"></th><th class="p-2 text-left">Indicador</th><th class="p-2 text-right">${igEsc(M.cur.etiqueta)}</th><th class="p-2 text-right">${igEsc(prevNom)}</th><th class="p-2 text-right">Cambio</th></tr></thead><tbody class="divide-y divide-slate-100">
+                ${M.kpiFilas.map(k => {
+                    const sem = k.clave ? igSemaforoKpi(k.clave, k.actual) : null;
+                    const c = igCambio(k.actual, k.anterior, k.bueno, k.fmt === 'p');
+                    return `<tr class="align-top"><td class="p-2 text-center text-base">${sem || ''}</td><td class="p-2"><span class="font-bold text-slate-700">${k.nombre}</span></td>
+                        <td class="p-2 text-right font-mono font-bold whitespace-nowrap">${igFmtValor(k.actual, k.fmt)}</td><td class="p-2 text-right font-mono text-slate-500 whitespace-nowrap">${igFmtValor(k.anterior, k.fmt)}</td><td class="p-2 text-right">${igCambioHtml(c)}</td></tr>`;
+                }).join('')}</tbody></table></div>`;
+        }
+        function igHtmlRatios(M) {
+            const ant = M.prevAcum ? M.prevAcum.ratios : null;
+            let h = `<div class="overflow-x-auto"><table class="w-full text-xs border-collapse"><thead><tr class="bg-slate-100 text-[10px] text-slate-600 uppercase border-b border-slate-300">
+                <th class="p-2 w-8"></th><th class="p-2 text-left">Ratio</th><th class="p-2 text-right">Ahora</th><th class="p-2 text-right">Mes anterior</th><th class="p-2 text-left">¿Qué mide?</th></tr></thead><tbody>`;
+            IG_GRUPOS_RATIOS.forEach(gr => {
+                h += `<tr class="bg-indigo-50"><td colspan="5" class="p-2 font-bold text-indigo-800 text-[11px]">${gr.titulo}</td></tr>`;
+                gr.nombres.forEach(nom => {
+                    const r = M.ratios.find(x => x.nombre === nom); if (!r) return;
+                    const ra = ant ? ant.find(x => x.nombre === nom) : null;
+                    h += `<tr class="align-top border-b border-slate-100"><td class="p-2 text-center text-base">${r.semaforo}</td><td class="p-2 font-bold text-slate-700">${nom.replace(/ \(.*\)/, '')}</td>
+                        <td class="p-2 text-right font-mono font-bold whitespace-nowrap">${igFmtRatio(r)}</td><td class="p-2 text-right font-mono text-slate-500 whitespace-nowrap">${ra ? `${ra.semaforo} ${igFmtRatio(ra)}` : '—'}</td><td class="p-2 text-slate-500">${IG_AYUDA_RATIOS[nom] || ''}</td></tr>`;
+                });
+            });
+            return h + '</tbody></table></div>';
+        }
+        function igHtmlRatiosCorto(M) {
+            const ant = M.prevAcum ? M.prevAcum.ratios : null;
+            const nombres = ['Razón Corriente', 'Capital de Trabajo', 'Razón de Endeudamiento', 'Margen Neto', 'ROE (Rentabilidad del Patrimonio)'];
+            return `<div class="overflow-x-auto"><table class="w-full text-xs border-collapse"><thead><tr class="bg-slate-100 text-[10px] text-slate-600 uppercase border-b border-slate-300">
+                <th class="p-2 w-8"></th><th class="p-2 text-left">Ratio</th><th class="p-2 text-right">Ahora</th><th class="p-2 text-right">Mes anterior</th></tr></thead><tbody class="divide-y divide-slate-100">
+                ${nombres.map(nom => { const r = M.ratios.find(x => x.nombre === nom); if (!r) return ''; const ra = ant ? ant.find(x => x.nombre === nom) : null;
+                    return `<tr><td class="p-2 text-center text-base">${r.semaforo}</td><td class="p-2 font-bold text-slate-700">${nom.replace(/ \(.*\)/, '')}</td><td class="p-2 text-right font-mono font-bold">${igFmtRatio(r)}</td><td class="p-2 text-right font-mono text-slate-500">${ra ? `${ra.semaforo} ${igFmtRatio(ra)}` : '—'}</td></tr>`; }).join('')}</tbody></table></div>`;
+        }
+        function igTextoTendencia(M) {
+            const n = M.serie.length;
+            if (n < 3 || !M.tendVentas) return null;
+            const dir = d => d > 0 ? 'al alza' : (d < 0 ? 'a la baja' : 'estable');
+            const primero = M.serie[0], cur = M.cur;
+            let tx = `En los últimos ${n} meses (${primero.nombre} a ${cur.nombre}) las ventas muestran una tendencia ${dir(M.tendVentas.dir)}: pasaron de ${igS(primero.ventas)} a ${igS(cur.ventas)}.`;
+            if (M.tendUtilidad) tx += ` La utilidad mensual va ${dir(M.tendUtilidad.dir)}: de ${igS(primero.utilidad)} a ${igS(cur.utilidad)}.`;
+            return tx;
+        }
+        function igTextoSituacion(M) {
+            const { conclusiones: c, esAcum, ratios } = M;
+            const clave = ['Razón Corriente', 'Razón de Endeudamiento', 'Margen Neto', 'ROE (Rentabilidad del Patrimonio)'];
+            const rojos = ratios.filter(r => clave.includes(r.nombre) && r.semaforo === '🔴').map(r => r.nombre.replace(/ \(.*\)/, ''));
+            const amar = ratios.filter(r => clave.includes(r.nombre) && r.semaforo === '🟡').map(r => r.nombre.replace(/ \(.*\)/, ''));
+            let tx = '';
+            if (rojos.length) tx += `En rojo: ${rojos.join(', ')}. `;
+            if (amar.length) tx += `A vigilar: ${amar.join(', ')}. `;
+            if (!rojos.length && !amar.length) tx += 'Los cuatro ratios clave (liquidez, endeudamiento, margen neto y rentabilidad del patrimonio) están en verde. ';
+            const ta = esAcum.totalActivo;
+            if (ta !== 0) tx += `De todo lo que tiene el negocio (${igS(ta)}), ${((esAcum.totalPasivo / ta) * 100).toFixed(0)}% está financiado con deudas y ${((esAcum.totalPatrimonio / ta) * 100).toFixed(0)}% es capital propio.`;
+            return tx.trim();
+        }
+        function igFechaEmision() { return new Date().toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' }); }
+        function igPreparadoPor() { if (appConfig.igPreparadoPor === undefined) appConfig.igPreparadoPor = 'CARLOS FLORES FIGUEROA'; return (appConfig.igPreparadoPor || '').trim(); }
+        function igNombreEmpresa(cfg) {
+            const rs = (cfg.razonSocial || '').trim(), nc = (cfg.nombreComercial || '').trim();
+            if (rs && nc && rs.toUpperCase() !== nc.toUpperCase()) return `${rs.toUpperCase()} (${nc})`;
+            return (rs || nc || 'EMPRESA').toUpperCase();
+        }
+
+        function igHtmlInforme(M) {
+            const { cfg, cur, prev, conclusiones } = M;
+            const comp = prev ? `Comparado con ${prev.nombre}${M.previos.length > 1 ? ` y los ${M.previos.length} meses anteriores` : ''}` : 'Sin meses anteriores para comparar';
+            const badge = { positivo: 'bg-emerald-100 text-emerald-800', atencion: 'bg-amber-100 text-amber-800', alerta: 'bg-rose-100 text-rose-800' }[conclusiones.colorSituacion];
+            const iconoTipo = { positivo: '✅', atencion: '⚠️', alerta: '🔴' };
+            const colorTipo = { positivo: 'bg-emerald-50 border-emerald-200 text-emerald-900', atencion: 'bg-amber-50 border-amber-200 text-amber-900', alerta: 'bg-rose-50 border-rose-200 text-rose-900', info: 'bg-sky-50 border-sky-200 text-sky-900' };
+            const prep = igPreparadoPor();
+            const tend = igTextoTendencia(M);
+
+            let h = `<div class="bg-gradient-to-r from-indigo-800 to-violet-700 text-white px-8 py-6">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-200">${igEsc(igNombreEmpresa(cfg))}</p>
+                <h2 class="text-2xl font-black">INFORME GERENCIAL · ${igEsc(cur.nombre.toUpperCase())}</h2>
+                <p class="text-xs text-indigo-100 mt-1">RUC: ${igEsc(cfg.ruc || '-')} · ${igEsc(comp)}</p>
+                <p class="text-[11px] text-indigo-200 mt-1">${prep ? `Preparado por: ${igEsc(prep)} · ` : ''}Emitido el ${igFechaEmision()}</p>
+            </div>`;
+            h += igHtmlTarjetas(M);
+            h += `<div class="p-6 md:p-8 space-y-7">`;
+            if (M.avisos.length) h += `<div class="space-y-2 ig-sec">${M.avisos.map(a => `<p class="text-xs border rounded-lg p-2.5 ${colorTipo[a.tipo] || colorTipo.info}">${a.tipo === 'info' ? 'ℹ️' : '⚠️'} ${igEsc(a.texto)}</p>`).join('')}</div>`;
+
+            h += `<div class="ig-sec">${igTituloSeccion('fa-bolt', 'Lo más importante del mes')}
+                <div class="flex flex-wrap items-center gap-2 mb-3"><span class="text-xs font-bold text-slate-500 uppercase">Situación general</span><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${badge}">${conclusiones.etiquetaSituacion}</span></div>
+                <ul class="space-y-2.5">${M.titulares.filter(t => t.titulo !== 'Gastos que más subieron').map(t => `<li class="flex gap-2.5 text-sm text-slate-700"><span class="mt-1.5 w-2.5 h-2.5 rounded-full flex-shrink-0 ${IG_PUNTO_TONO[t.tono]}"></span><span><b class="text-slate-800">${t.titulo}.</b> ${igEsc(t.texto)}</span></li>`).join('')}</ul></div>`;
+
+            if (M.serie.length > 1) h += `<div class="ig-sec">${igTituloSeccion('fa-chart-column', `Cómo vienen los últimos ${M.serie.length} meses`, 'Una cifra sola no dice mucho: aquí se ve si el negocio sube, baja o se mantiene.')}
+                ${igSvgEvolucion(M.serie)}<div class="flex gap-4 text-[11px] text-slate-600 mt-1 mb-3"><span><span class="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style="background:#4338ca"></span>Ventas</span><span><span class="inline-block w-2.5 h-2.5 rounded-sm mr-1 align-middle" style="background:#059669"></span>Utilidad del mes (rojo si es pérdida)</span><span class="text-slate-400">El mes informado va resaltado.</span></div>
+                ${igHtmlEvolucion(M)}
+                ${tend ? `<p class="text-sm text-slate-700 mt-3">${igEsc(tend)}</p>` : ''}</div>`;
+
+            if (prev && M.efectos) h += `<div class="ig-sec">${igTituloSeccion('fa-scale-balanced', `¿Por qué cambió la utilidad frente a ${igEsc(prev.nombre)}?`, 'Cada barra muestra cuánto sumó o restó cada concepto a la utilidad del mes.')}${igHtmlPuente(M)}</div>`;
+
+            h += `<div class="ig-sec">${igTituloSeccion('fa-receipt', '¿En qué se va cada sol que se vende?')}${igHtmlGastos(M, true)}</div>`;
+            h += `<div class="ig-sec">${igTituloSeccion('fa-chart-line', 'Indicadores del negocio', '🟢 bien · 🟡 vigilar · 🔴 requiere atención. El cambio en verde es favorable; en rojo, desfavorable.')}${igHtmlKpis(M)}</div>`;
+            h += `<div class="ig-sec">${igTituloSeccion('fa-gauge', 'Salud financiera', `🟢 óptimo · 🟡 aceptable, con seguimiento · 🔴 atención inmediata. Los ratios usan datos acumulados de enero a ${igEsc(cur.nombre)}.`)}${igHtmlRatiosCorto(M)}</div>`;
+
+            h += `<div><h4 class="font-bold text-white text-sm uppercase tracking-wide mb-3 flex items-center gap-2 bg-emerald-800 px-3 py-2 rounded-lg"><i class="fa-solid fa-lightbulb"></i> Qué hacer</h4>
+                <div class="space-y-2">${M.recomendaciones.slice(0, 4).map(rec => `<div class="ig-sec border rounded-xl p-3 text-sm flex items-start gap-2.5 ${colorTipo[rec.tipo]}"><span class="text-base leading-none">${iconoTipo[rec.tipo]}</span><span>${igEsc(rec.texto)}</span></div>`).join('')}</div></div>`;
+
+            h += `<div class="border-t pt-2"><p class="text-[10px] text-slate-500">${prep ? `<b>Preparado por:</b> ${igEsc(prep)} · ` : ''}Generado desde MYPECAR PLUS el ${new Date().toLocaleDateString('es-PE')}. Cifras en soles redondeados; detalle exacto en el Estado de Resultados.</p></div>`;
+            return h + '</div>';
+        }
+
+        function guardarPreparadoPorIG() {
+            appConfig.igPreparadoPor = document.getElementById('ig-preparado').value.trim();
+            try { localStorage.setItem('reportes_app_config', JSON.stringify(appConfig)); } catch (e) { /* almacenamiento no disponible */ }
+            renderInformeGerencial();
+        }
+
+        function renderInformeGerencial() {
+            const sinDatos = document.getElementById('ig-sin-datos'), hoja = document.getElementById('informe-gerencial-hoja');
+            if (!diarioImport || todosLosPeriodosDiario().length === 0) { sinDatos.classList.remove('hidden'); hoja.classList.add('hidden'); return; }
+            sinDatos.classList.add('hidden'); hoja.classList.remove('hidden');
+            const periodoHasta = document.getElementById('ig-periodo').value;
+            if (!periodoHasta) return;
+            const inp = document.getElementById('ig-preparado');
+            igPreparadoPor();
+            if (document.activeElement !== inp) inp.value = appConfig.igPreparadoPor || '';
+            const M = construirInformeGerencial(periodoHasta);
+            document.getElementById('ig-contenido').innerHTML = igHtmlInforme(M);
         }
 
         // ==================================================================
@@ -6921,249 +7343,197 @@ function renderAnalisisCuenta() {
             const periodoHasta = document.getElementById('ig-periodo').value;
             if (!periodoHasta) return;
             advertirSiLibroPendienteReportes(periodoHasta);
-            const [anioSel, mesSelStr] = periodoHasta.split('-');
-            const mesSel = parseInt(mesSelStr, 10);
-            const movAcum = getMovimientosAcumulado(periodoHasta);
-            const erAcum = calcularEstadoResultados(movAcum);
-            const esAcum = estadoSituacionAl(periodoHasta, erAcum.utilidad);
-            const ratios = calcularRatiosFinancieros(movAcum, erAcum, esAcum);
-            const kpisNegocio = calcularKPIsNegocio(periodoHasta, erAcum);
-            const recomendaciones = generarRecomendaciones(erAcum, esAcum, ratios, kpisNegocio);
-            const conclusiones = generarConclusiones(erAcum, esAcum, ratios, periodoHasta);
-            const nombreEmpresa = empresaHeader();
+            const M = construirInformeGerencial(periodoHasta);
+            const { cfg, cur, prev, serie } = M;
+            const NC = 12;
+            const TONO = { bueno: 'FF047857', malo: 'FFB91C1C', neutro: 'FF64748B' };
+            const FMT_S = '"S/ "#,##0;[Red]-"S/ "#,##0', FMT_DIF = '+#,##0;[Red]-#,##0;0';
 
             await descargarHojaUnica('Informe Gerencial', `Informe_Gerencial_${periodoHasta}.xlsx`, ws => {
-            ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } };
-            ws.views = [{ showGridLines: false }];
-            ws.columns = Array.from({ length: 12 }, () => ({ width: 10.5 }));
+                ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } };
+                ws.views = [{ showGridLines: false }];
+                ws.columns = Array.from({ length: NC }, () => ({ width: 11.5 }));
+                let row = 1;
 
-            // Título
-            ws.mergeCells(1, 1, 1, 12);
-            const t = ws.getCell(1, 1);
-            t.value = `INFORME GERENCIAL - ${nombreEmpresa} — ${MESES_NOMBRE[mesSel]} ${anioSel}`;
-            t.font = { bold: true, size: 16, color: { argb: COLOR_WHITE } };
-            t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLOR_HEADER } };
-            t.alignment = { vertical: 'middle', horizontal: 'center' };
-            ws.getRow(1).height = 34;
+                const relleno = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+                const pintar = (r, c1, c2, argb) => { for (let c = c1; c <= c2; c++) ws.getCell(r, c).fill = relleno(argb); };
+                const unir = (r, c1, c2) => { if (c2 > c1) ws.mergeCells(r, c1, r, c2); return ws.getCell(r, c1); };
+                const alto = (txt, span, tam) => { const t = tam || 9.5; return Math.max(15, Math.ceil(String(txt).length / (span * 12 * (9.5 / t))) * (t * 1.45) + 3); };
+                const linea = (r) => { for (let c = 1; c <= NC; c++) ws.getCell(r, c).border = { bottom: { style: 'hair', color: { argb: 'FFCBD5E1' } } }; };
+                const seccion = (txt, argb) => {
+                    row++;
+                    const c = unir(row, 1, NC); c.value = txt;
+                    c.font = { bold: true, size: 11, color: { argb: COLOR_WHITE } }; c.alignment = { vertical: 'middle', indent: 1 };
+                    pintar(row, 1, NC, argb || COLOR_HEADER2); ws.getRow(row).height = 19; row++;
+                };
+                const nota = (txt) => { const c = unir(row, 1, NC); c.value = txt; c.font = { italic: true, size: 8.5, color: { argb: 'FF64748B' } }; c.alignment = { wrapText: true, vertical: 'top' }; ws.getRow(row).height = alto(txt, NC, 8.5); row++; };
+                const parrafo = (txt, op) => {
+                    const o = op || {}, c = unir(row, 1, NC); c.value = txt;
+                    c.font = { size: 9.5, bold: !!o.bold }; c.alignment = { wrapText: true, vertical: 'top', indent: 1 };
+                    if (o.fill) pintar(row, 1, NC, o.fill);
+                    ws.getRow(row).height = alto(txt, NC, 9.5); row++;
+                };
+                const encabezado = (celdas) => { // celdas: [{ c1, c2, t, der }]
+                    celdas.forEach(x => { const c = unir(row, x.c1, x.c2); c.value = x.t; c.alignment = { horizontal: x.der ? 'right' : 'left', vertical: 'middle', wrapText: true }; });
+                    for (let c = 1; c <= NC; c++) { const cell = ws.getCell(row, c); cell.fill = relleno(COLOR_HEADER); cell.font = { bold: true, size: 9, color: { argb: COLOR_WHITE } }; }
+                    ws.getRow(row).height = 20; row++;
+                };
 
-            ws.mergeCells(2, 1, 2, 12);
-            const sub = ws.getCell(2, 1);
-            sub.value = `RUC: ${(diarioImport.config && diarioImport.config.ruc) || '-'}   |   Régimen MYPE Tributario   |   Elaborado automáticamente desde el Libro Diario   |   Acumulado: Enero a ${MESES_NOMBRE[mesSel]} ${anioSel}`;
-            sub.font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
-            sub.alignment = { horizontal: 'center' };
-            ws.getRow(3).height = 6;
+                // ---- Título ----
+                const t = unir(row, 1, NC);
+                t.value = `INFORME GERENCIAL · ${cur.nombre.toUpperCase()}`;
+                t.font = { bold: true, size: 16, color: { argb: COLOR_WHITE } }; t.alignment = { vertical: 'middle', horizontal: 'center' };
+                pintar(row, 1, NC, COLOR_HEADER); ws.getRow(row).height = 34; row++;
+                const s2 = unir(row, 1, NC);
+                s2.value = `${igNombreEmpresa(cfg)}   |   RUC: ${cfg.ruc || '-'}`;
+                s2.font = { bold: true, size: 10, color: { argb: 'FF334155' } }; s2.alignment = { horizontal: 'center' }; row++;
+                const prep = igPreparadoPor();
+                const s3 = unir(row, 1, NC);
+                s3.value = `${prep ? 'Preparado por: ' + prep + '   |   ' : ''}Emitido el ${igFechaEmision()}   |   ${prev ? `Comparado con ${prev.nombre}${M.previos.length > 1 ? ' y los ' + M.previos.length + ' meses anteriores' : ''}` : 'Sin meses anteriores para comparar'}`;
+                s3.font = { italic: true, size: 9, color: { argb: 'FF64748B' } }; s3.alignment = { horizontal: 'center' }; row++;
 
-            // --- KPI cards (fila 4-7) ---
-            const kpis = [
-                { label: 'VENTAS NETAS (ACUM.)', valor: `S/ ${erAcum.ventasNetas.toFixed(2)}`, color: 'FF0369A1' },
-                { label: 'UTILIDAD NETA (ACUM.)', valor: `S/ ${erAcum.utilidad.toFixed(2)}`, color: erAcum.utilidad >= 0 ? 'FF047857' : COLOR_BAD },
-                { label: 'MARGEN NETO', valor: erAcum.ventasNetas !== 0 ? `${((erAcum.utilidad / erAcum.ventasNetas) * 100).toFixed(1)}%` : 'N/A', color: 'FF7C3AED' },
-                { label: 'TOTAL ACTIVO', valor: `S/ ${esAcum.totalActivo.toFixed(2)}`, color: 'FFB45309' }
-            ];
-            const kpiColSpan = 3;
-            kpis.forEach((k, i) => {
-                const startCol = 1 + i * kpiColSpan;
-                ws.mergeCells(4, startCol, 4, startCol + kpiColSpan - 1);
-                ws.mergeCells(5, startCol, 6, startCol + kpiColSpan - 1);
-                const lbl = ws.getCell(4, startCol);
-                lbl.value = k.label; lbl.font = { bold: true, size: 8, color: { argb: COLOR_WHITE } };
-                lbl.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: k.color } };
-                lbl.alignment = { horizontal: 'center', vertical: 'middle' };
-                const val = ws.getCell(5, startCol);
-                val.value = k.valor; val.font = { bold: true, size: 18, color: { argb: k.color } };
-                val.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-                val.alignment = { horizontal: 'center', vertical: 'middle' };
-                ws.getCell(6, startCol).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-            });
-            ws.getRow(4).height = 16; ws.getRow(5).height = 24; ws.getRow(6).height = 6;
-            ws.getRow(7).height = 8;
-
-            // --- Análisis del periodo (bullets) ---
-            let row = 8;
-            ws.mergeCells(row, 1, row, 12);
-            ws.getCell(row, 1).value = '📊 ANÁLISIS DEL PERIODO';
-            ws.getCell(row, 1).font = { bold: true, size: 11, color: { argb: COLOR_HEADER } };
-            row++;
-            const margenBrutoPct = erAcum.ventasNetas !== 0 ? (erAcum.utilidadBruta / erAcum.ventasNetas) * 100 : 0;
-            const bulletsAnalisis = [
-                `Ventas netas acumuladas de S/ ${erAcum.ventasNetas.toFixed(2)}, con un costo de ventas de S/ ${erAcum.costoVentas.toFixed(2)} (${erAcum.ventasNetas !== 0 ? ((erAcum.costoVentas / erAcum.ventasNetas) * 100).toFixed(1) : '0'}% de las ventas).`,
-                `Utilidad bruta de S/ ${erAcum.utilidadBruta.toFixed(2)} (margen bruto de ${margenBrutoPct.toFixed(1)}%).`,
-                `Gastos administrativos y de ventas acumulados: S/ ${(erAcum.gastosAdmin + erAcum.gastosVentas).toFixed(2)}.`,
-                `Resultado neto del periodo: ${erAcum.utilidad >= 0 ? 'utilidad' : 'pérdida'} de S/ ${Math.abs(erAcum.utilidad).toFixed(2)}.`
-            ];
-            bulletsAnalisis.forEach(b => {
-                ws.mergeCells(row, 1, row, 12);
-                ws.getCell(row, 1).value = '•  ' + b;
-                ws.getCell(row, 1).font = { size: 9.5 };
-                ws.getCell(row, 1).alignment = { wrapText: true };
+                // ---- Tarjetas ----
                 row++;
-            });
-            row++;
+                const mgAcum = M.erAcum.ventasNetas > 0.005 ? M.erAcum.utilidad / M.erAcum.ventasNetas : null;
+                const txtVs = (c, opt) => prev && c ? `${igCambioTxt(c, opt)} vs ${prev.nombre}` : 'sin mes anterior';
+                const tarjetas = [
+                    { t: `VENTAS DE ${MESES_NOMBRE[cur.mes].toUpperCase()}`, v: cur.ventas, f: FMT_S, color: 'FF0369A1', c: igCambio(cur.ventas, prev && prev.ventas, true), o: {}, sub: `${M.acumLabel}: ${igS(M.erAcum.ventasNetas)}` },
+                    { t: 'UTILIDAD DEL MES', v: cur.utilidad, f: FMT_S, color: cur.utilidad >= 0 ? 'FF047857' : COLOR_BAD, c: igCambio(cur.utilidad, prev && prev.utilidad, true), o: { monto: true }, sub: `${M.acumLabel}: ${igS(M.erAcum.utilidad)}` },
+                    { t: 'MARGEN NETO DEL MES', v: cur.margenNeto, f: '0.0%', color: 'FF7C3AED', c: igCambio(cur.margenNeto, prev && prev.margenNeto, true, true), o: {}, sub: `${M.acumLabel}: ${igPct(mgAcum)}` },
+                    { t: 'CAJA Y BANCOS AL CIERRE', v: cur.efectivo, f: FMT_S, color: 'FFB45309', c: M.efectivoComparable ? igCambio(cur.efectivo, prev.efectivo, true) : null, o: { monto: true }, sub: `Total activo: ${igS(M.esAcum.totalActivo)}` }
+                ];
+                tarjetas.forEach((k, i) => {
+                    const c1 = 1 + i * 3, c2 = c1 + 2;
+                    const l = unir(row, c1, c2); l.value = k.t; l.font = { bold: true, size: 8.5, color: { argb: COLOR_WHITE } }; l.fill = relleno(k.color); l.alignment = { horizontal: 'center', vertical: 'middle' };
+                    ws.mergeCells(row + 1, c1, row + 2, c2);
+                    const v = ws.getCell(row + 1, c1); v.value = k.v; v.numFmt = k.f; v.font = { bold: true, size: 17, color: { argb: k.color } }; v.fill = relleno('FFF8FAFC'); v.alignment = { horizontal: 'center', vertical: 'middle' };
+                    const cm = unir(row + 3, c1, c2); cm.value = txtVs(k.c, k.o); cm.font = { bold: true, size: 9, color: { argb: TONO[k.c ? k.c.tono : 'neutro'] } }; cm.fill = relleno('FFF8FAFC'); cm.alignment = { horizontal: 'center' };
+                    const sb = unir(row + 4, c1, c2); sb.value = k.sub; sb.font = { size: 8.5, color: { argb: 'FF64748B' } }; sb.fill = relleno('FFF8FAFC'); sb.alignment = { horizontal: 'center' };
+                });
+                ws.getRow(row).height = 16; ws.getRow(row + 1).height = 14; ws.getRow(row + 2).height = 14; row += 5;
 
-            // --- Análisis de Gastos ---
-            ws.mergeCells(row, 1, row, 12);
-            ws.getCell(row, 1).value = '🧾 ANÁLISIS DE GASTOS';
-            ws.getCell(row, 1).font = { bold: true, size: 11, color: { argb: COLOR_HEADER } };
-            row++;
-            const gastoCategorias = [
-                { nombre: 'Costo de Ventas (insumos/mercadería)', valor: erAcum.costoVentas, color: 'FFF59E0B' },
-                { nombre: 'Gastos Administrativos (planilla, servicios)', valor: erAcum.gastosAdmin, color: 'FF6366F1' },
-                { nombre: 'Gastos de Ventas (publicidad)', valor: erAcum.gastosVentas, color: 'FF0EA5E9' },
-                { nombre: 'Gastos Financieros (intereses, comisiones)', valor: erAcum.gastosFinancieros, color: 'FFEF4444' }
-            ];
-            const totalGastos = gastoCategorias.reduce((s, g) => s + g.valor, 0) || 1;
-            const headerGastoRow = row;
-            ws.getCell(row, 1).value = 'Categoría'; ws.getCell(row, 5).value = 'Monto (S/)'; ws.getCell(row, 7).value = '% del Gasto Total'; ws.getCell(row, 9).value = 'Distribución';
-            for (const c of [1, 5, 7, 9]) { ws.getCell(row, c).font = { bold: true, size: 8.5 }; }
-            row++;
-            gastoCategorias.sort((a, b) => b.valor - a.valor).forEach(g => {
-                const pct = g.valor / totalGastos;
-                ws.mergeCells(row, 1, row, 4); ws.getCell(row, 1).value = g.nombre; ws.getCell(row, 1).font = { size: 9 };
-                ws.getCell(row, 5).value = g.valor; fmtMoneda(ws.getCell(row, 5)); ws.getCell(row, 5).font = { size: 9 };
-                ws.getCell(row, 7).value = pct; fmtPct(ws.getCell(row, 7)); ws.getCell(row, 7).font = { size: 9 };
-                // Barra de distribución "poor man's chart" con celdas coloreadas
-                const barLen = Math.max(1, Math.round(pct * 4));
-                for (let bc = 0; bc < 4; bc++) {
-                    const cell = ws.getCell(row, 9 + bc);
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bc < barLen ? g.color : 'FFE2E8F0' } };
+                // ---- Avisos ----
+                M.avisos.forEach(a => parrafo(`${a.tipo === 'info' ? 'ℹ' : '⚠'} ${a.texto}`, { fill: a.tipo === 'info' ? 'FFE0F2FE' : 'FFFEF3C7' }));
+
+                // ---- Lo más importante ----
+                seccion('LO MÁS IMPORTANTE DEL MES');
+                parrafo(`Situación general: ${M.conclusiones.etiquetaSituacion}`, { bold: true, fill: { positivo: 'FFD1FAE5', atencion: 'FFFEF3C7', alerta: 'FFFEE2E2' }[M.conclusiones.colorSituacion] });
+                M.titulares.forEach(x => parrafo(`•  ${x.titulo}. ${x.texto}`));
+
+                // ---- Evolución ----
+                if (serie.length > 1) {
+                seccion(`CÓMO VIENEN LOS ÚLTIMOS ${serie.length} MESES`);
+                encabezado([{ c1: 1, c2: 3, t: 'Montos en soles' }].concat(serie.map((m, i) => ({ c1: 4 + i, c2: 4 + i, t: m.etiqueta, der: true })), [{ c1: 10, c2: 12, t: M.previos.length === 1 ? `Frente a ${prev.etiqueta}` : 'Frente al promedio anterior', der: true }]));
+                IG_FILAS_EVOLUCION.forEach(f => {
+                    if (f.fuerte) { for (let c = 1; c <= NC; c++) { ws.getCell(row, c).fill = relleno('FFF1F5F9'); } }
+                    const e = unir(row, 1, 3); e.value = f.etiqueta; e.font = { size: 9.5, bold: !!f.fuerte };
+                    serie.forEach((m, i) => {
+                        const c = ws.getCell(row, 4 + i), v = m[f.key];
+                        c.value = (v === null || v === undefined) ? null : v;
+                        c.numFmt = f.fmt === 'p' ? '0.0%' : (f.fmt === 's2' ? '#,##0.00' : '#,##0;[Red]-#,##0');
+                        c.font = { size: 9.5, bold: !!f.fuerte || i === serie.length - 1 };
+                        if (i === serie.length - 1) c.fill = relleno('FFE0E7FF');
+                    });
+                    const cam = igCambio(cur[f.key], M.promPrevios ? M.promPrevios[f.key] : null, f.bueno, f.fmt === 'p');
+                    const cc = unir(row, 10, 12); cc.value = igCambioTxt(cam, { monto: f.key === 'utilidad' });
+                    cc.font = { size: 9.5, bold: true, color: { argb: TONO[cam ? cam.tono : 'neutro'] } }; cc.alignment = { horizontal: 'right' };
+                    linea(row); row++;
+                });
+                const tend = igTextoTendencia(M);
+                if (tend) parrafo(tend);
+
                 }
+
+                // ---- Puente de utilidad ----
+                if (prev && M.efectos) {
+                    seccion(`¿POR QUÉ CAMBIÓ LA UTILIDAD FRENTE A ${prev.nombre.toUpperCase()}?`);
+                    const nom = { ventas: v => v >= 0 ? 'Se vendió más' : 'Se vendió menos', costo: v => v >= 0 ? 'El costo de ventas bajó' : 'El costo de ventas subió', oper: v => v >= 0 ? 'Bajaron los gastos de administración y ventas' : 'Subieron los gastos de administración y ventas', otros: v => v >= 0 ? 'Bajaron los gastos financieros y otros' : 'Subieron los gastos financieros y otros' };
+                    const f1 = (txt, val, fmt, bold) => { const a = unir(row, 1, 7); a.value = txt; a.font = { size: 9.5, bold }; const b = unir(row, 8, 9); b.value = val; b.numFmt = fmt; b.font = { size: 9.5, bold, color: fmt === FMT_DIF ? { argb: val >= 0 ? TONO.bueno : TONO.malo } : undefined }; linea(row); row++; };
+                    f1(`Utilidad de ${prev.nombre}`, prev.utilidad, FMT_S, true);
+                    M.efectos.forEach(e => f1(nom[e.clave](e.valor), e.valor, FMT_DIF, false));
+                    f1(`Utilidad de ${cur.nombre}`, cur.utilidad, FMT_S, true);
+                }
+
+                // ---- Gastos ----
+                seccion('¿EN QUÉ SE VA CADA SOL QUE SE VENDE?');
+                const vv = cur.ventas > 0.005 ? cur.ventas : null;
+                if (vv) nota(`De cada S/ 100 vendidos en ${cur.nombre}: S/ ${(cur.costoVentas / vv * 100).toFixed(1)} fueron costo de ventas, S/ ${(cur.gastosOper / vv * 100).toFixed(1)} gastos de administración y ventas, S/ ${(cur.gastosOtros / vv * 100).toFixed(1)} gastos financieros y otros, y quedaron S/ ${(cur.utilidad / vv * 100).toFixed(1)} de utilidad.`);
+                encabezado([{ c1: 1, c2: 3, t: 'Montos en soles' }, { c1: 4, c2: 4, t: cur.etiqueta, der: true }, { c1: 5, c2: 5, t: '% ventas', der: true }, { c1: 6, c2: 6, t: prev ? prev.etiqueta : 'Mes ant.', der: true }, { c1: 7, c2: 8, t: 'Cambio', der: true }]);
+                const filasG = [
+                    ['Costo de ventas', cur.costoVentas, prev && prev.costoVentas], ['Gastos administrativos', cur.gastosAdmin, prev && prev.gastosAdmin],
+                    ['Gastos de ventas', cur.gastosVentas, prev && prev.gastosVentas], ['Gastos financieros', cur.gastosFin, prev && prev.gastosFin]
+                ];
+                if (Math.abs(cur.gastosSinCC) > 0.5 || (prev && Math.abs(prev.gastosSinCC) > 0.5)) filasG.push(['Gastos sin Centro de Costo', cur.gastosSinCC, prev && prev.gastosSinCC]);
+                filasG.push(['Total costos y gastos', filasG.reduce((s, f) => s + f[1], 0), prev ? filasG.reduce((s, f) => s + f[2], 0) : null]);
+                filasG.forEach((f, i) => {
+                    const ultimo = i === filasG.length - 1;
+                    if (ultimo) pintar(row, 1, NC, 'FFF1F5F9');
+                    const a = unir(row, 1, 3); a.value = f[0]; a.font = { size: 9.5, bold: ultimo };
+                    const b = ws.getCell(row, 4); b.value = f[1]; b.numFmt = '#,##0;[Red]-#,##0'; b.font = { size: 9.5, bold: ultimo };
+                    const p = ws.getCell(row, 5); p.value = vv ? f[1] / vv : null; p.numFmt = '0.0%'; p.font = { size: 9.5, color: { argb: 'FF64748B' } };
+                    const q = ws.getCell(row, 6); q.value = (prev && f[2] !== null) ? f[2] : null; q.numFmt = '#,##0;[Red]-#,##0'; q.font = { size: 9.5, color: { argb: 'FF64748B' } };
+                    const cam = (prev && f[2] !== null) ? igCambio(f[1], f[2], false) : null;
+                    const d = unir(row, 7, 8); d.value = cam ? igCambioTxt(cam, { monto: true }) : '—'; d.font = { size: 9.5, bold: true, color: { argb: TONO[cam ? cam.tono : 'neutro'] } }; d.alignment = { horizontal: 'right' };
+                    linea(row); row++;
+                });
+                if (prev) {
+                    if (M.gastosSubieron.length) {
+                        row++;
+                        encabezado([{ c1: 1, c2: 6, t: `Gastos que más subieron frente a ${prev.nombre}` }, { c1: 7, c2: 7, t: prev.etiqueta, der: true }, { c1: 8, c2: 8, t: cur.etiqueta, der: true }, { c1: 9, c2: 9, t: 'Subió', der: true }]);
+                        M.gastosSubieron.forEach(g => {
+                            const a = unir(row, 1, 6); a.value = `${g.nombre} (${g.cuenta})`; a.font = { size: 9.5 };
+                            const b = ws.getCell(row, 7); b.value = g.anterior; b.numFmt = '#,##0'; b.font = { size: 9.5 };
+                            const c = ws.getCell(row, 8); c.value = g.actual; c.numFmt = '#,##0'; c.font = { size: 9.5 };
+                            const d = ws.getCell(row, 9); d.value = g.dif; d.numFmt = '+#,##0'; d.font = { size: 9.5, bold: true, color: { argb: TONO.malo } };
+                            linea(row); row++;
+                        });
+                    } else nota(`Ninguna cuenta de gasto subió de forma relevante frente a ${prev.nombre}.`);
+                }
+
+                // ---- Indicadores del negocio ----
+                seccion('INDICADORES DEL NEGOCIO');
+                nota('🟢 bien · 🟡 vigilar · 🔴 requiere atención. El cambio en verde es favorable; en rojo, desfavorable.');
+                encabezado([{ c1: 1, c2: 3, t: 'Indicador' }, { c1: 4, c2: 4, t: cur.etiqueta, der: true }, { c1: 5, c2: 5, t: prev ? prev.etiqueta : 'Mes ant.', der: true }, { c1: 6, c2: 7, t: 'Cambio', der: true }, { c1: 8, c2: 12, t: '¿Qué significa?' }]);
+                M.kpiFilas.forEach(k => {
+                    const sem = k.clave ? igSemaforoKpi(k.clave, k.actual) : null;
+                    const cam = igCambio(k.actual, k.anterior, k.bueno, k.fmt === 'p');
+                    const a = unir(row, 1, 3); a.value = `${sem ? sem + ' ' : ''}${k.nombre}`; a.font = { size: 9.5, bold: true }; a.alignment = { vertical: 'top' };
+                    const b = ws.getCell(row, 4); b.value = igFmtValor(k.actual, k.fmt); b.font = { size: 9.5, bold: true }; b.alignment = { horizontal: 'right', vertical: 'top' };
+                    const c = ws.getCell(row, 5); c.value = igFmtValor(k.anterior, k.fmt); c.font = { size: 9.5, color: { argb: 'FF64748B' } }; c.alignment = { horizontal: 'right', vertical: 'top' };
+                    const d = unir(row, 6, 7); d.value = igCambioTxt(cam); d.font = { size: 9.5, bold: true, color: { argb: TONO[cam ? cam.tono : 'neutro'] } }; d.alignment = { horizontal: 'right', vertical: 'top' };
+                    const e = unir(row, 8, 12); e.value = k.ayuda; e.font = { size: 8.5, color: { argb: 'FF64748B' } }; e.alignment = { wrapText: true, vertical: 'top' };
+                    ws.getRow(row).height = alto(k.ayuda, 5, 8.5); linea(row); row++;
+                });
+
+                // ---- Salud financiera ----
+                seccion('SALUD FINANCIERA (RATIOS)');
+                nota(`🟢 óptimo · 🟡 aceptable, con seguimiento · 🔴 atención inmediata. Los ratios usan datos acumulados de enero a ${cur.nombre}.`);
+                encabezado([{ c1: 1, c2: 3, t: 'Ratio' }, { c1: 4, c2: 4, t: 'Ahora', der: true }, { c1: 5, c2: 5, t: 'Mes anterior', der: true }, { c1: 6, c2: 12, t: '¿Qué mide?' }]);
+                const antR = M.prevAcum ? M.prevAcum.ratios : null;
+                IG_GRUPOS_RATIOS.forEach(gr => {
+                    const g = unir(row, 1, NC); g.value = gr.titulo; g.font = { bold: true, size: 9.5, color: { argb: 'FF3730A3' } }; pintar(row, 1, NC, 'FFEEF2FF'); row++;
+                    gr.nombres.forEach(nm => {
+                        const r = M.ratios.find(x => x.nombre === nm); if (!r) return;
+                        const ra = antR ? antR.find(x => x.nombre === nm) : null;
+                        const a = unir(row, 1, 3); a.value = `${r.semaforo} ${nm.replace(/ \(.*\)/, '')}`; a.font = { size: 9.5, bold: true }; a.alignment = { vertical: 'top' };
+                        const b = ws.getCell(row, 4); b.value = igFmtRatio(r); b.font = { size: 9.5, bold: true }; b.alignment = { horizontal: 'right', vertical: 'top' };
+                        const c = ws.getCell(row, 5); c.value = ra ? `${ra.semaforo} ${igFmtRatio(ra)}` : '—'; c.font = { size: 9.5, color: { argb: 'FF64748B' } }; c.alignment = { horizontal: 'right', vertical: 'top' };
+                        const e = unir(row, 6, 12); e.value = IG_AYUDA_RATIOS[nm] || ''; e.font = { size: 8.5, color: { argb: 'FF64748B' } }; e.alignment = { wrapText: true, vertical: 'top' };
+                        ws.getRow(row).height = alto(e.value, 7, 8.5); linea(row); row++;
+                    });
+                });
+
+                // ---- Conclusión y qué hacer ----
+                seccion('CONCLUSIÓN');
+                parrafo(igTextoSituacion(M));
+                if (M.conclusiones.aplicacionRecomendaciones) parrafo(`Frente al mes anterior. ${M.conclusiones.aplicacionRecomendaciones}`);
+                seccion('QUÉ HACER', 'FF166534');
+                const iconoTipo = { positivo: '✅', atencion: '⚠️', alerta: '🔴' }, colorTipo = { positivo: 'FFD1FAE5', atencion: 'FFFEF3C7', alerta: 'FFFEE2E2' };
+                M.recomendaciones.forEach(rec => parrafo(`${iconoTipo[rec.tipo]}  ${rec.texto}`, { fill: colorTipo[rec.tipo] }));
+
                 row++;
+                nota(`${prep ? 'Preparado por: ' + prep + '. ' : ''}Generado desde MYPECAR PLUS el ${new Date().toLocaleDateString('es-PE')}. Cifras en soles; el detalle exacto está en el Estado de Resultados. Herramienta de apoyo a la gestión; no reemplaza el análisis del contador.`);
             });
-            row++;
-            if (erAcum.gastosSinCC && Math.abs(erAcum.gastosSinCC) > 0.5) {
-                ws.mergeCells(row, 1, row, 12);
-                ws.getCell(row, 1).value = `⚠ Hay S/ ${erAcum.gastosSinCC.toFixed(2)} en gastos sin Centro de Costo asignado. Revisa esas líneas en el Libro Diario para que el análisis de gastos sea 100% exacto.`;
-                ws.getCell(row, 1).font = { italic: true, size: 8.5, color: { argb: 'FFB45309' } };
-                row += 2;
-            } else {
-                row++;
-            }
-
-            // --- KPIs de negocio, con explicación de cada uno ---
-            ws.mergeCells(row, 1, row, 12);
-            ws.getCell(row, 1).value = '📊 KPIs DE NEGOCIO';
-            ws.getCell(row, 1).font = { bold: true, size: 11, color: { argb: COLOR_HEADER } };
-            row++;
-            ws.getCell(row, 1).value = 'KPI'; ws.getCell(row, 3).value = 'Resultado'; ws.getCell(row, 4).value = '¿Qué significa?';
-            ws.mergeCells(row, 1, row, 2); ws.mergeCells(row, 4, row, 12);
-            for (const c of [1, 3, 4]) { ws.getCell(row, c).font = { bold: true, size: 8.5, color: { argb: COLOR_WHITE } }; ws.getCell(row, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0EA5E9' } }; }
-            row++;
-            kpisNegocio.forEach((kp, i) => {
-                let valorTxt;
-                if (kp.valor === null) valorTxt = 'N/A';
-                else if (kp.fmt === 'soles') valorTxt = 'S/ ' + kp.valor.toFixed(2);
-                else if (kp.fmt === 'pct') valorTxt = (kp.valor * 100).toFixed(1) + '%';
-                else if (kp.fmt === 'dias') valorTxt = kp.valor.toFixed(0) + ' días';
-                else if (kp.fmt === 'numero') valorTxt = kp.valor.toLocaleString('es-PE');
-                else if (kp.fmt === 'pct_signed') valorTxt = (kp.valor >= 0 ? '+' : '') + (kp.valor * 100).toFixed(1) + '%';
-                const fillFila = i % 2 === 1 ? 'FFF8FAFC' : 'FFFFFFFF';
-                ws.mergeCells(row, 1, row, 2);
-                ws.getCell(row, 1).value = kp.nombre;
-                ws.getCell(row, 1).font = { size: 9, bold: true };
-                ws.getCell(row, 3).value = valorTxt;
-                ws.getCell(row, 3).font = { size: 9, bold: true };
-                ws.getCell(row, 3).alignment = { horizontal: 'right' };
-                ws.mergeCells(row, 4, row, 12);
-                ws.getCell(row, 4).value = KPI_EXPLICACIONES[kp.nombre] || '';
-                ws.getCell(row, 4).font = { size: 8.5, color: { argb: 'FF64748B' } };
-                ws.getCell(row, 4).alignment = { wrapText: true };
-                for (let c = 1; c <= 12; c++) { if (!ws.getCell(row, c).fill) ws.getCell(row, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillFila } }; }
-                row++;
-            });
-            row++;
-
-            // --- Ratios financieros completos, con explicación de cada uno ---
-            ws.mergeCells(row, 1, row, 12);
-            ws.getCell(row, 1).value = '📈 RATIOS FINANCIEROS (🟢 Óptimo · 🟡 Seguimiento · 🔴 Atención)';
-            ws.getCell(row, 1).font = { bold: true, size: 11, color: { argb: COLOR_HEADER } };
-            row++;
-            ws.getCell(row, 1).value = 'Ratio'; ws.getCell(row, 3).value = 'Valor'; ws.getCell(row, 4).value = '¿Qué mide?';
-            ws.mergeCells(row, 1, row, 2); ws.mergeCells(row, 4, row, 12);
-            for (const c of [1, 3, 4]) { ws.getCell(row, c).font = { bold: true, size: 8.5, color: { argb: COLOR_WHITE } }; ws.getCell(row, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }; }
-            row++;
-            ratios.forEach((rt, i) => {
-                const valorTxt = rt.valor === null ? 'N/A' : (rt.fmt === 'pct' ? (rt.valor * 100).toFixed(1) + '%' : rt.fmt === 'soles' ? 'S/ ' + rt.valor.toFixed(2) : rt.valor.toFixed(2) + 'x');
-                const fillFila = i % 2 === 1 ? 'FFF8FAFC' : 'FFFFFFFF';
-                ws.mergeCells(row, 1, row, 2);
-                ws.getCell(row, 1).value = `${rt.semaforo} ${rt.nombre}`;
-                ws.getCell(row, 1).font = { size: 9, bold: true };
-                ws.getCell(row, 3).value = valorTxt;
-                ws.getCell(row, 3).font = { size: 9, bold: true };
-                ws.getCell(row, 3).alignment = { horizontal: 'right' };
-                ws.mergeCells(row, 4, row, 12);
-                ws.getCell(row, 4).value = RATIO_EXPLICACIONES[rt.nombre] || '';
-                ws.getCell(row, 4).font = { size: 8.5, color: { argb: 'FF64748B' } };
-                ws.getCell(row, 4).alignment = { wrapText: true };
-                for (let c = 1; c <= 12; c++) { if (!ws.getCell(row, c).fill) ws.getCell(row, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillFila } }; }
-                row++;
-            });
-            row++;
-
-            // --- Conclusiones ---
-            ws.mergeCells(row, 1, row, 12);
-            ws.getCell(row, 1).value = '🏁 CONCLUSIONES';
-            ws.getCell(row, 1).font = { bold: true, size: 11, color: { argb: COLOR_HEADER } };
-            row++;
-
-            const badgeColorMap = { positivo: 'FFD1FAE5', atencion: 'FFFEF3C7', alerta: 'FFFEE2E2' };
-            ws.mergeCells(row, 1, row, 3);
-            ws.getCell(row, 1).value = `Situación Actual: ${conclusiones.etiquetaSituacion}`;
-            ws.getCell(row, 1).font = { bold: true, size: 9.5 };
-            ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: badgeColorMap[conclusiones.colorSituacion] } };
-            ws.mergeCells(row, 4, row, 12);
-            ws.getCell(row, 4).value = conclusiones.situacionActual;
-            ws.getCell(row, 4).font = { size: 9 };
-            ws.getCell(row, 4).alignment = { wrapText: true };
-            ws.getRow(row).height = 30;
-            row++;
-
-            ws.mergeCells(row, 1, row, 3);
-            ws.getCell(row, 1).value = 'Tendencia Financiera:';
-            ws.getCell(row, 1).font = { bold: true, size: 9.5 };
-            ws.mergeCells(row, 4, row, 12);
-            ws.getCell(row, 4).value = conclusiones.tendencia;
-            ws.getCell(row, 4).font = { size: 9 };
-            ws.getCell(row, 4).alignment = { wrapText: true };
-            ws.getRow(row).height = 30;
-            row++;
-
-            if (conclusiones.aplicacionRecomendaciones) {
-                ws.mergeCells(row, 1, row, 3);
-                ws.getCell(row, 1).value = 'Seguimiento a Recomendaciones Anteriores:';
-                ws.getCell(row, 1).font = { bold: true, size: 9.5 };
-                ws.mergeCells(row, 4, row, 12);
-                ws.getCell(row, 4).value = conclusiones.aplicacionRecomendaciones;
-                ws.getCell(row, 4).font = { size: 9 };
-                ws.getCell(row, 4).alignment = { wrapText: true };
-                ws.getRow(row).height = 30;
-                row++;
-            }
-            row++;
-
-            // --- Recomendaciones ---
-            ws.mergeCells(row, 1, row, 12);
-            ws.getCell(row, 1).value = '💡 RECOMENDACIONES';
-            ws.getCell(row, 1).font = { bold: true, size: 11, color: { argb: COLOR_WHITE } };
-            ws.getCell(row, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF166534' } };
-            ws.getRow(row).height = 18;
-            row++;
-            const iconoTipo = { positivo: '✅', atencion: '⚠️', alerta: '🔴' };
-            const colorTipo = { positivo: 'FFD1FAE5', atencion: 'FFFEF3C7', alerta: 'FFFEE2E2' };
-            recomendaciones.forEach(rec => {
-                ws.mergeCells(row, 1, row, 12);
-                const cell = ws.getCell(row, 1);
-                cell.value = `${iconoTipo[rec.tipo]}  ${rec.texto}`;
-                cell.font = { size: 9.5 };
-                cell.alignment = { wrapText: true, vertical: 'middle' };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorTipo[rec.tipo] } };
-                ws.getRow(row).height = 28;
-                row++;
-            });
-            row++;
-            ws.mergeCells(row, 1, row, 12);
-            ws.getCell(row, 1).value = `Generado automáticamente el ${new Date().toLocaleDateString('es-PE')} desde REPORTES. Este resumen es una herramienta de apoyo a la gestión; no reemplaza el análisis del contador.`;
-            ws.getCell(row, 1).font = { italic: true, size: 7.5, color: { argb: 'FF94A3B8' } };
-        });
         }
 
         // ============ EXPORTAR LIBRO DIARIO ============
