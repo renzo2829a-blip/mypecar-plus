@@ -9308,10 +9308,123 @@ function mensajeCuentaNoImputable(codigo, origen) {
             '¿Cómo registro un asiento?',
             '¿Por qué no me cuadra el balance?',
             '¿Cuánto me deben los clientes?',
+            '¿Dónde veo el punto de equilibrio?',
             '¿Qué es la NIC 16?'
         ];
 
+        // ------------------------------------------------------------------
+        // CAPA INTELIGENTE DEL CHAT (2026-11-25): entiende plurales, errores de tipeo y sinónimos,
+        // sabe en qué pestaña de ESTE módulo está cada cosa (y la abre con un botón), recuerda la
+        // pregunta anterior ("¿y en octubre?") y, si no entiende, propone lo más parecido.
+        // Todo local: no envía nada a internet.
+        // ------------------------------------------------------------------
+        const MAPA_PESTANAS = [
+            { id: 'dashboard', nombre: 'Panel General', claves: ['panel general', 'panel', 'inicio', 'resumen general', 'indicadores', 'grafico de ingresos'], desc: 'el resumen del mes: ventas, gastos, utilidad y saldos de un vistazo' },
+            { id: 'shortcuts', nombre: 'Registrar Asiento', claves: ['registrar asiento', 'nuevo asiento', 'crear asiento', 'plantilla de asiento', 'asiento manual', 'registrar un asiento'], desc: 'registrar un asiento contable a mano o con una plantilla' },
+            { id: 'diario', nombre: 'Libro Diario', claves: ['libro diario', 'diario', 'lista de asientos', 'asientos registrados', 'editar asiento', 'borrar asiento', 'anular asiento'], desc: 'ver, buscar, editar o anular todos tus asientos, en orden por fecha' },
+            { id: 'gastosreparados', nombre: 'Gastos Reparados', claves: ['gastos reparados', 'gasto reparado', 'sin comprobante', '65999', 'reparo'], desc: 'registrar gastos sin comprobante válido (cuenta 65999)' },
+            { id: 'mayor', nombre: 'Libro Mayor', claves: ['libro mayor', 'mayor', 'movimientos de una cuenta', 'detalle de cuenta', 'mayorizacion'], desc: 'ver los movimientos y el saldo de cada cuenta contable' },
+            { id: 'balancecomp', nombre: 'Balance de Comprobación', claves: ['balance de comprobacion', 'comprobacion', 'sumas y saldos', 'balance de sumas'], desc: 'ver las sumas y saldos de todas tus cuentas, y comprobar que cuadran' },
+            { id: 'situacion', nombre: 'Situación Financiera', claves: ['situacion financiera', 'balance general', 'activo pasivo patrimonio', 'estado de situacion', 'lo que tengo y debo', 'balance'], desc: 'el Estado de Situación Financiera (balance general): activos, pasivos y patrimonio' },
+            { id: 'notaseeff', nombre: 'Notas a los EEFF', claves: ['notas a los estados financieros', 'notas eeff', 'notas de los estados', 'notas'], desc: 'las notas explicativas de tus estados financieros' },
+            { id: 'resultados', nombre: 'Estado de Resultados', claves: ['estado de resultados', 'ganancias y perdidas', 'resultado del mes', 'utilidad', 'perdida', 'ganancia', 'estado de resultado'], desc: 'cuánto ganaste o perdiste: ventas, costos, gastos y utilidad' },
+            { id: 'patrimonio', nombre: 'Cambios en el Patrimonio', claves: ['cambios en el patrimonio', 'cambios patrimonio', 'patrimonio', 'capital y resultados'], desc: 'cómo cambió tu patrimonio: capital, resultados acumulados y aportes' },
+            { id: 'flujoefectivo', nombre: 'Flujo de Efectivo', claves: ['flujo de efectivo', 'estado de flujo de efectivo', 'de donde salio la plata', 'actividades de operacion'], desc: 'de dónde vino y a dónde fue tu dinero (operación, inversión y financiamiento)' },
+            { id: 'flujocaja', nombre: 'Flujo de Caja', claves: ['flujo de caja', 'flujo de caja proyectado', 'proyeccion de caja', 'caja futura', 'proyectar', 'proyeccion'], desc: 'proyectar cuánto dinero tendrás en los próximos meses' },
+            { id: 'informe', nombre: 'Informe Gerencial', claves: ['informe gerencial', 'informe', 'reporte gerencial', 'resumen para el gerente', 'ratios', 'indicadores financieros'], desc: 'un informe resumido con ratios y análisis para tomar decisiones' },
+            { id: 'puntoequilibrio', nombre: 'Punto de Equilibrio', claves: ['punto de equilibrio', 'equilibrio', 'margen de seguridad', 'ventas minimas', 'cuanto debo vender', 'cubrir mis gastos', 'break even', 'no perder'], desc: 'cuánto necesitas vender al mes para cubrir tus gastos sin ganar ni perder' },
+            { id: 'impuestos', nombre: 'Impuestos', claves: ['impuestos', 'impuesto', 'igv', 'renta', 'pdt 621', 'sunat', 'declarar', 'declaracion', 'tributos', 'pago a cuenta'], desc: 'calcular el IGV y la Renta del mes, para tu declaración (PDT 621)' },
+            { id: 'consultas', nombre: 'Consultas al Sistema', claves: ['consultas', 'este chat', 'asistente'], desc: 'este chat' },
+            { id: 'nicniif', nombre: 'NIC y NIIF', claves: ['nic y niif', 'nic', 'niif', 'normas contables', 'norma contable', 'normas internacionales'], desc: 'una guía de las normas contables (NIC y NIIF) y dónde aplican en el sistema' },
+            { id: 'almacen', nombre: 'Almacén', claves: ['almacen', 'existencias', 'mercaderia', 'inventario', 'stock'], desc: 'la valorización de tus existencias para el cierre contable' },
+            { id: 'seguridad', nombre: 'Seguridad', claves: ['seguridad', 'respaldo', 'copia de seguridad', 'backup', 'bitacora', 'quien cambio'], desc: 'tu copia de respaldo y el historial de cambios' },
+            { id: 'alertas', nombre: 'Alertas', claves: ['alertas', 'alerta', 'avisos', 'advertencias', 'errores del libro', 'pendientes'], desc: 'avisos de cosas por revisar (descuadres, cuentas faltantes, plazos)' },
+            { id: 'settings', nombre: 'Ajustes', claves: ['ajustes', 'configuracion', 'configurar', 'regimen tributario', 'datos de la empresa', 'plan de cuentas', 'tasa de igv', 'auditor', 'cambiar regimen'], desc: 'la configuración de la empresa, el régimen tributario y el plan de cuentas' },
+        ];
+        // Reduce una palabra a su "raíz" simple, para que ventas/venta/vendí o asientos/asiento coincidan.
+        function raizConsulta(w) {
+            w = normalizarTexto(w);
+            if (w.length > 5) w = w.replace(/(ciones|cion|mente|ando|iendo|ados|adas|idos|idas|es|s|ado|ada|ido|ida|ar|er|ir)$/, '');
+            else w = w.replace(/(es|s)$/, '');
+            return w;
+        }
+        function distanciaCorta(a, b) { // ¿difieren en a lo más 1 letra? (errores de tipeo)
+            if (Math.abs(a.length - b.length) > 1) return false;
+            let i = 0, j = 0, dif = 0;
+            while (i < a.length && j < b.length) {
+                if (a[i] === b[j]) { i++; j++; continue; }
+                if (++dif > 1) return false;
+                if (a.length > b.length) i++; else if (a.length < b.length) j++; else { i++; j++; }
+            }
+            return dif + (a.length - i) + (b.length - j) <= 1;
+        }
+        function coincidePalabra(raizPregunta, raizClave) {
+            if (raizPregunta === raizClave) return true;
+            if (raizClave.length >= 5 && raizPregunta.length >= 5 && distanciaCorta(raizPregunta, raizClave)) return true;
+            return raizClave.length >= 4 && raizPregunta.length >= 4 && (raizPregunta.startsWith(raizClave) || raizClave.startsWith(raizPregunta));
+        }
+        function puntuarPestanas(txt) {
+            const raices = normalizarTexto(txt).split(' ').filter(w => w.length > 1 && !STOPWORDS_CONSULTA.has(w)).map(raizConsulta);
+            const res = [];
+            for (const t of MAPA_PESTANAS) {
+                let puntaje = 0;
+                for (const clave of t.claves) {
+                    const rc = normalizarTexto(clave).split(' ').filter(w => w.length > 1 && !STOPWORDS_CONSULTA.has(w)).map(raizConsulta);
+                    if (!rc.length) continue;
+                    const hits = rc.filter(k => raices.some(r => coincidePalabra(r, k))).length;
+                    if (hits === rc.length) puntaje = Math.max(puntaje, hits * 2 + (rc.length > 1 ? 1 : 0));
+                }
+                if (puntaje > 0) res.push({ t, puntaje });
+            }
+            return res.sort((a, b) => b.puntaje - a.puntaje);
+        }
+        function respuestaPestana(t) {
+            return `${t.nombre}: ${t.desc}.<br>[[ir:${t.id}|Abrir ${t.nombre}]]`;
+        }
+        let ultimaPreguntaConsulta = '';
         function procesarConsulta(textoOriginal) {
+            const txt = normalizarTexto(textoOriginal);
+            // 1) El motor original (datos contables, FAQ, funciones de otros módulos)
+            const esUbicacion = /\b(donde|en que|en cual|que pestana|que parte|abrir|abre|ir a|llevame|muestrame|mostrar|ver el|ver la|como veo|como encuentro|encuentro|encontrar)\b/.test(txt);
+            const pestanas = puntuarPestanas(txt);
+            // Si la pregunta es de navegación ("dónde encuentro / cómo veo ..."), y coincide con una pestaña de ESTE módulo, se responde primero con eso.
+            if (esUbicacion && pestanas.length && pestanas[0].puntaje >= 2 && !buscarUbicacionEnTexto(txt)) {
+                ultimaPreguntaConsulta = textoOriginal;
+                return respuestaPestana(pestanas[0].t);
+            }
+            let r = procesarConsultaBase(textoOriginal);
+            if (r) { ultimaPreguntaConsulta = textoOriginal; return r; }
+            // 1b) Sinónimos del lenguaje cotidiano → se reformula la pregunta y se reintenta con el motor de datos
+            const REFORMULAR = [
+                [/\b(igv|impuesto)\b/, /\b(cuanto|debo|pagar|pago|monto|toca|tengo que)\b/, 'cuanto debo pagar de igv'],
+                [/\b(gane|gano|ganancia|ganancias|gananci)\b/, /./, 'cual es mi utilidad neta'],
+                [/\b(plata|dinero|efectivo)\b/, /\b(tengo|hay|queda)\b/, 'cuanto tengo en caja'],
+                [/\b(me deben|deben mis clientes|clientes me deben|quien me debe|quienes me deben|que clientes me deben)\b/, /./, 'cuanto me deben los clientes']
+            ];
+            for (const [a1, a2, nueva] of REFORMULAR) {
+                if (a1.test(txt) && a2.test(txt)) {
+                    const detectado = detectarPeriodoEnTexto(txt);
+                    const rr = procesarConsultaBase(nueva + (detectado ? ' ' + textoOriginal : ''));
+                    if (rr) { ultimaPreguntaConsulta = nueva; return rr; }
+                }
+            }
+            // 2) Seguimiento: "¿y en octubre?", "¿y el año pasado?" → repite la pregunta anterior con el nuevo periodo
+            if (ultimaPreguntaConsulta && txt.split(' ').length <= 6 && (/^y\b/.test(txt) || detectarPeriodoEnTexto(txt))) {
+                const r2 = procesarConsultaBase(ultimaPreguntaConsulta.replace(/\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|setiembre|septiembre|octubre|noviembre|diciembre|20\d\d|este mes|mes pasado|ano pasado|año pasado)\b/gi, ' ') + ' ' + textoOriginal);
+                if (r2) return r2;
+            }
+            // 3) Una pestaña de este módulo que coincida aunque no pregunten "dónde"
+            if (pestanas.length) {
+                ultimaPreguntaConsulta = textoOriginal;
+                if (pestanas.length === 1 || pestanas[0].puntaje > pestanas[1].puntaje) return respuestaPestana(pestanas[0].t);
+                return 'Encontré varias cosas relacionadas, ¿cuál buscas?<br>' + pestanas.slice(0, 3).map(p => `• ${p.t.nombre}: ${p.t.desc}.<br>[[ir:${p.t.id}|Abrir ${p.t.nombre}]]`).join('<br>');
+            }
+            // 4) No se entendió: se ofrecen alternativas en vez de rendirse
+            const sug = PREGUNTAS_SUGERIDAS.slice(0, 4).map(p => `• ${p}`).join('<br>');
+            return `No estoy seguro de haber entendido. Prueba con otras palabras, por ejemplo: <i>"dónde veo el punto de equilibrio"</i>, <i>"cuánto vendí en octubre"</i> o <i>"cuánto debo de IGV"</i>.<br>También puedes preguntarme:<br>${sug}<br>Si buscas algo de otro módulo (ventas, compras, planilla, activos fijos, inventario), dime su nombre y te indico en qué archivo está.`;
+        }
+
+        function procesarConsultaBase(textoOriginal) {
             const txt = normalizarTexto(textoOriginal);
 
             // ¿La pregunta menciona una función que vive en OTRO archivo del sistema (no en
@@ -9344,13 +9457,18 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 const respuesta = mejor.responder(txt);
                 if (respuesta) return respuesta;
             }
-            return `No encontré una respuesta directa para eso. Puedo ayudarte con datos como ventas, saldos de cuentas, impuestos, utilidad o el balance — de cualquier mes ya registrado (ej. "cuánto vendí en marzo"), con dudas de uso del sistema, y también puedo indicarte en qué archivo encontrar funciones como planilla, activos fijos o reportes. Intenta reformular tu pregunta, o prueba una de las sugerencias de abajo.`;
+            return null;
         }
 
         // SEGURIDAD (2026-11-24): el historial se sincroniza entre usuarios de la empresa; se pinta sin código:
         // el texto del usuario va escapado y en las respuestas solo se permiten <b>, <br>, <strong>, <i>, <ul>, <ol>, <li>.
         function escConsulta(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
         function htmlBasicoConsulta(s) { return escConsulta(s).replace(/&lt;(\/?)(b|br|strong|i|ul|ol|li)\s*\/?&gt;/gi, '<$1$2>'); }
+        function conBotonesConsulta(html) {
+            const ids = MAPA_PESTANAS.map(t => t.id);
+            return html.replace(/\[\[ir:([a-z]+)\|([^\]\[<>]{1,60})\]\]/g, (m, id, label) => ids.includes(id)
+                ? `<button type="button" onclick="switchTab('${id}')" class="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg"><i class="fa-solid fa-arrow-right"></i> ${label}</button>` : '');
+        }
         function renderMensajesConsultas() {
             const cont = document.getElementById('consultas-mensajes');
             cont.innerHTML = historialConsultas.map(m => {
@@ -9359,7 +9477,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 }
                 return `<div class="flex justify-start items-start gap-2">
                     <div class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5"><i class="fa-solid fa-robot text-xs"></i></div>
-                    <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%] text-sm text-slate-700 leading-relaxed">${htmlBasicoConsulta(m.texto)}</div>
+                    <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-2.5 max-w-[75%] text-sm text-slate-700 leading-relaxed">${conBotonesConsulta(htmlBasicoConsulta(m.texto))}</div>
                 </div>`;
             }).join('');
             cont.scrollTop = cont.scrollHeight;
