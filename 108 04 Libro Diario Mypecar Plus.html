@@ -16,6 +16,7 @@
     <script src="mypecar-login.js"></script>
 <script src="mypecar-mobile.js"></script>
 <script src="mypecar-asistente.js"></script>
+<script src="mypecar-demo.js"></script>
 
     <script>
     // Blindaje (2026-09-24): si por el nombre, la ubicacion, o la extension del
@@ -4935,7 +4936,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             lineas.push(...lineasNuevas);
 
             const nextId = asientos.length > 0 ? Math.max(...asientos.map(a => a.id)) + 1 : 1;
-            const nextNumero = asientos.length > 0 ? Math.max(...asientos.map(a => a.numero)) + 1 : 1;
+            const nextNumero = asientos.filter(a => !a.esDemo).length > 0 ? Math.max(...asientos.filter(a => !a.esDemo).map(a => a.numero)) + 1 : 1; // (los asientos de ejemplo no cuentan en la numeración)
             asientos.push({
                 id: nextId, numero: nextNumero, fecha: ultimoDiaMes(periodo),
                 glosa: `Cierre de existencias de ${formatPeriodoLabel(periodo)} (Costo de Ventas = S/ ${(saldoInicial + compras - saldoFinal).toFixed(2)})`,
@@ -5350,7 +5351,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
                 document.getElementById('form-asiento-modo-edicion').classList.add('hidden');
             } else {
                 const nextId = asientos.length > 0 ? Math.max(...asientos.map(a => a.id)) + 1 : 1;
-                const nextNumero = asientos.length > 0 ? Math.max(...asientos.map(a => a.numero)) + 1 : 1;
+                const nextNumero = asientos.filter(a => !a.esDemo).length > 0 ? Math.max(...asientos.filter(a => !a.esDemo).map(a => a.numero)) + 1 : 1; // (los asientos de ejemplo no cuentan en la numeración)
                 // Si el asiento viene de un archivo recién importado (mismo origen), conserva quién lo
                 // preparó originalmente y cuándo lo exportó — distinto de "registradoPor" (quien guarda aquí).
                 const vieneDeImportacion = datosImportacionPendiente && datosImportacionPendiente.origen === origen;

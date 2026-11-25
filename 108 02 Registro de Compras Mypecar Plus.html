@@ -20,6 +20,7 @@
     <script src="mypecar-login.js"></script>
 <script src="mypecar-mobile.js"></script>
 <script src="mypecar-asistente.js"></script>
+<script src="mypecar-demo.js"></script>
     <script>
     // Blindaje (2026-09-24): si por el nombre, la ubicacion, o la extension del
     // archivo (ej. quedo guardado como "mypecar-sync.js.txt" o en otra carpeta)
@@ -8044,13 +8045,13 @@ window.MYPECAR_PRIMEROS_PASOS = {
         { texto: 'Revisa los datos de tu empresa', ayuda: 'RUC, razón social y régimen tributario.', boton: 'Revisar',
           hecho: () => !!(config.ruc && config.razonSocial), ir: () => switchTab('settings') },
         { texto: 'Agrega tu primer proveedor', ayuda: 'Escribe su RUC y la razón social se llena sola.', boton: 'Agregar proveedor',
-          hecho: () => proveedores.length > 0 || hayComprasGuia(), ir: () => switchTab('proveedores') },
+          hecho: () => proveedores.some(c => !c.esDemo) || hayComprasGuia(), ir: () => switchTab('proveedores') },
         { texto: 'Registra tu primera compra', ayuda: 'Facturas de mercadería, servicios y gastos: suman a tu crédito fiscal.', boton: 'Registrar compra',
           hecho: () => hayComprasGuia(), ir: () => { switchTab('shortcuts'); const f = document.getElementById('form-compra'); if (f) { f.scrollIntoView({ behavior: 'smooth' }); const i = f.querySelector('input,select'); if (i) setTimeout(() => i.focus(), 400); } } }
     ],
     final: 'Con tus ventas (01) y compras registradas, 07 Reportes te muestra el IGV del mes y tu balance.'
 };
-function hayComprasGuia() { return (purchases && purchases.length > 0) || Object.values(periodsData || {}).some(p => p && Array.isArray(p.purchases) && p.purchases.length > 0); }
+function hayComprasGuia() { return (purchases && purchases.some(v => !v.esDemo)) || Object.values(periodsData || {}).some(p => p && Array.isArray(p.purchases) && p.purchases.some(v => !v.esDemo)); }
 </script>
 <script src="mypecar-primeros-pasos.js"></script>
 <script src="mypecar-ruc-gratis.js"></script>

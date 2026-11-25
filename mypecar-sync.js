@@ -960,7 +960,19 @@ var LZString = {
     }
   }
   // Único punto por donde se escribe en localStorage. true = quedó guardado en el disco de este equipo.
+  // (2026-11-25) DATOS DE EJEMPLO (mypecar-demo.js): los registros con esDemo:true viven solo en pantalla y JAMÁS se guardan
+  // ni se suben a la nube. Este es el único punto por donde pasa todo lo que se escribe, así que aquí se descartan.
+  function quitarDemo(v) {
+    if (Array.isArray(v)) return v.filter(function (x) { return !(x && (x.esDemo === true || (x.trabajadorId != null && global.__mpDemoTrab && global.__mpDemoTrab.has && global.__mpDemoTrab.has(x.trabajadorId)))); }).map(quitarDemo);
+    if (v && typeof v === 'object') { var o = {}; for (var k in v) o[k] = quitarDemo(v[k]); return o; }
+    return v;
+  }
+  function sinDemoTexto(texto) {
+    if (typeof texto !== 'string' || (texto.indexOf('"esDemo":true') < 0 && !(global.__mpDemoTrab && global.__mpDemoTrab.size && texto.indexOf('trabajadorId') >= 0))) return texto;
+    try { return JSON.stringify(quitarDemo(JSON.parse(texto))); } catch (e) { return texto; }
+  }
   function escribirTexto(key, texto) {
+    if (esClaveDeDatos(key)) texto = sinDemoTexto(texto);
     // (2026-09-24b) Si otra pestaña acaba de reiniciar los datos de ESTA
     // empresa (ver verificarReinicioDatos), esta página tiene en memoria
     // datos viejos y se va a recargar en un instante: no se le deja escribir
@@ -1299,6 +1311,7 @@ var LZString = {
       const { error: errMiembro } = await supabaseClient.from('empresa_usuarios')
         .insert({ empresa_id: emp.id, user_id: user.id, rol: 'owner' });
       if (errMiembro) throw errMiembro;
+      try { localStorage.setItem('mpdemo_' + emp.id, 'on'); } catch (e) {} // empresa nueva: los módulos vacíos muestran datos de ejemplo (solo en pantalla)
       return emp;
     },
     async listarMias() {
@@ -3005,6 +3018,7 @@ var LZString = {
     _ultimo: {},
     async publicar(tipo, payload) {
       requiereSupabase();
+      payload = quitarDemo(payload); // datos de ejemplo: nunca se publican
       const empresaId = empresas.activaId();
       if (!empresaId || !currentApp || !payload) return false;
       let userId = null;

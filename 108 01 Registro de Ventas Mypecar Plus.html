@@ -15,6 +15,7 @@
     <script src="mypecar-login.js"></script>
 <script src="mypecar-mobile.js"></script>
 <script src="mypecar-asistente.js"></script>
+<script src="mypecar-demo.js"></script>
     <script>window.MYPECAR_APP_VERSION = '2026-11-24';</script>
 
     <script>
@@ -6511,13 +6512,13 @@ window.MYPECAR_PRIMEROS_PASOS = {
         { texto: 'Revisa los datos de tu empresa', ayuda: 'RUC, razón social y régimen tributario (se llenan solos al registrar tu empresa).', boton: 'Revisar',
           hecho: () => !!(config.ruc && config.razonSocial), ir: () => switchTab('settings') },
         { texto: 'Agrega tu primer cliente', ayuda: 'Para facturas. Para boletas puedes usar "Público en general".', boton: 'Agregar cliente',
-          hecho: () => clientes.length > 0 || hayVentasGuia(), ir: () => switchTab('clientes') },
+          hecho: () => clientes.some(c => !c.esDemo) || hayVentasGuia(), ir: () => switchTab('clientes') },
         { texto: 'Registra tu primera venta', ayuda: 'El IGV y el asiento contable se calculan solos.', boton: 'Registrar venta',
           hecho: () => hayVentasGuia(), ir: () => { switchTab('shortcuts'); const f = document.getElementById('form-venta'); if (f) { f.scrollIntoView({ behavior: 'smooth' }); const i = f.querySelector('input,select'); if (i) setTimeout(() => i.focus(), 400); } } }
     ],
     final: 'Después registra tus compras en 02 Compras: con ambas verás tu IGV a pagar del mes en 07 Reportes.'
 };
-function hayVentasGuia() { return (sales && sales.length > 0) || Object.values(periodsData || {}).some(p => p && Array.isArray(p.sales) && p.sales.length > 0); }
+function hayVentasGuia() { return (sales && sales.some(v => !v.esDemo)) || Object.values(periodsData || {}).some(p => p && Array.isArray(p.sales) && p.sales.some(v => !v.esDemo)); }
 </script>
 <script src="mypecar-primeros-pasos.js"></script>
 <script src="mypecar-ruc-gratis.js"></script>
