@@ -3726,11 +3726,18 @@ const MypecarPEVista = (function () {
         function rgdDocumento(M, modo) {
             const cuerpo = modo === 'detalle' ? rgdDetalleHTML(M) : rgdHojaHTML(M);
             const t = `${modo === 'detalle' ? 'Reporte gerencial detallado' : 'Reporte gerencial del día'} ${M.hoy}`;
+            // Hoja A4 vertical con 5 mm a los lados y 6 mm arriba y abajo. Si el contenido es más alto que la hoja,
+            // se reduce con zoom y se ensancha en la misma proporción, para que siga ocupando todo el ancho.
+            const ajuste = `<script>window.rgdAjustar=function(){var h=document.querySelector('.rgd-hoja');if(!h||document.body.getAttribute('data-modo')==='detalle')return;
+h.style.zoom='';h.style.width='';var W=756,H=1066,a=h.getBoundingClientRect().height;if(a<=H)return;var z=Math.max(0.5,H/a);
+for(var i=0;i<5;i++){h.style.zoom=z;h.style.width=(W/z)+'px';var v=h.getBoundingClientRect().height;if(v<=H)break;z=Math.max(0.5,z*H/v*0.985);}};
+window.addEventListener('load',function(){window.rgdAjustar();});<\/script>`;
             return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${rgdEsc(t)}</title><style>
-@page{size:A4 portrait;margin:8mm}
+@page{size:A4 portrait;margin:6mm 5mm}
 html,body{margin:0;padding:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 ${RGD_CSS}
-</style></head><body>${cuerpo}</body></html>`;
+.rgd-hoja{width:200mm;max-width:none}
+</style></head><body data-modo="${modo === 'detalle' ? 'detalle' : 'hoja'}">${cuerpo}${ajuste}</body></html>`;
         }
 
         function rgdImprimir(modo) {
@@ -3753,11 +3760,7 @@ ${RGD_CSS}
                 d.open(); d.write(doc); d.close();
                 const lanzar = () => {
                     try {
-                        if (modo !== 'detalle') {
-                            const hoja = d.querySelector('.rgd-hoja');
-                            const alto = hoja ? hoja.scrollHeight : 0;
-                            if (alto > 1055) hoja.style.zoom = String(Math.max(0.6, 1055 / alto));
-                        }
+                        if (typeof fr.contentWindow.rgdAjustar === 'function') fr.contentWindow.rgdAjustar();
                         fr.contentWindow.focus();
                         fr.contentWindow.print();
                     } catch (e) { console.error('Reporte del día: impresión', e); fr.remove(); conVentana(); return; }
