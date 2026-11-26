@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
 <script src="mypecar-export.js"></script>
+<script src="mypecar-impuestos.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.js" integrity="sha384-lm7tNiW/3uF4tLujoEeoR94zIODe3hCWqRtW0UgxpQE3QslzOhlD22UqQk1tSBhB" crossorigin="anonymous"></script>
 <style>
     body { font-family: 'Inter', sans-serif; }
@@ -1620,11 +1621,71 @@ const MypecarPEVista = (function () {
 
         <!-- ================= PESTAÑA: IMPUESTOS ================= -->
         <section id="tab-impuestos" class="tab-content hidden space-y-6">
+            <!-- (2026-11-25) Control de impuestos: próximo mes, determinado vs. pagado, un impuesto, envío -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fa-solid fa-landmark text-rose-700"></i> Control de Impuestos</h3>
+                        <p class="text-xs text-slate-500 mt-1">Todo sale del Libro Diario importado: lo que se debe pagar, lo determinado y lo ya cancelado. El reporte que armes aquí (con los filtros elegidos) es el que se imprime, se baja o se envía.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="impRepExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                        <button onclick="impRepPdf()" class="bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                        <button onclick="impRepImprimir()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-print"></i> Imprimir</button>
+                        <button onclick="impRepEnviar('correo')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-envelope"></i> Correo</button>
+                        <button onclick="impRepEnviar('whatsapp')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-calendar-check text-amber-600"></i> 1. Impuestos por pagar en el mes</h4>
+                    <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mes de pago</label>
+                        <input type="month" id="imp-mes-pago" onchange="renderImpuestosReportes()" class="bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs"></div>
+                </div>
+                <div id="imp-prox-aviso" class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mb-2 hidden"></div>
+                <div class="overflow-x-auto"><table class="w-full text-xs">
+                    <thead class="bg-slate-100 text-[10px] uppercase text-slate-500"><tr><th class="p-2 text-left">Impuesto</th><th class="p-2 text-left">Se declara en</th><th class="p-2 text-left">Período</th><th class="p-2 text-left">Vence</th><th class="p-2 text-right">Determinado</th><th class="p-2 text-right">Ya pagado</th><th class="p-2 text-right">A pagar</th></tr></thead>
+                    <tbody id="imp-prox-body" class="divide-y divide-slate-100"></tbody>
+                </table></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-scale-balanced text-indigo-600"></i> 2. Determinado vs. pagado — por mes</h4>
+                    <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Año</label>
+                        <select id="imp-anio" onchange="renderImpuestosReportes()" class="bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs"></select></div>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-200"><table class="w-full text-left border-collapse text-xs">
+                    <thead id="imp-ctl-head" class="bg-slate-100 font-semibold"></thead>
+                    <tbody id="imp-ctl-body" class="divide-y divide-slate-100 font-mono"></tbody>
+                </table></div>
+                <p class="text-[10px] text-slate-500 mt-2">Cada pago registrado en Caja/Bancos (Debe a la cuenta del tributo) cancela primero la deuda más antigua, y solo de meses anteriores al del pago.</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-magnifying-glass-dollar text-rose-700"></i> 3. Control de un impuesto específico</h4>
+                    <div class="flex gap-2">
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Impuesto</label>
+                            <select id="imp-tributo" onchange="renderImpuestosReportes()" class="bg-slate-50 border border-slate-200 rounded-lg p-1.5 text-xs">
+                                <option value="igv">IGV</option><option value="renta">Impuesto a la Renta</option><option value="essalud">EsSalud</option><option value="onp">ONP</option><option value="afp">AFP</option>
+                            </select></div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto"><table class="w-full text-xs">
+                    <thead class="bg-slate-100 text-[10px] uppercase text-slate-500"><tr><th class="p-2 text-left">Período</th><th class="p-2 text-left">Vence</th><th class="p-2 text-right">Determinado</th><th class="p-2 text-right">Pagado</th><th class="p-2 text-right">Saldo</th><th class="p-2 text-center">Estado</th><th class="p-2 text-left">Pagos (fecha · asiento)</th></tr></thead>
+                    <tbody id="imp-uno-body" class="divide-y divide-slate-100"></tbody>
+                </table></div>
+                <p class="text-[10px] text-slate-500 mt-2" id="imp-uno-nota"></p>
+            </div>
+
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-2">
                     <div>
-                        <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fa-solid fa-landmark text-rose-700"></i> Impuestos y Obligaciones — Mes a Mes</h3>
-                        <p class="text-xs text-slate-500 mt-1">Una columna por cada mes con datos (desde enero hasta el último mes importado), más una columna de Acumulado del año. Para ver la fecha exacta de vencimiento de un mes específico, revisa la pestaña "Impuestos" del Libro Diario (04).</p>
+                        <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fa-solid fa-table text-rose-700"></i> Determinación mensual — Mes a Mes</h3>
+                        <p class="text-xs text-slate-500 mt-1">Una columna por cada mes con datos, más el Acumulado. La fecha exacta de vencimiento de cada mes está en la sección 1 y en la pestaña "Impuestos" del Libro Diario (04).</p>
                     </div>
                     <button onclick="exportarImpuestosMensualExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap">
                         <i class="fa-solid fa-file-excel"></i> Excel Mensual (Ene-Dic)
@@ -6021,7 +6082,29 @@ ${RGD_CSS}
             const totalPDT621 = igv + rentaMensual + cuotaNRUS;
             const totalPLAME = essalud + onp + afp + renta4ta5ta;
 
+            const M = modeloImpuestosRep();
+            if (M) {
+                const d = M.periodo(periodo);
+                return { igv: d.igv, rentaMensual: d.rentaMensual, cuotaNRUS: d.cuotaNRUS, essalud: d.essalud, onp: d.onp, afp: d.afp, renta4ta5ta: d.renta4ta5ta, totalPDT621: d.totalPDT621, totalPLAME: d.totalPLAME, totalGeneral: d.totalPDT621 + d.totalPLAME };
+            }
             return { igv, rentaMensual, cuotaNRUS, essalud, onp, afp, renta4ta5ta, totalPDT621, totalPLAME, totalGeneral: totalPDT621 + totalPLAME };
+        }
+
+        // ---------- Motor de control de impuestos (mypecar-impuestos.js) ----------
+        let _impCache = { ref: null, clave: '', modelo: null };
+        function modeloImpuestosRep() {
+            if (typeof MypecarImpuestos === 'undefined' || !diarioImport) return null;
+            const cfg = diarioImport.config || {};
+            const rg = rgdCfg();
+            const clave = [Object.keys(diarioImport.periodsData || {}).length, JSON.stringify(cfg.regimenTributario) + cfg.tasaRentaMensual + cfg.ruc + cfg.categoriaNRUS, rg.buenContribuyente, JSON.stringify(rg.vencSunat), new Date().toDateString()].join('|');
+            if (_impCache.ref === diarioImport && _impCache.clave === clave) return _impCache.modelo;
+            const modelo = MypecarImpuestos.construir({
+                periodsData: diarioImport.periodsData || {}, cfg,
+                ventasNetas: (p) => calcularEstadoResultados(getMovimientosDelMes(p)).ventasNetas,
+                vence: (p) => rgdVencSunat(p, { cfg: rg, emp: { ruc: cfg.ruc } })
+            });
+            _impCache = { ref: diarioImport, clave, modelo };
+            return modelo;
         }
 
         const FILAS_IMPUESTOS = [
@@ -6034,7 +6117,135 @@ ${RGD_CSS}
             ['renta4ta5ta', 'Retenciones Renta 4ta/5ta Cat.']
         ];
 
+        function badgeImpRep(estado) {
+            const c = { cancelado: 'bg-emerald-100 text-emerald-800', parcial: 'bg-amber-100 text-amber-800', pendiente: 'bg-slate-100 text-slate-700', vencido: 'bg-rose-100 text-rose-800', sin: 'bg-slate-50 text-slate-400' }[estado] || '';
+            return `<span class="px-2 py-0.5 rounded text-[9px] font-bold font-sans ${c}">${MypecarImpuestos.ETIQUETA_ESTADO[estado] || estado}</span>`;
+        }
+        // Lee los filtros de pantalla y devuelve lo que se muestra (sirve también para PDF, Excel y envío)
+        function impRepFiltros(M) {
+            const selMes = document.getElementById('imp-mes-pago');
+            if (selMes && !selMes.value) selMes.value = MypecarImpuestos.mesSiguiente();
+            const mes = (selMes && selMes.value) || MypecarImpuestos.mesSiguiente();
+            const selAnio = document.getElementById('imp-anio');
+            const anios = M.anios();
+            if (selAnio && selAnio.options.length !== anios.length) {
+                const previo = selAnio.value;
+                selAnio.innerHTML = anios.map(a => `<option value="${a}">${a}</option>`).join('');
+                selAnio.value = anios.indexOf(previo) >= 0 ? previo : (anios.indexOf(String(new Date().getFullYear())) >= 0 ? String(new Date().getFullYear()) : anios[anios.length - 1]);
+            }
+            const anio = (selAnio && selAnio.value) || anios[anios.length - 1];
+            const tributo = (document.getElementById('imp-tributo') || {}).value || 'igv';
+            return { mes, anio, tributo };
+        }
+        function renderImpuestosControl() {
+            const vacio = (msg) => ['imp-prox-body', 'imp-ctl-body', 'imp-uno-body'].forEach(id => { const e = document.getElementById(id); if (e) e.innerHTML = `<tr><td class="p-6 text-center text-slate-400" colspan="8">${msg}</td></tr>`; });
+            if (!diarioImport) { vacio('Importa los Datos del Libro Diario primero.'); document.getElementById('imp-ctl-head').innerHTML = ''; return; }
+            const M = modeloImpuestosRep();
+            if (!M) { vacio('No se cargó el módulo de impuestos. Actualiza la página.'); return; }
+            const U = MypecarImpuestos.util, F = impRepFiltros(M);
+
+            // 1) Por pagar en el mes
+            const px = M.proximos(F.mes);
+            const aviso = document.getElementById('imp-prox-aviso');
+            const msgs = [];
+            if (px.sinDatosPeriodo) msgs.push(`No hay datos importados de ${U.etiquetaPeriodo(px.periodoOrigen)}, que es el período que se paga en ${U.etiquetaPeriodo(F.mes)}. Importa el Libro Diario actualizado.`);
+            else if (px.mesAbierto) msgs.push(`${U.etiquetaPeriodo(px.periodoOrigen)} aún no termina o no está cerrado: los montos son provisionales con lo registrado a hoy.`);
+            aviso.innerHTML = msgs.join('<br>'); aviso.classList.toggle('hidden', !msgs.length);
+            const filaProx = (x, venc) => `<tr class="${venc ? 'bg-rose-50' : ''}"><td class="p-2 font-sans font-semibold">${x.nombre}${venc ? ' <span class="text-[9px] text-rose-700 font-bold">VENCIDO</span>' : ''}</td><td class="p-2 font-sans text-slate-500">${x.declara}</td><td class="p-2 font-sans">${U.etiquetaCorta(x.periodo)}</td><td class="p-2 font-sans">${U.dma(x.vence)}</td><td class="p-2 text-right font-mono">${U.num(x.det)}</td><td class="p-2 text-right font-mono text-emerald-700">${U.num(x.pag)}</td><td class="p-2 text-right font-mono font-bold">${U.num(x.pend)}</td></tr>`;
+            let h = '';
+            px.enMes.forEach(x => h += filaProx(x, false));
+            h += px.enMes.length ? `<tr class="font-bold border-t-2 border-slate-300"><td class="p-2 font-sans" colspan="6">TOTAL A PAGAR EN ${U.etiquetaPeriodo(F.mes).toUpperCase()}</td><td class="p-2 text-right font-mono">${U.num(px.totalEnMes)}</td></tr>` : `<tr><td class="p-4 text-center text-slate-400 font-sans" colspan="7">No hay impuestos pendientes que venzan en ${U.etiquetaPeriodo(F.mes)}.</td></tr>`;
+            if (px.vencidos.length) {
+                h += `<tr><td class="p-2 font-sans text-[10px] font-bold uppercase text-rose-700 bg-rose-50" colspan="7">Pendientes de meses anteriores (ya vencidos)</td></tr>`;
+                px.vencidos.forEach(x => h += filaProx(x, true));
+                h += `<tr class="font-bold"><td class="p-2 font-sans" colspan="6">TOTAL VENCIDO</td><td class="p-2 text-right font-mono text-rose-700">${U.num(px.totalVencidos)}</td></tr>`;
+            }
+            document.getElementById('imp-prox-body').innerHTML = h;
+
+            // 2) Determinado vs pagado por mes (año elegido)
+            const periodos = M.periodos().filter(p => p.slice(0, 4) === F.anio);
+            document.getElementById('imp-ctl-head').innerHTML = `<tr><th class="p-2 font-sans">Impuesto</th><th class="p-2 font-sans"></th>${periodos.map(p => `<th class="p-2 text-right font-sans">${U.etiquetaCorta(p).split(' ')[0]}</th>`).join('')}<th class="p-2 text-right bg-rose-50 font-sans">Total</th></tr>`;
+            let hc = '';
+            let gDet = periodos.map(() => 0), gPag = periodos.map(() => 0);
+            MypecarImpuestos.ORDEN.forEach(t => {
+                const rs = periodos.map(p => M.fila(t, p));
+                if (rs.every(r => r.det < 0.005 && r.pag < 0.005)) return;
+                const sum = (k) => rs.reduce((s, r) => s + r[k], 0);
+                rs.forEach((r, i) => { gDet[i] += r.det; gPag[i] += r.pag; });
+                hc += `<tr><td class="p-2 font-sans font-semibold" rowspan="3">${MypecarImpuestos.CORTO[t]}</td><td class="p-2 font-sans text-slate-500">Determinado</td>${rs.map(r => `<td class="p-2 text-right">${U.num(r.det)}</td>`).join('')}<td class="p-2 text-right bg-rose-50 font-bold">${U.num(sum('det'))}</td></tr>`;
+                hc += `<tr><td class="p-2 font-sans text-emerald-700">Pagado</td>${rs.map(r => `<td class="p-2 text-right text-emerald-700">${U.num(r.pag)}</td>`).join('')}<td class="p-2 text-right bg-rose-50 font-bold text-emerald-700">${U.num(sum('pag'))}</td></tr>`;
+                hc += `<tr class="border-b border-slate-300"><td class="p-2 font-sans text-rose-700">Saldo</td>${rs.map(r => `<td class="p-2 text-right ${r.pend > 0.005 ? 'text-rose-700 font-bold' : 'text-slate-400'}">${U.num(r.pend)}</td>`).join('')}<td class="p-2 text-right bg-rose-50 font-bold text-rose-700">${U.num(sum('pend'))}</td></tr>`;
+            });
+            if (hc) {
+                const tD = gDet.reduce((a, b) => a + b, 0), tP = gPag.reduce((a, b) => a + b, 0);
+                hc += `<tr class="font-bold bg-indigo-50"><td class="p-2 font-sans" colspan="2">TOTAL DETERMINADO</td>${gDet.map(v => `<td class="p-2 text-right">${U.num(v)}</td>`).join('')}<td class="p-2 text-right bg-rose-100">${U.num(tD)}</td></tr>`;
+                hc += `<tr class="font-bold bg-emerald-50"><td class="p-2 font-sans" colspan="2">TOTAL PAGADO</td>${gPag.map(v => `<td class="p-2 text-right text-emerald-700">${U.num(v)}</td>`).join('')}<td class="p-2 text-right bg-rose-100 text-emerald-700">${U.num(tP)}</td></tr>`;
+                hc += `<tr class="font-bold bg-rose-50"><td class="p-2 font-sans" colspan="2">SALDO POR PAGAR</td>${gDet.map((v, i) => `<td class="p-2 text-right text-rose-700">${U.num(Math.max(0, v - gPag[i]))}</td>`).join('')}<td class="p-2 text-right bg-rose-100 text-rose-700">${U.num(MypecarImpuestos.ORDEN.reduce((s, t) => s + M.resumen(t, F.anio).pend, 0))}</td></tr>`;
+            } else hc = `<tr><td class="p-6 text-center text-slate-400 font-sans" colspan="${periodos.length + 3}">No hay impuestos determinados en ${F.anio}.</td></tr>`;
+            document.getElementById('imp-ctl-body').innerHTML = hc;
+
+            // 3) Un impuesto específico
+            const rs = M.resumen(F.tributo, F.anio).filas.filter(r => r.det > 0.004 || r.pag > 0.004);
+            let hu = rs.map(r => `<tr><td class="p-2 font-sans font-semibold">${U.etiquetaPeriodo(r.periodo)}</td><td class="p-2">${U.dma(r.vence)}</td><td class="p-2 text-right font-mono">${U.num(r.det)}</td><td class="p-2 text-right font-mono text-emerald-700">${U.num(r.pag)}</td><td class="p-2 text-right font-mono font-bold ${r.pend > 0.005 ? 'text-rose-700' : ''}">${U.num(r.pend)}</td><td class="p-2 text-center">${badgeImpRep(r.estado)}</td><td class="p-2 text-[10px] text-slate-600">${r.pagos.length ? r.pagos.map(x => `${U.dma(x.fecha)} · N° ${x.numero} · S/ ${U.num(x.monto)}`).join('<br>') : '—'}</td></tr>`).join('');
+            const tot = M.resumen(F.tributo, F.anio);
+            hu += rs.length ? `<tr class="font-bold border-t-2 border-slate-300"><td class="p-2" colspan="2">TOTAL ${F.anio}</td><td class="p-2 text-right font-mono">${U.num(tot.det)}</td><td class="p-2 text-right font-mono text-emerald-700">${U.num(tot.pag)}</td><td class="p-2 text-right font-mono text-rose-700">${U.num(tot.pend)}</td><td colspan="2"></td></tr>` : `<tr><td class="p-4 text-center text-slate-400" colspan="7">Sin movimientos de ${MypecarImpuestos.CORTO[F.tributo]} en ${F.anio}.</td></tr>`;
+            document.getElementById('imp-uno-body').innerHTML = hu;
+            const sa = M.sinAplicar[F.tributo] || [];
+            document.getElementById('imp-uno-nota').innerText = sa.length ? `Hay ${sa.length} pago(s) de ${MypecarImpuestos.CORTO[F.tributo]} sin período al que asignarlos (corresponden a meses que no están cargados): ${sa.map(x => `${U.dma(x.fecha)} S/ ${U.num(x.monto)}`).join('; ')}.` : (F.tributo === 'renta' ? 'Renta incluye el pago a cuenta de 3ra categoría, las retenciones de 4ta/5ta y la cuota del Nuevo RUS; los pagos se toman de la cuenta 4017.' : '');
+        }
+
+        // Documento (PDF / Excel / impresión / envío) con lo que se ve en pantalla
+        function impRepDocumento() {
+            if (!diarioImport) { showToast('Importa los Datos del Libro Diario primero.', 'error'); return null; }
+            const M = modeloImpuestosRep();
+            if (!M) { showToast('No se cargó el módulo de impuestos. Actualiza la página.', 'error'); return null; }
+            const U = MypecarImpuestos.util, F = impRepFiltros(M), cfg = diarioImport.config || {};
+            const px = M.proximos(F.mes);
+            const secciones = [];
+            const fp = px.enMes.map(x => [x.nombre, U.etiquetaCorta(x.periodo), U.dma(x.vence), x.det, x.pag, x.pend]);
+            fp.push(['TOTAL A PAGAR EN ' + U.etiquetaPeriodo(F.mes).toUpperCase(), '', '', '', '', px.totalEnMes]);
+            secciones.push({ titulo: '1. Impuestos por pagar en ' + U.etiquetaPeriodo(F.mes), cabeceras: ['Impuesto', 'Período', 'Vence', 'Determinado', 'Ya pagado', 'A pagar'], filas: fp, alinear: ['l', 'c', 'c', 'r', 'r', 'r'], totales: [fp.length - 1],
+                nota: px.sinDatosPeriodo ? `No hay datos importados de ${U.etiquetaPeriodo(px.periodoOrigen)}.` : (px.mesAbierto ? `${U.etiquetaPeriodo(px.periodoOrigen)} aún no está cerrado: montos provisionales.` : '') });
+            if (px.vencidos.length) {
+                const fv = px.vencidos.map(x => [x.nombre, U.etiquetaCorta(x.periodo), U.dma(x.vence), x.det, x.pag, x.pend]);
+                fv.push(['TOTAL VENCIDO', '', '', '', '', px.totalVencidos]);
+                secciones.push({ titulo: 'Pendientes ya vencidos', cabeceras: ['Impuesto', 'Período', 'Vence', 'Determinado', 'Ya pagado', 'A pagar'], filas: fv, alinear: ['l', 'c', 'c', 'r', 'r', 'r'], totales: [fv.length - 1] });
+            }
+            const filasCtl = [];
+            MypecarImpuestos.ORDEN.forEach(t => {
+                const r = M.resumen(t, F.anio);
+                if (r.det < 0.005 && r.pag < 0.005) return;
+                filasCtl.push([MypecarImpuestos.CORTO[t], r.det, r.pag, r.pend]);
+            });
+            const sD = filasCtl.reduce((s, f) => s + f[1], 0), sP = filasCtl.reduce((s, f) => s + f[2], 0), sS = filasCtl.reduce((s, f) => s + f[3], 0);
+            filasCtl.push(['TOTAL ' + F.anio, sD, sP, sS]);
+            secciones.push({ titulo: `2. Determinado vs. pagado — ${F.anio}`, cabeceras: ['Impuesto', 'Determinado', 'Pagado', 'Saldo por pagar'], filas: filasCtl, alinear: ['l', 'r', 'r', 'r'], totales: [filasCtl.length - 1] });
+            const rs = M.resumen(F.tributo, F.anio).filas.filter(r => r.det > 0.004 || r.pag > 0.004);
+            const fu = rs.map(r => [U.etiquetaPeriodo(r.periodo), U.dma(r.vence), r.det, r.pag, r.pend, MypecarImpuestos.ETIQUETA_ESTADO[r.estado], r.pagos.map(x => U.dma(x.fecha)).join(', ') || '—']);
+            const tu = M.resumen(F.tributo, F.anio);
+            fu.push(['TOTAL ' + F.anio, '', tu.det, tu.pag, tu.pend, '', '']);
+            secciones.push({ titulo: `3. Control de ${MypecarImpuestos.NOMBRE[F.tributo]} — ${F.anio}`, cabeceras: ['Período', 'Vence', 'Determinado', 'Pagado', 'Saldo', 'Estado', 'Fechas de pago'], filas: fu, alinear: ['l', 'c', 'r', 'r', 'r', 'c', 'l'], totales: [fu.length - 1], vacio: 'Sin movimientos.' });
+            const empresa = cfg.nombreComercial || cfg.razonSocial || 'EMPRESA';
+            return {
+                titulo: 'Control de impuestos', empresa, horizontal: true,
+                subtitulo: `RUC: ${cfg.ruc || '-'}  |  Mes de pago: ${U.etiquetaPeriodo(F.mes)}  |  Año de control: ${F.anio}  |  Emitido el ${new Date().toLocaleDateString('es-PE')}`,
+                secciones, archivo: 'Control_Impuestos_' + U.nombreSeguro(empresa).slice(0, 25) + '_' + F.anio,
+                notas: ['Calculado desde el Libro Diario importado. Un pago cancela primero la deuda más antigua y solo de meses anteriores al del pago. El aporte AFP vence a los 5 primeros días hábiles del mes siguiente (sin descontar feriados). Verifica siempre con el cronograma oficial de SUNAT.'],
+                mensaje: `Te comparto el control de impuestos de ${empresa}.
+A pagar en ${U.etiquetaPeriodo(F.mes)}: ${U.mon(px.totalEnMes)}` + (px.totalVencidos > 0.005 ? `
+Pendiente ya vencido: ${U.mon(px.totalVencidos)}` : '') + `
+Determinado ${F.anio}: ${U.mon(sD)} · Pagado: ${U.mon(sP)} · Saldo: ${U.mon(sS)}.
+El detalle va en el PDF adjunto.`,
+                responsable: 'CARLOS FLORES FIGUEROA'
+            };
+        }
+        function impRepExcel() { const d = impRepDocumento(); if (d) MypecarImpuestos.excel(d); }
+        function impRepPdf() { const d = impRepDocumento(); if (d) MypecarImpuestos.pdf(d); }
+        function impRepImprimir() { const d = impRepDocumento(); if (d) MypecarImpuestos.imprimir(d); }
+        function impRepEnviar(canal) { const d = impRepDocumento(); if (d) MypecarImpuestos.enviar(canal, d); }
+
         function renderImpuestosReportes() {
+            try { renderImpuestosControl(); } catch (e) { console.error('Control de impuestos:', e); }
             const thead = document.getElementById('imp-mensual-head');
             const tbody = document.getElementById('imp-mensual-body');
             if (!diarioImport) { thead.innerHTML = ''; tbody.innerHTML = `<tr><td class="p-6 text-center text-slate-400">Importa los Datos del Libro Diario primero.</td></tr>`; return; }

@@ -15,6 +15,7 @@
     <script src="mypecar-sync.js"></script>
     <script src="mypecar-login.js"></script>
 <script src="mypecar-mobile.js"></script>
+<script src="mypecar-impuestos.js"></script>
 <script src="mypecar-asistente.js"></script>
 <script src="mypecar-demo.js"></script>
 <script src="mypecar-novedades.js"></script>
@@ -1857,8 +1858,11 @@ const MypecarPEVista = (function () {
                         <button onclick="exportarImpuestosExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
                             <i class="fa-solid fa-file-excel"></i> Exportar Excel
                         </button>
-                        <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
-                            <i class="fa-solid fa-print"></i> Imprimir / Guardar como PDF
+                        <button onclick="impPdf()" class="bg-rose-700 hover:bg-rose-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-file-pdf"></i> PDF
+                        </button>
+                        <button onclick="impImprimir()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-print"></i> Imprimir
                         </button>
                     </div>
                 </div>
@@ -1909,6 +1913,22 @@ const MypecarPEVista = (function () {
                             <tbody id="imp-tabla-plame" class="divide-y divide-slate-100"></tbody>
                         </table>
                     </div>
+                </div>
+
+                <div class="px-6 pt-5">
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-center"><p class="text-[9px] font-bold text-slate-500 uppercase">Determinado</p><p class="font-black text-slate-800" id="imp-kpi-det">S/ 0.00</p></div>
+                        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-center"><p class="text-[9px] font-bold text-emerald-700 uppercase">Cancelado</p><p class="font-black text-emerald-800" id="imp-kpi-pag">S/ 0.00</p></div>
+                        <div class="bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-center"><p class="text-[9px] font-bold text-rose-700 uppercase">Saldo por pagar</p><p class="font-black text-rose-800" id="imp-kpi-pend">S/ 0.00</p></div>
+                    </div>
+                    <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wide mb-1.5 flex items-center gap-2"><i class="fa-solid fa-scale-balanced"></i> Control de pago del mes — determinado vs. cancelado</h4>
+                    <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                        <thead><tr class="text-[9px] uppercase text-slate-400 border-b"><th class="text-left pb-1">Tributo</th><th class="text-left pb-1">Vence</th><th class="text-right pb-1">Determinado</th><th class="text-right pb-1">Cancelado</th><th class="text-right pb-1">Saldo</th><th class="text-center pb-1">Estado</th></tr></thead>
+                        <tbody id="imp-tabla-control" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1.5" id="imp-nota-control"></p>
                 </div>
 
                 <div class="px-6 pt-4" id="imp-bloque-detracciones" style="display: none;">
@@ -3547,6 +3567,14 @@ const MypecarPEVista = (function () {
         // ==================================================================
         // NAVEGACIÓN DE PESTAÑAS
         // ==================================================================
+        // (2026-11-25) Al cambiar de mes con una pestaña abierta (Impuestos, Informe, Punto de equilibrio...)
+        // renderAll() no la repinta y se quedaba con el mes anterior: se vuelve a pintar la pestaña visible.
+        function refrescarPestanaActiva() {
+            try {
+                const visible = document.querySelector('.tab-content:not(.hidden)');
+                if (visible && visible.id && visible.id.indexOf('tab-') === 0) switchTab(visible.id.slice(4));
+            } catch (e) { console.error('No se pudo refrescar la pestaña activa:', e); }
+        }
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -3716,10 +3744,107 @@ const MypecarPEVista = (function () {
 
         const REGIMEN_LABEL_IMP = { nrus: 'Nuevo RUS', rer: 'Régimen Especial (RER)', rmt: 'Régimen MYPE Tributario (RMT)', rg: 'Régimen General' };
 
+
+        // ==================================================================
+        // CONTROL DE IMPUESTOS DETERMINADOS Y PAGADOS (2026-11-25) — motor mypecar-impuestos.js
+        // ==================================================================
+        function movimientosDePeriodo(key) {
+            const map = {};
+            ((periodsData[key] && periodsData[key].asientos) || []).forEach(a => (a.lineas || []).forEach(l => {
+                if (!map[l.cuenta]) map[l.cuenta] = { debe: 0, haber: 0, movimientos: [] };
+                map[l.cuenta].debe += l.debe; map[l.cuenta].haber += l.haber;
+            }));
+            return map;
+        }
+        function modeloImpuestos() {
+            if (typeof MypecarImpuestos === 'undefined') return null;
+            return MypecarImpuestos.construir({
+                periodsData, cfg: config,
+                ventasNetas: (p) => calcularEstadoResultados(movimientosDePeriodo(p)).ventasNetas,
+                vence: (p) => {
+                    const v = obtenerFechaVencimiento(p);
+                    // el cronograma editable no tiene año: solo vale si la fecha cae en el mes siguiente al periodo
+                    if (v && v.fecha && v.fecha.slice(0, 7) === MypecarImpuestos.util.periodoMas(p, 1)) return { fecha: v.fecha, fuente: 'Cronograma SUNAT' };
+                    return null;
+                }
+            });
+        }
+        // Sustituye los montos del mes por los del motor (sin contar los asientos de pago del tributo)
+        function aplicarMotorImpuestos(imp, modelo) {
+            if (!modelo) return imp;
+            const d = modelo.periodo(config.periodoActivo);
+            imp.igvDebito = d.igvDebito; imp.igvCredito = d.igvCredito; imp.igv = d.igv; imp.saldoFavorIgv = d.saldoFavorIgv;
+            imp.rentaMensual = d.rentaMensual; imp.cuotaNRUS = d.cuotaNRUS; imp.renta4ta5ta = d.renta4ta5ta;
+            imp.essalud = d.essalud; imp.onp = d.onp; imp.afp = d.afp;
+            imp.totalPDT621 = d.totalPDT621; imp.totalPLAME = d.totalPLAME; imp.totalGeneral = d.totalPDT621 + d.totalPLAME;
+            return imp;
+        }
+        function badgeEstadoImp(estado) {
+            const E = MypecarImpuestos.ETIQUETA_ESTADO;
+            const c = { cancelado: 'bg-emerald-100 text-emerald-800', parcial: 'bg-amber-100 text-amber-800', pendiente: 'bg-slate-100 text-slate-700', vencido: 'bg-rose-100 text-rose-800', sin: 'bg-slate-50 text-slate-400' }[estado] || '';
+            return `<span class="px-2 py-0.5 rounded text-[9px] font-bold ${c}">${E[estado] || estado}</span>`;
+        }
+        function documentoImpuestos() {
+            const modelo = modeloImpuestos(); if (!modelo) return null;
+            const U = MypecarImpuestos.util;
+            const mov = getMovimientosPorCuenta();
+            const er = calcularEstadoResultados(mov);
+            const imp = aplicarMotorImpuestos(calcularImpuestosDelMes(mov, er), modelo);
+            const d = modelo.periodo(config.periodoActivo);
+            const venc = obtenerFechaVencimiento(config.periodoActivo);
+            const empresa = config.nombreComercial || config.razonSocial || 'EMPRESA';
+            const periodoTxt = formatPeriodoLabel(config.periodoActivo);
+            const det = [];
+            if (imp.regimen === 'nrus') det.push(['Cuota Fija Nuevo RUS', 'Categoría ' + config.categoriaNRUS, imp.cuotaNRUS]);
+            else {
+                det.push(['IGV Débito Fiscal (Ventas)', 'Cuenta 40111', imp.igvDebito]);
+                det.push(['IGV Crédito Fiscal (Compras)', 'Cuenta 40112', -imp.igvCredito]);
+                det.push(['IGV a pagar', 'Débito − Crédito', imp.igv]);
+                if (imp.saldoFavorIgv > 0.005) det.push(['Saldo a favor de IGV (se arrastra)', '—', -imp.saldoFavorIgv]);
+                det.push(['Pago a cuenta de Renta (3ra categoría)', `Ventas netas × ${config.tasaRentaMensual}%`, imp.rentaMensual]);
+            }
+            det.push(['EsSalud (aporte del empleador)', 'Cuenta 4031', imp.essalud]);
+            det.push(['ONP (retención a trabajadores)', 'Cuenta 4032', imp.onp]);
+            det.push(['AFP (retención a trabajadores)', 'Cuenta 407', imp.afp]);
+            det.push(['Retenciones de Renta (4ta/5ta)', 'Cuenta 4017', imp.renta4ta5ta]);
+            det.push(['TOTAL DETERMINADO', '', imp.totalGeneral]);
+            const ctl = d.control.filter(c => c.r.det > 0.004 || c.r.pag > 0.004).map(c => [c.nombre, U.dma(c.r.vence), c.r.det, c.r.pag, c.r.pend, MypecarImpuestos.ETIQUETA_ESTADO[c.r.estado]]);
+            ctl.push(['TOTAL', '', d.totDet, d.totPag, d.totPend, '']);
+            const secciones = [
+                { titulo: 'Determinación del mes', cabeceras: ['Concepto', 'Base de cálculo', 'Monto'], filas: det, alinear: ['l', 'l', 'r'], totales: [det.length - 1] },
+                { titulo: 'Control de pago — determinado vs. cancelado', cabeceras: ['Tributo', 'Vence', 'Determinado', 'Cancelado', 'Saldo', 'Estado'], filas: ctl, alinear: ['l', 'c', 'r', 'r', 'r', 'c'], totales: [ctl.length - 1], vacio: 'No hay impuestos determinados en este período.' }
+            ];
+            const sa = [];
+            MypecarImpuestos.ORDEN.forEach(t => (modelo.sinAplicar[t] || []).forEach(x => sa.push([MypecarImpuestos.CORTO[t], U.dma(x.fecha), 'Asiento ' + x.numero, x.monto])));
+            if (sa.length) secciones.push({ titulo: 'Pagos registrados sin período al que asignarlos', cabeceras: ['Tributo', 'Fecha', 'Referencia', 'Monto'], filas: sa, alinear: ['l', 'c', 'l', 'r'], nota: 'Un pago solo cancela deudas de meses anteriores al mes en que se registró. Estos pagos corresponden a períodos que no están cargados en el sistema.' });
+            return {
+                titulo: 'Impuestos y obligaciones del mes', empresa, ruc: config.ruc,
+                subtitulo: `RUC: ${config.ruc || '-'}  |  Período: ${periodoTxt}  |  Régimen: ${REGIMEN_LABEL_IMP[imp.regimen]}  |  Vence PDT 621 y PLAME: ${venc.fecha ? U.fechaLarga(venc.fecha) : '—'}`,
+                secciones, archivo: 'Impuestos_' + U.nombreSeguro(empresa).slice(0, 25) + '_' + config.periodoActivo,
+                notas: ['El aporte AFP no sigue el cronograma SUNAT: vence a los 5 primeros días hábiles del mes siguiente (no se descuentan feriados). Verifica siempre con el cronograma oficial de SUNAT antes de declarar.'],
+                mensaje: `Te comparto los impuestos y obligaciones de ${empresa} (${periodoTxt}).\nDeterminado: ${U.mon(d.totDet)} · Cancelado: ${U.mon(d.totPag)} · Saldo por pagar: ${U.mon(d.totPend)}.\nEl detalle va en el PDF adjunto.`,
+                responsable: 'CARLOS FLORES FIGUEROA'
+            };
+        }
+        function impPdf() { const doc = documentoImpuestos(); if (!doc) return showToast('No se cargó el módulo de impuestos. Actualiza la página.', 'error'); MypecarImpuestos.pdf(doc); }
+        function impImprimir() { const doc = documentoImpuestos(); if (!doc) return window.print(); MypecarImpuestos.imprimir(doc); }
+        async function exportarImpuestosExcel() {
+            const doc = documentoImpuestos();
+            if (!doc) return exportarImpuestosExcelBasico();
+            await MypecarImpuestos.excel(doc);
+        }
+        function enviarImpuestosCompleto(canal) {
+            const doc = documentoImpuestos();
+            if (!doc) return enviarImpuestosBasico(canal);
+            const destino = canal === 'correo' ? document.getElementById('imp-envio-correo').value.trim() : document.getElementById('imp-envio-celular').value.trim();
+            MypecarImpuestos.enviar(canal, doc, { destino });
+        }
+
         function renderImpuestos() {
             const mov = getMovimientosPorCuenta();
             const er = calcularEstadoResultados(mov);
-            const imp = calcularImpuestosDelMes(mov, er);
+            const modelo = modeloImpuestos();
+            const imp = aplicarMotorImpuestos(calcularImpuestosDelMes(mov, er), modelo);
             const venc = obtenerFechaVencimiento(config.periodoActivo);
 
             document.getElementById('imp-titulo').innerText = (config.nombreComercial || config.razonSocial || 'EMPRESA').toUpperCase();
@@ -3765,9 +3890,24 @@ const MypecarPEVista = (function () {
             }
 
             document.getElementById('imp-total-general').innerText = `S/ ${imp.totalGeneral.toFixed(2)}`;
+
+            // Control de pago: determinado vs. cancelado vs. saldo
+            const tbCtl = document.getElementById('imp-tabla-control');
+            if (modelo && tbCtl) {
+                const U = MypecarImpuestos.util, d = modelo.periodo(config.periodoActivo);
+                const filas = d.control.filter(c => c.r.det > 0.004 || c.r.pag > 0.004);
+                tbCtl.innerHTML = filas.length ? filas.map(c => `<tr><td class="py-2 text-slate-700">${c.nombre}</td><td class="py-2 text-slate-500">${U.dma(c.r.vence)}</td><td class="py-2 text-right font-mono">S/ ${c.r.det.toFixed(2)}</td><td class="py-2 text-right font-mono text-emerald-700">S/ ${c.r.pag.toFixed(2)}</td><td class="py-2 text-right font-mono font-semibold ${c.r.pend > 0.005 ? 'text-rose-700' : ''}">S/ ${c.r.pend.toFixed(2)}</td><td class="py-2 text-center">${badgeEstadoImp(c.r.estado)}</td></tr>`).join('')
+                    + `<tr class="font-bold border-t-2 border-slate-200"><td class="py-2">TOTAL</td><td></td><td class="py-2 text-right font-mono">S/ ${d.totDet.toFixed(2)}</td><td class="py-2 text-right font-mono text-emerald-700">S/ ${d.totPag.toFixed(2)}</td><td class="py-2 text-right font-mono text-rose-700">S/ ${d.totPend.toFixed(2)}</td><td></td></tr>`
+                    : `<tr><td colspan="6" class="py-3 text-center text-slate-400">No hay impuestos determinados en este período.</td></tr>`;
+                document.getElementById('imp-kpi-det').innerText = `S/ ${d.totDet.toFixed(2)}`;
+                document.getElementById('imp-kpi-pag').innerText = `S/ ${d.totPag.toFixed(2)}`;
+                document.getElementById('imp-kpi-pend').innerText = `S/ ${d.totPend.toFixed(2)}`;
+                const nSin = MypecarImpuestos.ORDEN.reduce((s, t) => s + (modelo.sinAplicar[t] || []).length, 0);
+                document.getElementById('imp-nota-control').innerText = 'Cancelado = pagos registrados desde Caja/Bancos (Debe a la cuenta del tributo en un mes posterior). Cada pago cancela primero la deuda más antigua.' + (nSin ? ` Hay ${nSin} pago(s) sin período al que asignar: se detallan en el PDF.` : '');
+            }
         }
 
-        async function exportarImpuestosExcel() {
+        async function exportarImpuestosExcelBasico() {
             const mov = getMovimientosPorCuenta();
             const er = calcularEstadoResultados(mov);
             const imp = calcularImpuestosDelMes(mov, er);
@@ -3842,7 +3982,7 @@ const MypecarPEVista = (function () {
             showToast('Impuestos exportados a Excel — listo para enviar por correo.');
         }
 
-        function enviarImpuestosCompleto(canal) {
+        function enviarImpuestosBasico(canal) {
             const empresa = config.nombreComercial || config.razonSocial || 'la empresa';
             const periodoTexto = formatPeriodoLabel(config.periodoActivo);
             const asunto = `Impuestos y Obligaciones — ${periodoTexto} — ${empresa}`;
@@ -4297,6 +4437,7 @@ function mensajeCuentaNoImputable(codigo, origen) {
             asientos = periodsData[key].asientos;
             await storageSet('libro_diario_config', config);
             renderPeriodSelectors(); syncConfigUI(); renderAll(); updateChart();
+            refrescarPestanaActiva();
             showToast(`Periodo activo: ${formatPeriodoLabel(key)}.`);
         }
 
