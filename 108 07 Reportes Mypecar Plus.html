@@ -1734,6 +1734,12 @@ const MypecarPEVista = (function () {
             </div>
 
             <div class="max-w-5xl mx-auto bg-white p-5 rounded-2xl shadow-sm border border-slate-200 no-print">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 uppercase"><i class="fa-solid fa-hand-holding-dollar text-emerald-700"></i> Reporte de Cuentas por Cobrar (12)</h3>
+                <p class="text-xs text-slate-500 mt-1">Saldo pendiente de cobro por cliente y por fecha de vencimiento.</p>
+                <p class="text-xs font-mono text-slate-600 mt-1" id="cxc-titulo-pantalla-sub"></p>
+            </div>
+
+            <div class="max-w-5xl mx-auto bg-white p-5 rounded-2xl shadow-sm border border-slate-200 no-print">
                 <div class="flex flex-wrap items-end justify-between gap-3">
                     <div>
                         <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Ver saldo pendiente al cierre de</label>
@@ -1901,6 +1907,12 @@ const MypecarPEVista = (function () {
                     <h2 class="text-lg font-bold text-slate-900 uppercase">REPORTE DE CUENTAS POR PAGAR (42)</h2>
                     <p class="text-xs font-mono mt-1" id="cxp-print-subtitulo"></p>
                 </div>
+            </div>
+
+            <div class="max-w-5xl mx-auto bg-white p-5 rounded-2xl shadow-sm border border-slate-200 no-print">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 uppercase"><i class="fa-solid fa-file-invoice-dollar text-rose-700"></i> Reporte de Cuentas por Pagar (42)</h3>
+                <p class="text-xs text-slate-500 mt-1">Saldo pendiente de pago por proveedor y por fecha de vencimiento.</p>
+                <p class="text-xs font-mono text-slate-600 mt-1" id="cxp-titulo-pantalla-sub"></p>
             </div>
 
             <div class="max-w-5xl mx-auto bg-white p-5 rounded-2xl shadow-sm border border-slate-200 no-print">
@@ -10953,6 +10965,7 @@ function renderAnalisisCuenta() {
             document.getElementById(tipo + (esCxC ? '-kpi-clientes' : '-kpi-proveedores')).innerText = r.lista.length;
             document.getElementById(tipo + '-kpi-vencidas').innerText = r.totalFacturasVencidas;
             document.getElementById(tipo + '-print-subtitulo').innerText = `${empresaHeader()} — Al cierre de ${formatPeriodoLabel(periodoHasta)}`;
+            { const subPant = document.getElementById(tipo + '-titulo-pantalla-sub'); if (subPant) subPant.innerText = `${empresaHeader()} — Al cierre de ${formatPeriodoLabel(periodoHasta)}`; }
             document.getElementById(tipo + '-tramos').innerHTML = renderTramosHtmlV(r, esCxC);
             document.getElementById(tipo + '-conciliacion').innerHTML = esCxC
                 ? renderConciliacionHtmlV('Total por cobrar según comprobantes', r.totalGeneral, ['12'], periodoHasta, false, 'cobros registrados fuera de 01 Ventas')
