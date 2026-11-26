@@ -3817,19 +3817,19 @@ ${RGD_CSS}
             const P = M.pagos, ef = M.efectivo;
             await descargarHojaUnica(modo === 'detalle' ? 'Gerencial detallado' : 'Gerencial del día', `Reporte_Gerencial_${modo === 'detalle' ? 'Detallado_' : ''}${M.hoy}.xlsx`, ws => {
                 const N = 6; let r = 1;
-                ws.columns = [{ width: 46 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }];
+                ws.columns = [{ width: 40 }, { width: 14 }, { width: 17 }, { width: 17 }, { width: 15 }, { width: 14 }];
                 estiloTituloHoja(ws, `${empresaHeader()}  |  REPORTE GERENCIAL ${modo === 'detalle' ? 'DETALLADO' : 'DEL DÍA'}`, N);
                 estiloSubtitulo(ws, 2, `Información al cierre de ayer, ${rgdFechaLarga(M.ayer)}. Emitido el ${rgdDMA(M.hoy)}${M.hora ? ' a las ' + M.hora + ' h' : ''}. Preparado por ${M.cfg.preparado || 'CARLOS FLORES FIGUEROA'}.`, N);
                 r = 4;
                 const bloque = (titulo, cab, filas, totales) => {
                     ws.mergeCells(r, 1, r, N); const t = ws.getCell(r, 1); t.value = titulo; t.font = { bold: true, size: 10 }; t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; r++;
                     cab.forEach((c, i) => { ws.getCell(r, i + 1).value = c; }); estiloEncabezadoTabla(ws, r, cab.length); r++;
-                    filas.forEach(f => { f.forEach((v, i) => { const c = ws.getCell(r, i + 1); c.value = v; if (typeof v === 'number') fmtMoneda(c); }); r++; });
+                    filas.forEach(f => { f.forEach((v, i) => { const c = ws.getCell(r, i + 1); if (v && typeof v === 'object') { c.value = v.pct; c.numFmt = '0.0%'; } else { c.value = v; if (typeof v === 'number') fmtMoneda(c); } }); r++; });
                     if (totales) { totales.forEach((v, i) => { const c = ws.getCell(r, i + 1); c.value = v; if (typeof v === 'number') fmtMoneda(c); }); estiloFilaTotal(ws, r, totales.length); r++; }
                     r++;
                 };
                 if (ef) bloque('Caja y bancos al cierre de ayer', ['Cuenta', 'Saldo', 'Ingresó ayer', 'Salió ayer'], ef.disp.map(o => [`${o.cuenta} ${o.nombre}`, o.saldo, o.ing, o.egr]), ['Total disponible', ef.total, ef.ing, ef.egr]);
-                const vf = (n, x) => x ? [n, x.ayer.m, x.mes.m, x.prev.m, rgdVar(x.mes.m, x.prev.m) === null ? '' : rgdVar(x.mes.m, x.prev.m) / 100] : [n, '', '', '', ''];
+                const vf = (n, x) => x ? [n, x.ayer.m, x.mes.m, x.prev.m, rgdVar(x.mes.m, x.prev.m) === null ? '' : { pct: rgdVar(x.mes.m, x.prev.m) / 100 }] : [n, '', '', '', ''];
                 bloque(`Ventas y compras (${M.cfg.base === 'conigv' ? 'con IGV' : 'sin IGV'})`, ['Concepto', `Ayer ${rgdDM(M.ayer)}`, 'Acumulado mes', `Mes anterior al ${rgdDM(M.finPrev)}`, 'Variación'], [vf('Ventas', M.ventas), vf('Compras', M.compras)]);
                 const filasP = P.pagar.map(x => [x.etiqueta, x.venc, x.hoy, x.prox, x.venc + x.hoy + x.prox, x.desp]);
                 if (P.cobrar) filasP.push([P.cobrar.etiqueta + ' (por cobrar)', P.cobrar.venc, P.cobrar.hoy, P.cobrar.prox, P.cobrar.venc + P.cobrar.hoy + P.cobrar.prox, P.cobrar.desp]);
@@ -3848,8 +3848,16 @@ ${RGD_CSS}
                     ter('Cuentas por pagar a proveedores', P.porProv); if (M.cfg.incluirCobros) ter('Cuentas por cobrar a clientes', P.porCli);
                     if (P.cuotas.length) bloque('Cuotas de préstamos pendientes', ['Acreedor', 'Cuota', 'Vence', 'Monto'], P.cuotas.map(q => [q.acreedor, String(q.numero || ''), rgdDMA(q.fecha), q.monto]));
                 }
-                if (M.avisos.length) bloque('Avisos', ['Aviso'], M.avisos.map(a => [a]));
+                if (M.avisos.length) {
+                    // Los avisos son frases largas: se combinan las 6 columnas y se ajusta el texto, para que no se corten al imprimir.
+                    ws.mergeCells(r, 1, r, N); const t = ws.getCell(r, 1); t.value = 'Avisos'; t.font = { bold: true, size: 10 }; t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; r++;
+                    M.avisos.forEach(av => { ws.mergeCells(r, 1, r, N); const c = ws.getCell(r, 1); c.value = '⚠ ' + av; c.alignment = { wrapText: true, vertical: 'top' }; c.font = { size: 9 }; ws.getRow(r).height = av.length > 110 ? 26 : 14; r++; });
+                    r++;
+                }
                 bloque('Último registro de cada fuente', ['Fuente', 'Último movimiento', 'Registrado', 'Archivo generado'], M.fuentes.map(f => [f.nombre, f.ultMov ? rgdDMA(f.ultMov) : '', rgdTS(f.ultReg), rgdTS(f.exportado)]));
+                // Impresión: A4 vertical, todo el ancho en una hoja (la versión de una hoja también cabe en alto) y márgenes mínimos.
+                ws.pageSetup = { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: modo === 'detalle' ? 0 : 1, horizontalCentered: true,
+                    margins: { left: 0.2, right: 0.2, top: 0.3, bottom: 0.3, header: 0.1, footer: 0.1 } };
             });
         }
 
