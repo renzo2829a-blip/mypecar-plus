@@ -54,9 +54,6 @@
         body.imprimiendo-rg * { visibility: hidden; }
         body.imprimiendo-rg #rg-imprimible, body.imprimiendo-rg #rg-imprimible * { visibility: visible; }
         body.imprimiendo-rg #rg-imprimible { position: absolute; left: 0; top: 0; width: 100%; }
-        body.imprimiendo-rgd * { visibility: hidden; }
-        body.imprimiendo-rgd #rgd-imprimible, body.imprimiendo-rgd #rgd-imprimible * { visibility: visible; }
-        body.imprimiendo-rgd #rgd-imprimible { position: absolute; left: 0; top: 0; width: 100%; }
         body.imprimiendo-dj * { visibility: hidden; }
         body.imprimiendo-dj #dj-imprimible, body.imprimiendo-dj #dj-imprimible * { visibility: visible; }
         body.imprimiendo-dj #dj-imprimible { position: absolute; left: 0; top: 0; width: 100%; }
@@ -653,7 +650,7 @@ const MypecarPEVista = (function () {
                     <i class="fa-solid fa-landmark"></i> Impuestos
                 </button>
                 <button id="btn-tab-resumendia" onclick="switchTab('resumendia')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all whitespace-nowrap">
-                    <i class="fa-solid fa-bolt"></i> Resumen del Día
+                    <i class="fa-solid fa-bolt"></i> Reporte Gerencial del Día
                 </button>
                 <button id="btn-tab-dashventas" onclick="switchTab('dashventas')" class="tab-btn px-4 py-1.5 text-sm font-semibold rounded-lg flex items-center gap-2 text-white hover:bg-white hover:bg-opacity-10 transition-all whitespace-nowrap">
                     <i class="fa-solid fa-chart-line"></i> Dashboard Ventas
@@ -1947,59 +1944,58 @@ const MypecarPEVista = (function () {
         </section>
 
         <!-- ================= PESTAÑA: REPORTE GENERAL ACUMULATIVO ================= -->
-        <!-- ================= PESTAÑA: RESUMEN GERENCIAL DEL DÍA ================= -->
-        <section id="tab-resumendia" class="tab-content hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 mb-1"><i class="fa-solid fa-bolt text-amber-500"></i> Resumen Gerencial del Día</h3>
-                <p class="text-xs text-slate-500">Un mensaje corto y claro, listo para enviar al Gerente o al Contador — sin esperar al cierre del mes.</p>
-                <div id="rgd-frescura" class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]"></div>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <button type="button" onclick="toggleSelectorResumenDia()" class="w-full flex items-center justify-between p-4 text-left hover:bg-slate-50 transition-all">
-                    <span class="font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-list-check text-violet-600"></i> Elegir qué incluir en el resumen</span>
-                    <i id="rgd-chevron" class="fa-solid fa-chevron-down text-slate-400 transition-transform"></i>
-                </button>
-                <div id="rgd-selector-body" class="hidden border-t border-slate-200 p-4 space-y-2">
-                    <label class="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-slate-50"><input type="checkbox" id="rgd-chk-ventas-hoy" checked onchange="renderResumenDia()"> Ventas de hoy</label>
-                    <label class="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-slate-50"><input type="checkbox" id="rgd-chk-ventas-mes" checked onchange="renderResumenDia()"> Ventas acumuladas del mes</label>
-                    <label class="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-slate-50"><input type="checkbox" id="rgd-chk-compras-hoy" onchange="renderResumenDia()"> Compras de hoy</label>
-                    <label class="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-slate-50"><input type="checkbox" id="rgd-chk-compras-mes" onchange="renderResumenDia()"> Compras acumuladas del mes</label>
-                    <label class="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-slate-50"><input type="checkbox" id="rgd-chk-saldo-bancos" checked onchange="renderResumenDia()"> Saldo en Caja y Bancos</label>
-                    <label class="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-slate-50"><input type="checkbox" id="rgd-chk-cxc" checked onchange="renderResumenDia()"> Cuentas por Cobrar pendientes</label>
-                    <label class="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-slate-50"><input type="checkbox" id="rgd-chk-cxp" checked onchange="renderResumenDia()"> Cuentas por Pagar pendientes</label>
-                    <label class="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-slate-50"><input type="checkbox" id="rgd-chk-detracciones" onchange="renderResumenDia()"> Detracciones pendientes de depositar</label>
+        <!-- ================= PESTAÑA: REPORTE GERENCIAL DEL DÍA (rediseño 2026-11-25) ================= -->
+        <section id="tab-resumendia" class="tab-content hidden space-y-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2 mb-1"><i class="fa-solid fa-bolt text-amber-500"></i> Reporte Gerencial del Día</h3>
+                <p class="text-xs text-slate-500 mb-4">Se emite a primera hora con la información al cierre de ayer: saldos de caja y bancos, ventas y compras del día anterior y del mes, y los pagos que vencen. Cabe en una hoja A4 vertical. El detallado va aparte.</p>
+                <div class="flex flex-wrap items-end gap-3 mb-3">
+                    <label class="text-xs font-semibold text-slate-600">Fecha de emisión
+                        <input type="date" id="rgd-fecha" onchange="renderResumenDia()" class="block mt-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm">
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Ventas y compras
+                        <select id="rgd-base" onchange="renderResumenDia()" class="block mt-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm">
+                            <option value="sinigv">Sin IGV</option>
+                            <option value="conigv">Con IGV</option>
+                        </select>
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Pagos de los próximos (días)
+                        <input type="number" min="1" max="31" id="rgd-dias" onchange="renderResumenDia()" class="block mt-1 w-24 bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm">
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600">Día de pago de sueldos
+                        <input type="number" min="1" max="31" id="rgd-dia-sueldos" onchange="renderResumenDia()" class="block mt-1 w-24 bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm">
+                    </label>
+                    <label class="text-xs font-semibold text-slate-600 flex-1 min-w-[200px]">Preparado por
+                        <input type="text" id="rgd-preparado" onchange="renderResumenDia()" class="block mt-1 w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm">
+                    </label>
                 </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h4 class="font-bold text-slate-800 mb-3">Vista previa</h4>
-                <pre id="rgd-preview" class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs whitespace-pre-wrap font-sans text-slate-700 leading-relaxed"></pre>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <div class="flex flex-wrap items-center gap-2 mb-3">
-                    <button onclick="copiarResumenDia()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-copy"></i> Copiar Texto</button>
-                    <button onclick="imprimirResumenDia()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-print"></i> Imprimir / PDF</button>
-                    <button onclick="exportarResumenDiaExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-file-excel"></i> Exportar a Excel</button>
+                <div class="flex flex-wrap gap-x-5 gap-y-1 text-sm mb-4">
+                    <label class="flex items-center gap-2"><input type="checkbox" id="rgd-chk-inv" onchange="renderResumenDia()"> Incluir inventarios (saldos en soles)</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" id="rgd-chk-cob" onchange="renderResumenDia()"> Incluir lo que hay por cobrar</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" id="rgd-chk-buen" onchange="renderResumenDia()"> Buen contribuyente (fechas SUNAT)</label>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <input type="email" id="rgd-envio-correo" placeholder="Correo del Gerente o Contador" class="flex-1 min-w-[180px] bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
-                    <button onclick="enviarResumenDia('correo')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-envelope"></i> Enviar por Correo</button>
-                    <input type="text" id="rgd-envio-celular" placeholder="Celular (WhatsApp)" class="flex-1 min-w-[180px] bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
-                    <button onclick="enviarResumenDia('whatsapp')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5"><i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp</button>
+                    <button id="rgd-vista-hoja" onclick="rgdCambiarVista('hoja')" class="px-4 py-2 rounded-lg text-xs font-bold border bg-slate-900 text-white border-slate-900"><i class="fa-solid fa-file"></i> Una hoja</button>
+                    <button id="rgd-vista-detalle" onclick="rgdCambiarVista('detalle')" class="px-4 py-2 rounded-lg text-xs font-bold border bg-white text-slate-600 border-slate-200"><i class="fa-solid fa-list"></i> Detallado</button>
+                    <span class="flex-1"></span>
+                    <button onclick="rgdImprimir(rgdVista)" class="px-4 py-2 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700"><i class="fa-solid fa-print"></i> Imprimir / PDF</button>
+                    <button onclick="rgdExcel(rgdVista)" class="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                    <button onclick="rgdCopiar()" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-700 text-white hover:bg-slate-800"><i class="fa-solid fa-copy"></i> Copiar texto</button>
                 </div>
             </div>
 
-            <!-- Versión limpia para impresión/PDF — oculta en pantalla, solo aparece al imprimir -->
-            <div id="rgd-imprimible" class="hidden bg-white p-8">
-                <div class="text-center mb-6 pb-4 border-b-2 border-slate-800">
-                    <h2 class="font-black text-2xl text-slate-900">RESUMEN GERENCIAL DEL DÍA</h2>
-                    <p class="text-sm text-slate-600 mt-1" id="rgd-imp-empresa"></p>
-                    <p class="text-xs text-slate-400" id="rgd-imp-fecha"></p>
+            <div class="bg-slate-200 p-3 sm:p-6 rounded-2xl overflow-auto">
+                <div id="rgd-preview" class="bg-white shadow-md mx-auto p-4" style="max-width:215mm"></div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 class="font-bold text-slate-700 text-sm mb-2">Enviar el texto resumido</h4>
+                <div class="flex flex-wrap gap-2">
+                    <input type="email" id="rgd-envio-correo" placeholder="Correo del Gerente o Contador" class="flex-1 min-w-[180px] bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                    <button onclick="rgdEnviar('correo')" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-700 text-white hover:bg-slate-800"><i class="fa-solid fa-envelope"></i> Correo</button>
+                    <input type="text" id="rgd-envio-celular" placeholder="Celular (WhatsApp)" class="flex-1 min-w-[180px] bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
+                    <button onclick="rgdEnviar('whatsapp')" class="px-4 py-2 rounded-lg text-xs font-bold bg-green-600 text-white hover:bg-green-700"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
                 </div>
-                <div id="rgd-imp-filas" class="space-y-3"></div>
-                <p class="text-[10px] text-slate-400 mt-8 text-center">Generado con MYPECAR CONTABLE</p>
             </div>
         </section>
 
@@ -3136,178 +3132,792 @@ const MypecarPEVista = (function () {
         }
 
         // ==================================================================
-        // RESUMEN GERENCIAL DEL DÍA — mensaje corto, listo para enviar, armado
-        // con lo que ya se importó de 01/02/04. No espera al cierre de mes: usa
-        // lo más reciente disponible, y siempre avisa cuándo se actualizó cada
-        // fuente, para que nadie confunda un dato del día con uno de hace tiempo.
+        // REPORTE GERENCIAL DEL DÍA — rediseño 2026-11-25
+        // Una sola hoja A4 vertical para el Gerente, con la información al cierre
+        // del DÍA ANTERIOR (se emite a primera hora). Muestra fecha y hora de
+        // emisión y, por cada fuente, cuándo fue su último registro.
+        // Un solo modelo (rgdConstruirModelo) alimenta la pantalla, la impresión,
+        // el texto para WhatsApp/correo y el Excel: los cuatro dicen lo mismo.
+        // La versión detallada (por cobrar, por pagar, impuestos, planillas...)
+        // es otro reporte, en la misma pestaña.
+        // La impresión ya no usa la página de la app: arma un documento aparte
+        // (iframe) con su propio estilo, así no depende de nada de la pantalla.
         // ==================================================================
-        function toggleSelectorResumenDia() {
-            const body = document.getElementById('rgd-selector-body');
-            const chevron = document.getElementById('rgd-chevron');
-            body.classList.toggle('hidden');
-            chevron.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+
+        // Cronograma mensual SUNAT 2026 (último dígito del RUC): [0, 1, 2-3, 4-5, 6-7, 8-9, Buenos Contribuyentes].
+        // Clave = período tributario; la fecha es el vencimiento (mes siguiente). Fuente: SUNAT, Anexo I de la
+        // R.S. 281-2022/SUNAT. Si el domicilio fiscal tiene prórroga, se corrige a mano en el reporte.
+        const RGD_SUNAT = {
+            '2026-01': ['2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-23', '2026-02-24'],
+            '2026-02': ['2026-03-16', '2026-03-17', '2026-03-18', '2026-03-19', '2026-03-20', '2026-03-23', '2026-03-24'],
+            '2026-03': ['2026-04-17', '2026-04-20', '2026-04-21', '2026-04-22', '2026-04-23', '2026-04-24', '2026-04-27'],
+            '2026-04': ['2026-05-18', '2026-05-19', '2026-05-20', '2026-05-21', '2026-05-22', '2026-05-25', '2026-05-26'],
+            '2026-05': ['2026-06-15', '2026-06-16', '2026-06-17', '2026-06-18', '2026-06-19', '2026-06-22', '2026-06-23'],
+            '2026-06': ['2026-07-15', '2026-07-16', '2026-07-17', '2026-07-20', '2026-07-21', '2026-07-22', '2026-07-24'],
+            '2026-07': ['2026-08-18', '2026-08-19', '2026-08-20', '2026-08-21', '2026-08-24', '2026-08-25', '2026-08-26'],
+            '2026-08': ['2026-09-15', '2026-09-16', '2026-09-17', '2026-09-18', '2026-09-21', '2026-09-22', '2026-09-23'],
+            '2026-09': ['2026-10-16', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-26'],
+            '2026-10': ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-23', '2026-11-24'],
+            '2026-11': ['2026-12-17', '2026-12-18', '2026-12-21', '2026-12-22', '2026-12-23', '2026-12-24', '2026-12-28'],
+            '2026-12': ['2027-01-18', '2027-01-19', '2027-01-20', '2027-01-21', '2027-01-22', '2027-01-25', '2027-01-26']
+        };
+
+        // Obligaciones que se calculan desde el Libro Diario (cuentas 40 y 41).
+        // "esPasivo" separa lo que se paga (débito a la deuda) del crédito fiscal (40112), que no es un pago.
+        const RGD_OBLIGACIONES = [
+            { clave: 'igv', etiqueta: 'IGV por pagar', coincide: c => c.startsWith('4011'), esPasivo: c => !c.startsWith('40112'), venc: 'sunat' },
+            { clave: 'renta', etiqueta: 'Impuesto a la renta (pago a cuenta y retenciones)', coincide: c => c.startsWith('401') && !c.startsWith('4011'), esPasivo: () => true, venc: 'sunat' },
+            { clave: 'planilla', etiqueta: 'EsSalud, ONP y AFP', coincide: c => c.startsWith('403') || c.startsWith('407'), esPasivo: () => true, venc: 'sunat' },
+            { clave: 'sueldos', etiqueta: 'Remuneraciones por pagar', coincide: c => c.startsWith('411') || c.startsWith('419'), esPasivo: () => true, venc: 'sueldos' }
+        ];
+
+        // ---------- Fechas y formatos (siempre hora local, nunca UTC) ----------
+        function rgdEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function rgdISO(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+        function rgdFecha(iso) { const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1); }
+        function rgdMasDias(iso, n) { const d = rgdFecha(iso); d.setDate(d.getDate() + n); return rgdISO(d); }
+        function rgdPeriodo(iso) { return String(iso).slice(0, 7); }
+        function rgdPeriodoMas(p, n) { const [y, m] = p.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+        function rgdUltimoDia(p) { const [y, m] = p.split('-').map(Number); return new Date(y, m, 0).getDate(); }
+        function rgdDMA(iso) { if (!iso) return '—'; const [y, m, d] = String(iso).slice(0, 10).split('-'); return d ? `${d}/${m}/${y}` : String(iso); }
+        function rgdDM(iso) { if (!iso) return '—'; const [, m, d] = String(iso).slice(0, 10).split('-'); return d ? `${d}/${m}` : String(iso); }
+        function rgdFechaLarga(iso) { return rgdFecha(iso).toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
+        function rgdHora(d) { return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
+        function rgdTS(ts) { if (!ts) return ''; const d = new Date(ts); return isNaN(d) ? '' : `${rgdDMA(rgdISO(d))} ${rgdHora(d)}`; }
+        function rgdNum(n) {
+            let v = Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
+            if (Math.abs(v) < 0.005) v = 0;
+            return v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        function rgdMon(n) { const v = Number(n) || 0; return (v < -0.004 ? '-' : '') + 'S/ ' + rgdNum(Math.abs(v)); }
+        function rgdCel(n) { return Math.abs(Number(n) || 0) < 0.005 ? '—' : rgdNum(n); }
+        function rgdVar(act, prev) {
+            if (!(Math.abs(prev) > 0.005)) return null;
+            return ((act - prev) / Math.abs(prev)) * 100;
+        }
+        function rgdVarTxt(v) { return v === null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`; }
+        function rgdPlural(n, s, p) { return `${n} ${n === 1 ? s : p}`; }
+
+        // ---------- Configuración propia del reporte (se guarda en el navegador) ----------
+        function rgdCfg() {
+            const c = appConfig.rgd = appConfig.rgd || {};
+            c.base = c.base === 'conigv' ? 'conigv' : 'sinigv';
+            if (!(c.dias >= 1 && c.dias <= 31)) c.dias = 7;
+            if (!(c.diaSueldos >= 1 && c.diaSueldos <= 31)) c.diaSueldos = 5;
+            if (c.incluirInventario === undefined) c.incluirInventario = false;
+            if (c.incluirCobros === undefined) c.incluirCobros = true;
+            if (c.buenContribuyente === undefined) c.buenContribuyente = false;
+            if (c.preparado === undefined) c.preparado = 'CARLOS FLORES FIGUEROA';
+            if (!c.vencSunat) c.vencSunat = {};
+            return c;
+        }
+        function rgdGuardar() { try { localStorage.setItem('reportes_app_config', JSON.stringify(appConfig)); } catch (e) { /* almacenamiento no disponible */ } }
+
+        // ---------- Vencimientos de impuestos y planillas ----------
+        function rgdVencSunat(periodo, M) {
+            if (M.cfg.vencSunat && M.cfg.vencSunat[periodo]) return { fecha: M.cfg.vencSunat[periodo], fuente: 'manual' };
+            const fila = RGD_SUNAT[periodo];
+            const dig = parseInt(String(M.emp.ruc || '').slice(-1), 10);
+            if (fila && !isNaN(dig)) {
+                const idx = M.cfg.buenContribuyente ? 6 : (dig === 0 ? 0 : dig === 1 ? 1 : dig <= 3 ? 2 : dig <= 5 ? 3 : dig <= 7 ? 4 : 5);
+                return { fecha: fila[idx], fuente: 'SUNAT' };
+            }
+            return { fecha: rgdPeriodoMas(periodo, 1) + '-18', fuente: 'estimado' };
+        }
+        function rgdVencSueldos(periodo, M) {
+            const sig = rgdPeriodoMas(periodo, 1);
+            return { fecha: `${sig}-${String(Math.min(M.cfg.diaSueldos, rgdUltimoDia(sig))).padStart(2, '0')}`, fuente: 'configurado' };
         }
 
-        function obtenerFechaHoyISO() {
-            return hoyPeru();
+        // Pendiente de pago por período, desde el Libro Diario: cada mes genera una deuda (con arrastre del
+        // crédito fiscal cuando el mes sale a favor) y los pagos hechos desde caja o bancos cancelan primero
+        // lo más antiguo. Solo usa asientos hasta el cierre de ayer.
+        function rgdObligaciones(M) {
+            if (!diarioImport) return null;
+            return RGD_OBLIGACIONES.map(g => {
+                const porMes = {}; let pagos = 0, saldo = 0;
+                Object.keys(diarioImport.periodsData || {}).sort().forEach(k => (diarioImport.periodsData[k].asientos || []).forEach(a => {
+                    const f = String(a.fecha || (k + '-01')).slice(0, 10);
+                    if (f > M.ayer) return;
+                    const lineas = a.lineas || [];
+                    const propias = lineas.filter(l => g.coincide(String(l.cuenta || '')));
+                    if (!propias.length) return;
+                    const salePlata = lineas.some(l => /^10/.test(String(l.cuenta || '')) && (l.haber || 0) > 0.004);
+                    let devengo = 0;
+                    propias.forEach(l => {
+                        const d = l.debe || 0, h = l.haber || 0;
+                        saldo += h - d;
+                        if (salePlata && g.esPasivo(String(l.cuenta || '')) && d > h) pagos += d - h;
+                        else devengo += h - d;
+                    });
+                    const m = f.slice(0, 7);
+                    porMes[m] = (porMes[m] || 0) + devengo;
+                }));
+                let carry = 0; const deuda = [];
+                Object.keys(porMes).sort().forEach(m => {
+                    const n = porMes[m] - carry;
+                    if (n > 0.004) { deuda.push({ periodo: m, monto: n }); carry = 0; } else { carry = -n; }
+                });
+                let resto = pagos;
+                deuda.forEach(d => { const p = Math.min(d.monto, resto); d.pend = d.monto - p; resto -= p; });
+                const pend = deuda.filter(d => d.pend > 0.005).map(d => {
+                    const v = g.venc === 'sunat' ? rgdVencSunat(d.periodo, M) : rgdVencSueldos(d.periodo, M);
+                    return { periodo: d.periodo, monto: d.pend, fecha: v.fecha, fuente: v.fuente };
+                });
+                return { clave: g.clave, etiqueta: g.etiqueta, saldo, pend };
+            });
         }
 
-        function formatFechaHoraCorta(iso) {
-            if (!iso) return null;
-            const d = new Date(iso);
-            const hoy = obtenerFechaHoyISO();
-            const esHoy = iso.split('T')[0] === hoy;
-            const hora = d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
-            if (esHoy) return `hoy ${hora}`;
-            const dias = Math.floor((new Date() - d) / (1000 * 60 * 60 * 24));
-            if (dias === 1) return `ayer ${hora}`;
-            if (dias < 7) return `hace ${dias} días`;
-            return d.toLocaleDateString('es-PE');
+        // ---------- Ventas y compras ----------
+        function rgdMonto(r, base) {
+            const s = String(r.tipoDoc) === '07' ? -1 : 1;
+            const total = Number(r.total) || 0, igv = Number(r.igv) || 0;
+            return (base === 'conigv' ? total : total - igv) * s;
+        }
+        function rgdComprobantes(origen, clave, M, tipo) {
+            if (!origen) return null;
+            const r = { ayer: { m: 0, n: 0 }, mes: { m: 0, n: 0 }, prev: { m: 0, n: 0 }, ultEmision: '', ultReg: '', lista: [] };
+            Object.keys(origen.periodsData || {}).forEach(p => (origen.periodsData[p][clave] || []).forEach(x => {
+                const f = String(x.fechaEmision || '').slice(0, 10);
+                if (!f || f > M.ayer) return;
+                const m = rgdMonto(x, M.cfg.base);
+                if (f === M.ayer) {
+                    r.ayer.m += m; r.ayer.n++;
+                    r.lista.push({ doc: `${x.serie || ''}-${x.numero || ''}`, tipoDoc: x.tipoDoc, tercero: (tipo === 'v' ? x.clienteRazonSocial : x.proveedorRazonSocial) || '', concepto: x.concepto || '', monto: m });
+                }
+                if (f >= M.ini) { r.mes.m += m; r.mes.n++; }
+                if (f >= M.iniPrev && f <= M.finPrev) { r.prev.m += m; r.prev.n++; }
+                if (f > r.ultEmision) r.ultEmision = f;
+                if (x.fechaRegistro && x.fechaRegistro > r.ultReg) r.ultReg = x.fechaRegistro;
+            }));
+            r.lista.sort((a, b) => Math.abs(b.monto) - Math.abs(a.monto));
+            r.exportado = origen.generadoEl || '';
+            return r;
         }
 
-        function renderRGDFrescura() {
-            const cont = document.getElementById('rgd-frescura');
+        // ---------- Caja y bancos (desde el Libro Diario, cuentas 10) ----------
+        function rgdEfectivo(M) {
+            if (!diarioImport) return null;
+            const cta = {}; const movs = [];
+            let ultFecha = '', ultReg = '';
+            Object.keys(diarioImport.periodsData || {}).sort().forEach(k => (diarioImport.periodsData[k].asientos || []).forEach(a => {
+                const f = String(a.fecha || (k + '-01')).slice(0, 10);
+                if (f > M.ayer) return;
+                if (f > ultFecha) ultFecha = f;
+                if (a.fechaRegistro && a.fechaRegistro > ultReg) ultReg = a.fechaRegistro;
+                (a.lineas || []).forEach(l => {
+                    const c = String(l.cuenta || '');
+                    if (!/^10/.test(c)) return;
+                    const o = cta[c] || (cta[c] = { cuenta: c, saldo: 0, ing: 0, egr: 0 });
+                    o.saldo += (l.debe || 0) - (l.haber || 0);
+                    if (f === M.ayer) {
+                        o.ing += l.debe || 0; o.egr += l.haber || 0;
+                        movs.push({ numero: a.numero, glosa: a.glosa || '', cuenta: c, ing: l.debe || 0, egr: l.haber || 0 });
+                    }
+                });
+            }));
+            const disp = [], restr = [];
+            Object.values(cta).filter(o => Math.abs(o.saldo) > 0.004 || Math.abs(o.ing) > 0.004 || Math.abs(o.egr) > 0.004)
+                .sort((a, b) => a.cuenta.localeCompare(b.cuenta)).forEach(o => {
+                    const nom = getAccountName(o.cuenta);
+                    o.nombre = nom && nom !== 'Cuenta No Catalogada' ? nom : `Cuenta ${o.cuenta}`;
+                    ((/^(101|102|103|104|105)/.test(o.cuenta) && !o.cuenta.startsWith('1042')) ? disp : restr).push(o);
+                });
+            const suma = (arr, k) => arr.reduce((s, o) => s + o[k], 0);
+            return { disp, restr, total: suma(disp, 'saldo'), ing: suma(disp, 'ing'), egr: suma(disp, 'egr'), totalRestr: suma(restr, 'saldo'), movs, ultFecha, ultReg, exportado: diarioImport.generadoEl || '' };
+        }
+
+        // ---------- Pagos y cobros por fecha de vencimiento ----------
+        function rgdPagos(M, efectivo) {
+            const fila = (clave, etiqueta) => ({ clave, etiqueta, venc: 0, hoy: 0, prox: 0, desp: 0, nVenc: 0, nHoy: 0, nProx: 0 });
+            const det = { hoy: [], venc: [], prox: [] };
+            const poner = (f, fecha, monto, desc) => {
+                if (!(Math.abs(monto) > 0.004)) return;
+                const fe = String(fecha || M.hoy).slice(0, 10);
+                let cual;
+                if (fe < M.hoy) { f.venc += monto; f.nVenc++; cual = 'venc'; }
+                else if (fe === M.hoy) { f.hoy += monto; f.nHoy++; cual = 'hoy'; }
+                else if (fe <= M.limite) { f.prox += monto; f.nProx++; cual = 'prox'; }
+                else { f.desp += monto; cual = null; }
+                if (cual && desc) det[cual].push({ ...desc, fecha: fe, monto, fila: f.etiqueta });
+            };
+            const aviso = (t) => M.avisos.push(t);
+            const pagar = [];
+            const porProv = [], porCli = [], cuotas = [];
+
+            const fProv = fila('prov', 'Proveedores (facturas por pagar)');
+            const fDet = fila('det', 'Detracciones por depositar');
+            try {
+                if (comprasImport) {
+                    const cxp = armarVencimientosTercerosV('cxp', M.mes);
+                    if (cxp) cxp.lista.forEach(g => {
+                        const loc = fila('x', g.nombre);
+                        g.facturas.forEach(fa => fa.items.forEach(q => {
+                            const dest = q.esDetraccion ? fDet : fProv;
+                            const d = { concepto: g.nombre, detalle: `${fa.serie || ''}-${fa.numero || ''}${q.esDetraccion ? ' (detracción)' : ''}` };
+                            poner(dest, q.fecha, q.pendiente, d);
+                            poner(loc, q.fecha, q.pendiente, null);
+                        }));
+                        porProv.push({ nombre: g.nombre, ruc: g.ruc, ...loc, total: loc.venc + loc.hoy + loc.prox + loc.desp });
+                    });
+                }
+            } catch (e) { console.error('Reporte del día: proveedores', e); aviso('No se pudieron calcular las cuentas por pagar a proveedores.'); }
+            if (comprasImport) { pagar.push(fProv); if (Math.abs(fDet.venc + fDet.hoy + fDet.prox + fDet.desp) > 0.004) pagar.push(fDet); }
+
+            const fPre = fila('pre', 'Préstamos y cuotas');
+            try {
+                if (cajaImport || diarioImport) {
+                    const pr = armarPrestamosV(M.mes);
+                    if (pr && pr.lista.length) {
+                        pr.lista.forEach(p => p.estado.cuotas.forEach(q => {
+                            if (q.pendiente > 0.005) {
+                                poner(fPre, q.fecha, q.pendiente, { concepto: p.acreedor || 'Préstamo', detalle: `Cuota ${q.numero || ''}` });
+                                cuotas.push({ acreedor: p.acreedor || 'Préstamo', numero: q.numero, fecha: q.fecha, monto: q.pendiente });
+                            }
+                        }));
+                        pagar.push(fPre);
+                    }
+                }
+            } catch (e) { console.error('Reporte del día: préstamos', e); aviso('No se pudieron calcular las cuotas de préstamos.'); }
+
+            let obligaciones = null;
+            try {
+                obligaciones = rgdObligaciones(M);
+                if (obligaciones) obligaciones.forEach(o => {
+                    const f = fila(o.clave, o.etiqueta);
+                    o.pend.forEach(p => poner(f, p.fecha, p.monto, { concepto: o.etiqueta, detalle: formatPeriodoLabel(p.periodo) }));
+                    o.fila = f;
+                    if (o.pend.length) pagar.push(f);
+                });
+            } catch (e) { console.error('Reporte del día: impuestos y planillas', e); aviso('No se pudieron calcular impuestos y planillas.'); }
+
+            const tot = fila('tot', 'Total a pagar');
+            ['venc', 'hoy', 'prox', 'desp', 'nVenc', 'nHoy', 'nProx'].forEach(k => { tot[k] = pagar.reduce((s, f) => s + f[k], 0); });
+            tot.total = tot.venc + tot.hoy + tot.prox + tot.desp;
+            pagar.forEach(f => { f.total = f.venc + f.hoy + f.prox + f.desp; });
+
+            let cobrar = null;
+            try {
+                if (M.cfg.incluirCobros && ventasImport) {
+                    const f = fila('cob', 'Clientes (facturas por cobrar)');
+                    const cxc = armarVencimientosTercerosV('cxc', M.mes);
+                    if (cxc) cxc.lista.forEach(g => {
+                        const loc = fila('x', g.nombre);
+                        g.facturas.forEach(fa => fa.items.forEach(q => {
+                            if (q.esDetraccion) return; // la detracción la deposita el cliente en el Banco de la Nación
+                            poner(f, q.fecha, q.pendiente, null);
+                            poner(loc, q.fecha, q.pendiente, null);
+                        }));
+                        porCli.push({ nombre: g.nombre, ruc: g.ruc, ...loc, total: loc.venc + loc.hoy + loc.prox + loc.desp });
+                    });
+                    f.total = f.venc + f.hoy + f.prox + f.desp;
+                    cobrar = f;
+                }
+            } catch (e) { console.error('Reporte del día: cobranzas', e); aviso('No se pudieron calcular las cuentas por cobrar.'); }
+
+            ['hoy', 'venc', 'prox'].forEach(k => det[k].sort((a, b) => Math.abs(b.monto) - Math.abs(a.monto)));
+            porProv.sort((a, b) => b.total - a.total); porCli.sort((a, b) => b.total - a.total);
+            cuotas.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+            const disp = efectivo ? efectivo.total : null;
+            const cobertura = disp === null ? null : disp - (tot.venc + tot.hoy + tot.prox);
+            return { pagar, tot, cobrar, det, porProv, porCli, cuotas, obligaciones, cobertura, ayudaHoy: tot.venc + tot.hoy };
+        }
+
+        // ---------- Inventarios (opcional) ----------
+        function rgdInventario(M) {
+            if (!M.cfg.incluirInventario) return null;
+            const inv = inventarioImport;
+            const exist = (diarioImport && diarioImport.existenciasPorPeriodo) || {};
+            const periodos = Object.keys(exist).filter(p => p <= M.mes).sort();
+            const up = periodos.length ? periodos[periodos.length - 1] : null;
+            if (!inv && !up) return { vacio: true };
+            const nombres = { '601': 'Mercaderías', '602': 'Materias primas', '603': 'Suministros', '604': 'Envases y embalajes' };
+            const vg = (inv && inv.valorPorGrupo) || {};
+            const grupos = Object.keys(nombres).map(c => ({ nombre: nombres[c], valor: Number(vg[c]) || 0 })).filter(g => Math.abs(g.valor) > 0.004);
+            if (Math.abs(Number(vg.sin_grupo) || 0) > 0.004) grupos.push({ nombre: 'Sin grupo contable', valor: Number(vg.sin_grupo) });
+            const porProd = {};
+            ((inv && inv.productos) || []).forEach(p => { porProd[p.productoNombre] = (porProd[p.productoNombre] || 0) + (Number(p.valor) || 0); });
+            const top = Object.entries(porProd).map(([nombre, valor]) => ({ nombre, valor })).sort((a, b) => b.valor - a.valor).slice(0, 8);
+            return {
+                kardex: inv ? { fechaCorte: inv.fechaCorte, valor: Number(inv.valorTotal) || 0, metodo: inv.metodoValorizacion === 'PEPS' ? 'PEPS' : 'Promedio ponderado', exportado: inv.generadoEl || '', bajoMinimo: (inv.alertasStockMinimo || []).length, grupos, top } : null,
+                contable: up ? { periodo: up, valor: Number(exist[up].saldoFinal) || 0 } : null
+            };
+        }
+
+        // ---------- Cuándo fue el último registro de cada fuente ----------
+        function rgdCaja03(M) {
+            if (!cajaImport) return null;
+            let ultFecha = '', ultReg = '';
+            Object.values(cajaImport.periodsData || {}).forEach(p => (p.movimientos || []).forEach(m => {
+                const f = String(m.fecha || '').slice(0, 10);
+                if (f && f <= M.ayer && f > ultFecha) ultFecha = f;
+                if (m.fechaRegistro && m.fechaRegistro > ultReg) ultReg = m.fechaRegistro;
+            }));
+            return { ultFecha, ultReg, exportado: cajaImport.generadoEl || '' };
+        }
+
+        // ---------- Modelo completo del reporte ----------
+        function rgdConstruirModelo() {
+            const cfg = rgdCfg();
+            const emp = obtenerConfigEmpresaImportada() || {};
+            const inp = document.getElementById('rgd-fecha');
+            const ahora = new Date();
+            const hoyReal = (typeof hoyPeru === 'function' ? hoyPeru() : rgdISO(ahora));
+            const hoy = (inp && /^\d{4}-\d{2}-\d{2}$/.test(inp.value)) ? inp.value : hoyReal;
+            const ayer = rgdMasDias(hoy, -1);
+            const mes = rgdPeriodo(ayer);
+            const mesPrev = rgdPeriodoMas(mes, -1);
+            const M = {
+                cfg, emp, hoy, hoyReal, ayer, mes, mesPrev,
+                ini: mes + '-01', iniPrev: mesPrev + '-01',
+                finPrev: `${mesPrev}-${String(Math.min(Number(ayer.slice(8, 10)), rgdUltimoDia(mesPrev))).padStart(2, '0')}`,
+                limite: rgdMasDias(hoy, cfg.dias),
+                hora: hoy === hoyReal ? rgdHora(ahora) : '',
+                emitidoTS: ahora.toISOString(),
+                avisos: [], fuentes: []
+            };
+            M.hayDatos = !!(diarioImport || ventasImport || comprasImport || cajaImport);
+            if (!M.hayDatos) return M;
+            M.ventas = rgdComprobantes(ventasImport, 'sales', M, 'v');
+            M.compras = rgdComprobantes(comprasImport, 'purchases', M, 'c');
+            M.efectivo = rgdEfectivo(M);
+            M.pagos = rgdPagos(M, M.efectivo);
+            M.inventario = rgdInventario(M);
+            M.caja03 = rgdCaja03(M);
+
+            // Fuentes y su último registro
+            const f = (nombre, ultMov, ultReg, exportado, nota) => M.fuentes.push({ nombre, ultMov, ultReg, exportado, nota: nota || '' });
+            f('Libro Diario (caja y bancos)', M.efectivo && M.efectivo.ultFecha, M.efectivo && M.efectivo.ultReg, M.efectivo && M.efectivo.exportado);
+            f('Registro de Ventas', M.ventas && M.ventas.ultEmision, M.ventas && M.ventas.ultReg, M.ventas && M.ventas.exportado);
+            f('Registro de Compras', M.compras && M.compras.ultEmision, M.compras && M.compras.ultReg, M.compras && M.compras.exportado);
+            if (M.caja03) f('Caja y Bancos (pagos y préstamos)', M.caja03.ultFecha, M.caja03.ultReg, M.caja03.exportado);
+            if (M.cfg.incluirInventario && inventarioImport) f('Inventarios (Kardex)', inventarioImport.fechaCorte, '', inventarioImport.generadoEl);
+
+            // Avisos: lo que el Gerente debe saber antes de confiar en las cifras
+            const dif = (a, b) => Math.round((rgdFecha(b) - rgdFecha(a)) / 86400000);
+            if (!diarioImport) M.avisos.push('No hay Libro Diario importado: faltan los saldos de caja y bancos, los impuestos y las planillas.');
+            else if (M.efectivo.ultFecha && dif(M.efectivo.ultFecha, M.ayer) >= 3) M.avisos.push(`Libro Diario: el último asiento es del ${rgdDMA(M.efectivo.ultFecha)}. Los saldos de bancos pueden estar desactualizados.`);
+            if (!ventasImport) M.avisos.push('No hay Registro de Ventas importado.');
+            else if (!M.ventas.ultEmision || dif(M.ventas.ultEmision, M.ayer) >= 1) M.avisos.push(`Ventas: el último comprobante registrado es del ${M.ventas.ultEmision ? rgdDMA(M.ventas.ultEmision) : '—'}; el reporte llega hasta el ${rgdDMA(M.ayer)}. Si hubo ventas después de esa fecha, falta importarlas.`);
+            if (!comprasImport) M.avisos.push('No hay Registro de Compras importado.');
+            else if (!M.compras.ultEmision || dif(M.compras.ultEmision, M.ayer) >= 3) M.avisos.push(`Compras: el último comprobante registrado es del ${M.compras.ultEmision ? rgdDMA(M.compras.ultEmision) : '—'}.`);
+            if (M.pagos.cobertura !== null && M.pagos.cobertura < -0.005) M.avisos.push(`El efectivo disponible no alcanza para los pagos vencidos, de hoy y de los próximos ${M.cfg.dias} días (faltan ${rgdMon(-M.pagos.cobertura)}).`);
+            if (M.cfg.incluirInventario && M.inventario && M.inventario.kardex && M.inventario.kardex.fechaCorte && dif(M.inventario.kardex.fechaCorte, M.ayer) >= 1) M.avisos.push(`Inventarios: la valorización importada es al ${rgdDMA(M.inventario.kardex.fechaCorte)}.`);
+            return M;
+        }
+
+        // ==================================================================
+        // Diseño de la hoja (comparten pantalla e impresión)
+        // ==================================================================
+        const RGD_CSS = `
+.rgd-hoja{font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:10px;line-height:1.35;width:194mm;margin:0 auto;box-sizing:border-box}
+.rgd-hoja *{box-sizing:border-box}
+.rgd-hoja .cab{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0f172a;padding-bottom:5px;margin-bottom:7px}
+.rgd-hoja .cab .emp{font-size:13px;font-weight:700}
+.rgd-hoja .cab .ruc{font-size:9px;color:#475569}
+.rgd-hoja .cab .tit{text-align:right}
+.rgd-hoja .cab .tit b{display:block;font-size:14px;letter-spacing:.3px}
+.rgd-hoja .cab .tit span{font-size:9px;color:#475569;display:block}
+.rgd-hoja .kpis{display:flex;gap:6px;margin-bottom:7px}
+.rgd-hoja .kpi{flex:1;border:1px solid #cbd5e1;border-radius:4px;padding:5px 7px;background:#f8fafc}
+.rgd-hoja .kpi .l{font-size:8px;text-transform:uppercase;color:#64748b;letter-spacing:.4px}
+.rgd-hoja .kpi .v{font-size:15px;font-weight:700;margin-top:1px}
+.rgd-hoja .kpi .s{font-size:8px;color:#64748b}
+.rgd-hoja .kpi.alerta{background:#fef2f2;border-color:#fca5a5}
+.rgd-hoja .kpi.alerta .v{color:#b91c1c}
+.rgd-hoja h3{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;margin:7px 0 3px;padding:2px 5px;background:#e2e8f0;color:#0f172a}
+.rgd-hoja table{width:100%;border-collapse:collapse}
+.rgd-hoja th{font-size:8px;text-transform:uppercase;color:#475569;text-align:right;padding:2px 4px;border-bottom:1px solid #94a3b8;font-weight:700}
+.rgd-hoja th:first-child{text-align:left}
+.rgd-hoja td{padding:2px 4px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap}
+.rgd-hoja td:first-child{text-align:left;white-space:normal}
+.rgd-hoja tr.tot td{font-weight:700;border-top:1.5px solid #334155;border-bottom:none;background:#f1f5f9}
+.rgd-hoja tr.ref td{color:#475569;font-style:italic}
+.rgd-hoja td.neg{color:#b91c1c}
+.rgd-hoja td.pos{color:#15803d}
+.rgd-hoja .nota{font-size:8px;color:#64748b;margin-top:2px}
+.rgd-hoja .hoy td{font-size:9.5px}
+.rgd-hoja .av{border:1px solid #fbbf24;background:#fffbeb;border-radius:3px;padding:3px 6px;margin-top:6px;font-size:9px}
+.rgd-hoja .av div{margin:1px 0}
+.rgd-hoja .pie{margin-top:8px;border-top:1px solid #94a3b8;padding-top:4px;font-size:8px;color:#475569}
+.rgd-hoja .pie .firma{margin-top:3px;font-size:9px;color:#0f172a}
+.rgd-hoja .dos{display:flex;gap:8px}
+.rgd-hoja .dos>div{flex:1;min-width:0}
+.rgd-hoja .salto{page-break-before:always;break-before:page}
+.rgd-hoja .vacio{padding:14px;text-align:center;color:#64748b;border:1px dashed #cbd5e1;border-radius:4px}
+.rgd-hoja .sub{font-size:9px;color:#475569;margin:2px 0 4px}
+`;
+
+        function rgdCabecera(M, titulo) {
+            const e = M.emp || {};
+            const emit = `Emitido el ${rgdDMA(M.hoy)}${M.hora ? ' a las ' + M.hora + ' h' : ''}`;
+            return `<div class="cab">
+                <div><div class="emp">${rgdEsc(e.razonSocial || e.nombreComercial || 'Empresa')}</div><div class="ruc">${e.ruc ? 'RUC ' + rgdEsc(e.ruc) : ''}</div></div>
+                <div class="tit"><b>${rgdEsc(titulo)}</b><span>Información al cierre de ayer: ${rgdEsc(rgdFechaLarga(M.ayer))}</span><span>${rgdEsc(emit)}</span></div>
+            </div>`;
+        }
+
+        function rgdPieHTML(M) {
+            const filas = M.fuentes.map(f => {
+                const partes = [];
+                if (f.ultMov) partes.push(`último movimiento ${rgdDMA(f.ultMov)}`);
+                if (f.ultReg) partes.push(`registrado ${rgdTS(f.ultReg)}`);
+                if (f.exportado) partes.push(`archivo generado ${rgdTS(f.exportado)}`);
+                return `${rgdEsc(f.nombre)}: ${partes.length ? rgdEsc(partes.join(' · ')) : 'sin datos'}`;
+            });
+            return `<div class="pie">
+                <div><b>Último registro de cada fuente.</b> ${filas.join(' &nbsp;|&nbsp; ')}</div>
+                <div class="firma">Preparado por: <b>${rgdEsc(M.cfg.preparado || 'CARLOS FLORES FIGUEROA')}</b> — Auditor / Consultor responsable</div>
+            </div>`;
+        }
+
+        function rgdAvisosHTML(M, max) {
+            const a = M.avisos.slice(0, max || 3);
+            if (!a.length) return '';
+            const mas = M.avisos.length - a.length;
+            return `<div class="av">${a.map(t => `<div>⚠ ${rgdEsc(t)}</div>`).join('')}${mas > 0 ? `<div>… y ${mas} aviso(s) más en el reporte detallado.</div>` : ''}</div>`;
+        }
+
+        function rgdVacioHTML(M) {
+            return `<div class="rgd-hoja">${rgdCabecera(M, 'REPORTE GERENCIAL DEL DÍA')}<div class="vacio">Todavía no hay datos. Importa el Libro Diario, el Registro de Ventas, el de Compras y, si quieres, Caja y Bancos o Inventarios, y el reporte se arma solo.</div></div>`;
+        }
+
+        function rgdHojaHTML(M) {
+            if (!M.hayDatos) return rgdVacioHTML(M);
+            const ef = M.efectivo, P = M.pagos, V = M.ventas, C = M.compras;
+            const base = M.cfg.base === 'conigv' ? 'con IGV' : 'sin IGV';
+            const varFila = (act, prev) => { const v = rgdVar(act, prev); return `<td class="${v === null ? '' : (v >= 0 ? 'pos' : 'neg')}">${rgdVarTxt(v)}</td>`; };
+
+            // KPIs
+            const hoyPagar = P.tot.venc + P.tot.hoy;
+            const kpis = `<div class="kpis">
+                <div class="kpi"><div class="l">Efectivo disponible</div><div class="v">${ef ? rgdMon(ef.total) : '—'}</div><div class="s">${ef ? 'Caja y bancos al cierre de ayer' : 'Falta el Libro Diario'}</div></div>
+                <div class="kpi"><div class="l">Ventas de ayer (${base})</div><div class="v">${V ? rgdMon(V.ayer.m) : '—'}</div><div class="s">${V ? rgdPlural(V.ayer.n, 'comprobante', 'comprobantes') : 'Falta el Registro de Ventas'}</div></div>
+                <div class="kpi"><div class="l">Ventas del mes (${base})</div><div class="v">${V ? rgdMon(V.mes.m) : '—'}</div><div class="s">${V ? 'del 1 al ' + rgdDM(M.ayer) : ''}</div></div>
+                <div class="kpi ${hoyPagar > 0.004 ? 'alerta' : ''}"><div class="l">A pagar hoy y vencido</div><div class="v">${rgdMon(hoyPagar)}</div><div class="s">${rgdEsc(rgdPlural(P.tot.nHoy + P.tot.nVenc, 'partida', 'partidas'))}</div></div>
+            </div>`;
+
+            // Bancos
+            let bancos = '';
+            if (ef) {
+                let filas = ef.disp.slice();
+                let otras = '';
+                if (filas.length > 8) {
+                    filas.sort((a, b) => b.saldo - a.saldo);
+                    const resto = filas.slice(7); filas = filas.slice(0, 7);
+                    const s = k => resto.reduce((t, o) => t + o[k], 0);
+                    otras = `<tr><td>Otras ${resto.length} cuentas</td><td>${rgdCel(s('saldo'))}</td><td>${rgdCel(s('ing'))}</td><td>${rgdCel(s('egr'))}</td></tr>`;
+                }
+                bancos = `<h3>Caja y bancos al cierre de ayer</h3>
+                <table><tr><th>Cuenta</th><th>Saldo</th><th>Ingresó ayer</th><th>Salió ayer</th></tr>
+                ${filas.map(o => `<tr><td>${rgdEsc(o.cuenta)} ${rgdEsc(o.nombre)}</td><td class="${o.saldo < -0.004 ? 'neg' : ''}">${rgdNum(o.saldo)}</td><td>${rgdCel(o.ing)}</td><td>${rgdCel(o.egr)}</td></tr>`).join('')}${otras}
+                <tr class="tot"><td>Total disponible</td><td>${rgdNum(ef.total)}</td><td>${rgdCel(ef.ing)}</td><td>${rgdCel(ef.egr)}</td></tr></table>
+                ${Math.abs(ef.totalRestr) > 0.004 ? `<div class="nota">No incluye ${rgdMon(ef.totalRestr)} en cuentas de detracciones u otros fondos restringidos.</div>` : ''}`;
+            } else bancos = `<h3>Caja y bancos</h3><div class="vacio">Importa el Libro Diario para ver los saldos.</div>`;
+
+            // Ventas y compras
+            const f = (x, ayer, mes, prev) => x ? `<td>${rgdNum(ayer)}</td><td>${rgdNum(mes)}</td><td>${rgdNum(prev)}</td>${varFila(mes, prev)}` : `<td colspan="4" style="text-align:center;color:#94a3b8">sin datos importados</td>`;
+            const vc = `<h3>Ventas y compras (${base})</h3>
+                <table><tr><th>Concepto</th><th>Ayer ${rgdDM(M.ayer)}</th><th>Acumulado mes</th><th>Mes anterior al ${rgdDM(M.finPrev)}</th><th>Variación</th></tr>
+                <tr><td>Ventas</td>${f(V, V && V.ayer.m, V && V.mes.m, V && V.prev.m)}</tr>
+                <tr><td>Compras</td>${f(C, C && C.ayer.m, C && C.mes.m, C && C.prev.m)}</tr>
+                ${V && C ? `<tr class="tot"><td>Ventas menos compras</td><td>${rgdNum(V.ayer.m - C.ayer.m)}</td><td>${rgdNum(V.mes.m - C.mes.m)}</td><td>${rgdNum(V.prev.m - C.prev.m)}</td><td></td></tr>` : ''}</table>`;
+
+            // Pagos
+            const filasPagar = P.pagar.map(r => `<tr><td>${rgdEsc(r.etiqueta)}</td><td class="${r.venc > 0.004 ? 'neg' : ''}">${rgdCel(r.venc)}</td><td>${rgdCel(r.hoy)}</td><td>${rgdCel(r.prox)}</td><td>${rgdCel(r.venc + r.hoy + r.prox)}</td></tr>`).join('');
+            const cob = P.cobrar ? `<tr class="ref"><td>${rgdEsc(P.cobrar.etiqueta)} — por cobrar</td><td>${rgdCel(P.cobrar.venc)}</td><td>${rgdCel(P.cobrar.hoy)}</td><td>${rgdCel(P.cobrar.prox)}</td><td>${rgdCel(P.cobrar.venc + P.cobrar.hoy + P.cobrar.prox)}</td></tr>` : '';
+            const sinPagos = !P.pagar.length ? `<tr><td colspan="5" style="text-align:center;color:#94a3b8">No hay pagos pendientes en los datos importados.</td></tr>` : '';
+            const pagos = `<h3>Pagos pendientes</h3>
+                <table><tr><th>Concepto</th><th>Ya vencido</th><th>Hoy ${rgdDM(M.hoy)}</th><th>Próx. ${M.cfg.dias} días</th><th>Total</th></tr>
+                ${filasPagar}${sinPagos}
+                <tr class="tot"><td>Total a pagar</td><td>${rgdNum(P.tot.venc)}</td><td>${rgdNum(P.tot.hoy)}</td><td>${rgdNum(P.tot.prox)}</td><td>${rgdNum(P.tot.venc + P.tot.hoy + P.tot.prox)}</td></tr>
+                ${cob}</table>
+                ${P.cobertura !== null ? `<div class="nota">Efectivo disponible ${rgdMon(ef.total)} menos pagos hasta el ${rgdDM(M.limite)}: <b>${rgdMon(P.cobertura)}</b> ${P.cobertura < -0.005 ? '(no alcanza)' : '(alcanza)'}.</div>` : ''}`;
+
+            // Lo que vence hoy
+            const hoy = P.det.hoy.slice(0, 6);
+            const lhoy = hoy.length ? `<h3>Vence hoy ${rgdDMA(M.hoy)}</h3><table class="hoy">${hoy.map(d => `<tr><td>${rgdEsc(d.concepto)} <span style="color:#64748b">${rgdEsc(d.detalle || '')}</span></td><td>${rgdNum(d.monto)}</td></tr>`).join('')}</table>${P.det.hoy.length > hoy.length ? `<div class="nota">y ${P.det.hoy.length - hoy.length} partida(s) más, en el reporte detallado.</div>` : ''}` : '';
+
+            // Inventario
+            let inv = '';
+            if (M.inventario) {
+                if (M.inventario.vacio) inv = `<h3>Inventarios</h3><div class="nota">No hay inventario importado.</div>`;
+                else {
+                    const k = M.inventario.kardex, c = M.inventario.contable;
+                    inv = `<h3>Inventarios (valor en soles)</h3><table>
+                        ${k ? `<tr><td>Valorización del Kardex al ${rgdDMA(k.fechaCorte)} (${rgdEsc(k.metodo)})</td><td>${rgdNum(k.valor)}</td></tr>` : ''}
+                        ${k ? k.grupos.map(g => `<tr class="ref"><td>&nbsp;&nbsp;${rgdEsc(g.nombre)}</td><td>${rgdNum(g.valor)}</td></tr>`).join('') : ''}
+                        ${c ? `<tr><td>Saldo contable de existencias, cierre de ${rgdEsc(formatPeriodoLabel(c.periodo))}</td><td>${rgdNum(c.valor)}</td></tr>` : ''}
+                        </table>${k && k.bajoMinimo ? `<div class="nota">${rgdPlural(k.bajoMinimo, 'producto bajo', 'productos bajo')} su stock mínimo.</div>` : ''}`;
+                }
+            }
+
+            return `<div class="rgd-hoja">${rgdCabecera(M, 'REPORTE GERENCIAL DEL DÍA')}${kpis}${bancos}${vc}${pagos}${lhoy}${inv}${rgdAvisosHTML(M, 3)}${rgdPieHTML(M)}</div>`;
+        }
+
+        // ---------- Reporte detallado (varias hojas) ----------
+        function rgdTablaTerceros(titulo, arr, M) {
+            if (!arr.length) return `<h3>${rgdEsc(titulo)}</h3><div class="nota">Sin saldos pendientes.</div>`;
+            const s = k => arr.reduce((t, o) => t + o[k], 0);
+            return `<h3>${rgdEsc(titulo)}</h3><table><tr><th>${/clientes/i.test(titulo) ? 'Cliente' : 'Proveedor'}</th><th>Ya vencido</th><th>Hoy</th><th>Próx. ${M.cfg.dias} días</th><th>Después</th><th>Total</th></tr>
+                ${arr.map(o => `<tr><td>${rgdEsc(o.nombre)}${o.ruc ? ' <span style="color:#64748b">' + rgdEsc(o.ruc) + '</span>' : ''}</td><td>${rgdCel(o.venc)}</td><td>${rgdCel(o.hoy)}</td><td>${rgdCel(o.prox)}</td><td>${rgdCel(o.desp)}</td><td>${rgdNum(o.total)}</td></tr>`).join('')}
+                <tr class="tot"><td>Total</td><td>${rgdNum(s('venc'))}</td><td>${rgdNum(s('hoy'))}</td><td>${rgdNum(s('prox'))}</td><td>${rgdNum(s('desp'))}</td><td>${rgdNum(s('total'))}</td></tr></table>`;
+        }
+
+        function rgdDetalleHTML(M) {
+            if (!M.hayDatos) return rgdVacioHTML(M);
+            const P = M.pagos, ef = M.efectivo;
+            let h = `<div class="rgd-hoja">${rgdCabecera(M, 'REPORTE GERENCIAL DETALLADO')}`;
+            h += `<div class="sub">Detalle de lo que respalda el reporte de una hoja. Cifras en soles. Corte: ${rgdDMA(M.ayer)}; vencimientos medidos desde el ${rgdDMA(M.hoy)}.</div>`;
+
+            // Pagos y cobros por fecha
+            ['venc', 'hoy', 'prox'].forEach(k => {
+                const t = { venc: 'Pagos ya vencidos', hoy: `Pagos de hoy ${rgdDMA(M.hoy)}`, prox: `Pagos de los próximos ${M.cfg.dias} días` }[k];
+                const arr = P.det[k];
+                h += `<h3>${rgdEsc(t)}</h3>`;
+                if (!arr.length) { h += `<div class="nota">Nada pendiente.</div>`; return; }
+                h += `<table><tr><th>Concepto</th><th>Detalle</th><th>Vence</th><th>Monto</th></tr>${arr.slice(0, 60).map(d => `<tr><td>${rgdEsc(d.concepto)}</td><td style="text-align:left">${rgdEsc(d.detalle || '')}</td><td>${rgdDMA(d.fecha)}</td><td>${rgdNum(d.monto)}</td></tr>`).join('')}
+                    <tr class="tot"><td colspan="3">Total (${arr.length})</td><td>${rgdNum(arr.reduce((s, d) => s + d.monto, 0))}</td></tr></table>${arr.length > 60 ? `<div class="nota">Se muestran las 60 partidas mayores de ${arr.length}.</div>` : ''}`;
+            });
+
+            // Impuestos y planillas
+            h += `<h3>Impuestos y planillas por pagar (según Libro Diario)</h3>`;
+            if (!P.obligaciones) h += `<div class="nota">Falta el Libro Diario.</div>`;
+            else {
+                const filas = [];
+                P.obligaciones.forEach(o => o.pend.forEach(p => filas.push({ o, p })));
+                if (!filas.length) h += `<div class="nota">No hay obligaciones pendientes según los asientos registrados.</div>`;
+                else h += `<table><tr><th>Obligación</th><th>Período</th><th>Vence</th><th>Origen de la fecha</th><th>Monto</th></tr>${filas.map(({ o, p }) => `<tr><td>${rgdEsc(o.etiqueta)}</td><td style="text-align:left">${rgdEsc(formatPeriodoLabel(p.periodo))}</td><td>${rgdDMA(p.fecha)}</td><td style="text-align:left">${rgdEsc(p.fuente === 'SUNAT' ? 'Cronograma SUNAT' : p.fuente === 'manual' ? 'Corregida a mano' : p.fuente === 'estimado' ? 'Estimada, verificar' : 'Día de pago configurado')}</td><td>${rgdNum(p.monto)}</td></tr>`).join('')}</table>`;
+            }
+
+            h += rgdTablaTerceros('Cuentas por pagar a proveedores', P.porProv, M);
+            if (P.cuotas.length) h += `<h3>Cuotas de préstamos pendientes</h3><table><tr><th>Acreedor</th><th>Cuota</th><th>Vence</th><th>Monto</th></tr>${P.cuotas.slice(0, 40).map(q => `<tr><td>${rgdEsc(q.acreedor)}</td><td>${rgdEsc(q.numero || '')}</td><td>${rgdDMA(q.fecha)}</td><td>${rgdNum(q.monto)}</td></tr>`).join('')}</table>`;
+            if (M.cfg.incluirCobros) h += rgdTablaTerceros('Cuentas por cobrar a clientes', P.porCli, M);
+
+            // Bancos
+            if (ef) {
+                h += `<h3>Movimiento de caja y bancos de ayer</h3>`;
+                h += ef.movs.length ? `<table><tr><th>Asiento</th><th>Glosa</th><th>Cuenta</th><th>Ingreso</th><th>Salida</th></tr>${ef.movs.slice(0, 40).map(m => `<tr><td>${rgdEsc(m.numero || '')}</td><td style="text-align:left;white-space:normal">${rgdEsc(String(m.glosa).slice(0, 70))}</td><td>${rgdEsc(m.cuenta)}</td><td>${rgdCel(m.ing)}</td><td>${rgdCel(m.egr)}</td></tr>`).join('')}</table>` : `<div class="nota">No hubo movimientos de caja o bancos registrados ayer.</div>`;
+                if (ef.restr.length) h += `<div class="nota">Fondos restringidos (fuera del disponible): ${ef.restr.map(o => `${rgdEsc(o.cuenta)} ${rgdEsc(o.nombre)} ${rgdNum(o.saldo)}`).join('; ')}.</div>`;
+            }
+
+            // Mayores comprobantes de ayer
+            [['Ventas', M.ventas], ['Compras', M.compras]].forEach(([n, x]) => {
+                if (!x) return;
+                h += `<h3>${n} de ayer, mayores comprobantes</h3>`;
+                h += x.lista.length ? `<table><tr><th>Documento</th><th>${n === 'Ventas' ? 'Cliente' : 'Proveedor'}</th><th>Monto</th></tr>${x.lista.slice(0, 10).map(d => `<tr><td>${rgdEsc(d.doc)}</td><td style="text-align:left;white-space:normal">${rgdEsc(d.tercero || d.concepto)}</td><td>${rgdNum(d.monto)}</td></tr>`).join('')}</table>${x.lista.length > 10 ? `<div class="nota">y ${x.lista.length - 10} comprobante(s) más.</div>` : ''}` : `<div class="nota">Sin comprobantes registrados ayer.</div>`;
+            });
+
+            // Inventario
+            if (M.inventario && !M.inventario.vacio && M.inventario.kardex) {
+                const k = M.inventario.kardex;
+                h += `<h3>Inventarios, productos de mayor valor (Kardex al ${rgdDMA(k.fechaCorte)})</h3><table><tr><th>Producto</th><th>Valor</th></tr>${k.top.map(t => `<tr><td>${rgdEsc(t.nombre)}</td><td>${rgdNum(t.valor)}</td></tr>`).join('')}<tr class="tot"><td>Total valorizado</td><td>${rgdNum(k.valor)}</td></tr></table>`;
+            }
+
+            h += rgdAvisosHTML(M, 20);
+            h += `<div class="nota" style="margin-top:6px">Límites a tener en cuenta: los impuestos y planillas se calculan con los asientos del Libro Diario, sin saldos de años anteriores si no fueron importados. Las compras al contado figuran como por pagar hasta que se registre su pago en Caja y Bancos. Las fechas SUNAT siguen el cronograma por último dígito del RUC; si el domicilio fiscal tiene prórroga, la fecha real puede variar.</div>`;
+            h += rgdPieHTML(M) + `</div>`;
+            return h;
+        }
+
+        // ==================================================================
+        // Impresión: documento aparte en un iframe fuera de pantalla
+        // ==================================================================
+        function rgdDocumento(M, modo) {
+            const cuerpo = modo === 'detalle' ? rgdDetalleHTML(M) : rgdHojaHTML(M);
+            const t = `${modo === 'detalle' ? 'Reporte gerencial detallado' : 'Reporte gerencial del día'} ${M.hoy}`;
+            return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${rgdEsc(t)}</title><style>
+@page{size:A4 portrait;margin:8mm}
+html,body{margin:0;padding:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${RGD_CSS}
+</style></head><body>${cuerpo}</body></html>`;
+        }
+
+        function rgdImprimir(modo) {
+            const M = rgdConstruirModelo();
+            if (!M.hayDatos) { showToast('Primero importa algún archivo para armar el reporte.', 'error'); return; }
+            const doc = rgdDocumento(M, modo);
+            const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+            const conVentana = () => {
+                const w = window.open('', '_blank');
+                if (!w) { showToast('El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio e inténtalo otra vez.', 'error'); return; }
+                w.document.open(); w.document.write(doc.replace('</body>', '<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},300)})<\/script></body>')); w.document.close();
+            };
+            if (esMovil) { conVentana(); return; }
+            try {
+                const fr = document.createElement('iframe');
+                fr.setAttribute('aria-hidden', 'true');
+                fr.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;visibility:hidden';
+                document.body.appendChild(fr);
+                const d = fr.contentWindow.document;
+                d.open(); d.write(doc); d.close();
+                const lanzar = () => {
+                    try {
+                        if (modo !== 'detalle') {
+                            const hoja = d.querySelector('.rgd-hoja');
+                            const alto = hoja ? hoja.scrollHeight : 0;
+                            if (alto > 1055) hoja.style.zoom = String(Math.max(0.6, 1055 / alto));
+                        }
+                        fr.contentWindow.focus();
+                        fr.contentWindow.print();
+                    } catch (e) { console.error('Reporte del día: impresión', e); fr.remove(); conVentana(); return; }
+                    setTimeout(() => { try { fr.remove(); } catch (e) { /* ya no está */ } }, 60000);
+                };
+                const imgs = Array.from(d.images || []).filter(i => !i.complete);
+                if (!imgs.length) setTimeout(lanzar, 150);
+                else { let n = imgs.length; const listo = () => { if (--n <= 0) setTimeout(lanzar, 100); }; imgs.forEach(i => { i.onload = listo; i.onerror = listo; }); setTimeout(lanzar, 3000); }
+            } catch (e) { console.error('Reporte del día: iframe', e); conVentana(); }
+        }
+
+        // ==================================================================
+        // Texto para WhatsApp / correo
+        // ==================================================================
+        function rgdTexto(M) {
+            if (!M.hayDatos) return 'Todavía no hay datos importados para armar el reporte.';
+            const L = []; const P = M.pagos, ef = M.efectivo;
+            const nom = (M.emp.nombreComercial || M.emp.razonSocial || 'Empresa');
+            L.push(`*${nom} — Reporte gerencial del día*`);
+            L.push(`Información al cierre de ayer, ${rgdFechaLarga(M.ayer)}. Emitido el ${rgdDMA(M.hoy)}${M.hora ? ' a las ' + M.hora + ' h' : ''}.`);
+            if (ef) {
+                L.push('', `*Efectivo disponible: ${rgdMon(ef.total)}*`);
+                ef.disp.forEach(o => L.push(`• ${o.nombre} (${o.cuenta}): ${rgdMon(o.saldo)}`));
+                L.push(`Ayer ingresaron ${rgdMon(ef.ing)} y salieron ${rgdMon(ef.egr)}.`);
+            }
+            const b = M.cfg.base === 'conigv' ? 'con IGV' : 'sin IGV';
+            if (M.ventas) L.push('', `*Ventas (${b})*`, `Ayer: ${rgdMon(M.ventas.ayer.m)} (${rgdPlural(M.ventas.ayer.n, 'comprobante', 'comprobantes')})`, `Acumulado del mes: ${rgdMon(M.ventas.mes.m)} (${rgdVarTxt(rgdVar(M.ventas.mes.m, M.ventas.prev.m))} frente al mes anterior a la misma fecha)`);
+            if (M.compras) L.push('', `*Compras (${b})*`, `Ayer: ${rgdMon(M.compras.ayer.m)}`, `Acumulado del mes: ${rgdMon(M.compras.mes.m)}`);
+            L.push('', '*Pagos pendientes*');
+            if (!P.pagar.length) L.push('No hay pagos pendientes en los datos importados.');
+            else {
+                L.push(`Ya vencido: ${rgdMon(P.tot.venc)}`, `Hoy: ${rgdMon(P.tot.hoy)}`, `Próximos ${M.cfg.dias} días: ${rgdMon(P.tot.prox)}`);
+                P.det.hoy.slice(0, 6).forEach(d => L.push(`• Hoy: ${d.concepto}${d.detalle ? ' ' + d.detalle : ''} — ${rgdMon(d.monto)}`));
+                if (P.cobertura !== null) L.push(P.cobertura < -0.005 ? `El efectivo no alcanza: faltan ${rgdMon(-P.cobertura)}.` : `El efectivo alcanza y queda ${rgdMon(P.cobertura)}.`);
+            }
+            if (P.cobrar) L.push('', `*Por cobrar a clientes*: vencido ${rgdMon(P.cobrar.venc)}, hoy ${rgdMon(P.cobrar.hoy)}, próximos ${M.cfg.dias} días ${rgdMon(P.cobrar.prox)}.`);
+            if (M.inventario && !M.inventario.vacio) {
+                const k = M.inventario.kardex, c = M.inventario.contable;
+                L.push('', '*Inventarios*');
+                if (k) L.push(`Valorizado al ${rgdDMA(k.fechaCorte)}: ${rgdMon(k.valor)}`);
+                if (c) L.push(`Saldo contable al cierre de ${formatPeriodoLabel(c.periodo)}: ${rgdMon(c.valor)}`);
+            }
+            if (M.avisos.length) { L.push('', '*Ojo*'); M.avisos.slice(0, 3).forEach(a => L.push(`• ${a}`)); }
+            L.push('', `Preparado por ${M.cfg.preparado || 'CARLOS FLORES FIGUEROA'}.`);
+            return L.join('\n');
+        }
+
+        // ==================================================================
+        // Excel
+        // ==================================================================
+        async function rgdExcel(modo) {
+            const M = rgdConstruirModelo();
+            if (!M.hayDatos) { showToast('Primero importa algún archivo para armar el reporte.', 'error'); return; }
+            const P = M.pagos, ef = M.efectivo;
+            await descargarHojaUnica(modo === 'detalle' ? 'Gerencial detallado' : 'Gerencial del día', `Reporte_Gerencial_${modo === 'detalle' ? 'Detallado_' : ''}${M.hoy}.xlsx`, ws => {
+                const N = 6; let r = 1;
+                ws.columns = [{ width: 46 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }];
+                estiloTituloHoja(ws, `${empresaHeader()}  |  REPORTE GERENCIAL ${modo === 'detalle' ? 'DETALLADO' : 'DEL DÍA'}`, N);
+                estiloSubtitulo(ws, 2, `Información al cierre de ayer, ${rgdFechaLarga(M.ayer)}. Emitido el ${rgdDMA(M.hoy)}${M.hora ? ' a las ' + M.hora + ' h' : ''}. Preparado por ${M.cfg.preparado || 'CARLOS FLORES FIGUEROA'}.`, N);
+                r = 4;
+                const bloque = (titulo, cab, filas, totales) => {
+                    ws.mergeCells(r, 1, r, N); const t = ws.getCell(r, 1); t.value = titulo; t.font = { bold: true, size: 10 }; t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; r++;
+                    cab.forEach((c, i) => { ws.getCell(r, i + 1).value = c; }); estiloEncabezadoTabla(ws, r, cab.length); r++;
+                    filas.forEach(f => { f.forEach((v, i) => { const c = ws.getCell(r, i + 1); c.value = v; if (typeof v === 'number') fmtMoneda(c); }); r++; });
+                    if (totales) { totales.forEach((v, i) => { const c = ws.getCell(r, i + 1); c.value = v; if (typeof v === 'number') fmtMoneda(c); }); estiloFilaTotal(ws, r, totales.length); r++; }
+                    r++;
+                };
+                if (ef) bloque('Caja y bancos al cierre de ayer', ['Cuenta', 'Saldo', 'Ingresó ayer', 'Salió ayer'], ef.disp.map(o => [`${o.cuenta} ${o.nombre}`, o.saldo, o.ing, o.egr]), ['Total disponible', ef.total, ef.ing, ef.egr]);
+                const vf = (n, x) => x ? [n, x.ayer.m, x.mes.m, x.prev.m, rgdVar(x.mes.m, x.prev.m) === null ? '' : rgdVar(x.mes.m, x.prev.m) / 100] : [n, '', '', '', ''];
+                bloque(`Ventas y compras (${M.cfg.base === 'conigv' ? 'con IGV' : 'sin IGV'})`, ['Concepto', `Ayer ${rgdDM(M.ayer)}`, 'Acumulado mes', `Mes anterior al ${rgdDM(M.finPrev)}`, 'Variación'], [vf('Ventas', M.ventas), vf('Compras', M.compras)]);
+                const filasP = P.pagar.map(x => [x.etiqueta, x.venc, x.hoy, x.prox, x.venc + x.hoy + x.prox, x.desp]);
+                if (P.cobrar) filasP.push([P.cobrar.etiqueta + ' (por cobrar)', P.cobrar.venc, P.cobrar.hoy, P.cobrar.prox, P.cobrar.venc + P.cobrar.hoy + P.cobrar.prox, P.cobrar.desp]);
+                bloque('Pagos pendientes', ['Concepto', 'Ya vencido', `Hoy ${rgdDM(M.hoy)}`, `Próx. ${M.cfg.dias} días`, 'Total hasta el límite', 'Después'], filasP, ['Total a pagar', P.tot.venc, P.tot.hoy, P.tot.prox, P.tot.venc + P.tot.hoy + P.tot.prox, P.tot.desp]);
+                if (M.inventario && !M.inventario.vacio) {
+                    const k = M.inventario.kardex, c = M.inventario.contable; const fi = [];
+                    if (k) { fi.push([`Kardex al ${rgdDMA(k.fechaCorte)} (${k.metodo})`, k.valor]); k.grupos.forEach(g => fi.push(['   ' + g.nombre, g.valor])); }
+                    if (c) fi.push([`Saldo contable, cierre de ${formatPeriodoLabel(c.periodo)}`, c.valor]);
+                    bloque('Inventarios (valor en soles)', ['Concepto', 'Valor'], fi);
+                }
+                if (modo === 'detalle') {
+                    ['venc', 'hoy', 'prox'].forEach(k => bloque({ venc: 'Pagos ya vencidos', hoy: 'Pagos de hoy', prox: `Pagos de los próximos ${M.cfg.dias} días` }[k], ['Concepto', 'Detalle', 'Vence', 'Monto'], P.det[k].map(d => [d.concepto, d.detalle || '', rgdDMA(d.fecha), d.monto])));
+                    const ob = []; (P.obligaciones || []).forEach(o => o.pend.forEach(p => ob.push([o.etiqueta, formatPeriodoLabel(p.periodo), rgdDMA(p.fecha), p.fuente, p.monto])));
+                    bloque('Impuestos y planillas por pagar', ['Obligación', 'Período', 'Vence', 'Origen de la fecha', 'Monto'], ob);
+                    const ter = (n, a) => bloque(n, ['Nombre', 'Ya vencido', 'Hoy', `Próx. ${M.cfg.dias} días`, 'Después', 'Total'], a.map(o => [o.nombre, o.venc, o.hoy, o.prox, o.desp, o.total]));
+                    ter('Cuentas por pagar a proveedores', P.porProv); if (M.cfg.incluirCobros) ter('Cuentas por cobrar a clientes', P.porCli);
+                    if (P.cuotas.length) bloque('Cuotas de préstamos pendientes', ['Acreedor', 'Cuota', 'Vence', 'Monto'], P.cuotas.map(q => [q.acreedor, String(q.numero || ''), rgdDMA(q.fecha), q.monto]));
+                }
+                if (M.avisos.length) bloque('Avisos', ['Aviso'], M.avisos.map(a => [a]));
+                bloque('Último registro de cada fuente', ['Fuente', 'Último movimiento', 'Registrado', 'Archivo generado'], M.fuentes.map(f => [f.nombre, f.ultMov ? rgdDMA(f.ultMov) : '', rgdTS(f.ultReg), rgdTS(f.exportado)]));
+            });
+        }
+
+        // ==================================================================
+        // Pantalla
+        // ==================================================================
+        let rgdVista = 'hoja';
+        function rgdCambiarVista(v) {
+            rgdVista = v === 'detalle' ? 'detalle' : 'hoja';
+            renderResumenDia();
+        }
+        function rgdLeerUI() {
+            const c = rgdCfg();
+            const g = id => document.getElementById(id);
+            if (g('rgd-chk-inv')) c.incluirInventario = g('rgd-chk-inv').checked;
+            if (g('rgd-chk-cob')) c.incluirCobros = g('rgd-chk-cob').checked;
+            if (g('rgd-chk-buen')) c.buenContribuyente = g('rgd-chk-buen').checked;
+            if (g('rgd-base')) c.base = g('rgd-base').value === 'conigv' ? 'conigv' : 'sinigv';
+            if (g('rgd-dias') && g('rgd-dias').value) c.dias = Math.min(31, Math.max(1, parseInt(g('rgd-dias').value, 10) || 7));
+            if (g('rgd-dia-sueldos') && g('rgd-dia-sueldos').value) c.diaSueldos = Math.min(31, Math.max(1, parseInt(g('rgd-dia-sueldos').value, 10) || 5));
+            if (g('rgd-preparado')) c.preparado = g('rgd-preparado').value.trim() || 'CARLOS FLORES FIGUEROA';
+            rgdGuardar();
+        }
+        function rgdPintarUI() {
+            const c = rgdCfg(); const g = id => document.getElementById(id);
+            if (g('rgd-fecha') && !g('rgd-fecha').value) g('rgd-fecha').value = (typeof hoyPeru === 'function' ? hoyPeru() : rgdISO(new Date()));
+            if (g('rgd-chk-inv')) g('rgd-chk-inv').checked = !!c.incluirInventario;
+            if (g('rgd-chk-cob')) g('rgd-chk-cob').checked = !!c.incluirCobros;
+            if (g('rgd-chk-buen')) g('rgd-chk-buen').checked = !!c.buenContribuyente;
+            if (g('rgd-base')) g('rgd-base').value = c.base;
+            if (g('rgd-dias')) g('rgd-dias').value = c.dias;
+            if (g('rgd-dia-sueldos')) g('rgd-dia-sueldos').value = c.diaSueldos;
+            if (g('rgd-preparado')) g('rgd-preparado').value = c.preparado;
+        }
+        let rgdUIListo = false;
+        function renderResumenDia() {
+            const cont = document.getElementById('rgd-preview');
             if (!cont) return;
-            const fuentes = [
-                { nombre: 'Ventas', data: ventasImport },
-                { nombre: 'Compras', data: comprasImport },
-                { nombre: 'Libro Diario', data: diarioImport },
-            ];
-            cont.innerHTML = fuentes.map(f => {
-                const ts = f.data ? (f.data._fechaImportacionLocal || f.data.generadoEl) : null;
-                const texto = ts ? formatFechaHoraCorta(ts) : 'sin importar';
-                const color = !f.data ? 'bg-slate-100 text-slate-500' : (ts && ts.split('T')[0] === obtenerFechaHoyISO() ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700');
-                return `<div class="rounded-lg p-2 ${color}"><b>${f.nombre}:</b> ${texto}</div>`;
-            }).join('');
+            if (!rgdUIListo) { rgdPintarUI(); rgdUIListo = true; } else rgdLeerUI();
+            ['hoja', 'detalle'].forEach(v => {
+                const b = document.getElementById('rgd-vista-' + v);
+                if (b) b.className = 'px-4 py-2 rounded-lg text-xs font-bold border ' + (rgdVista === v ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50');
+            });
+            let M;
+            try { M = rgdConstruirModelo(); }
+            catch (e) { console.error('Reporte del día', e); cont.innerHTML = '<div class="p-6 text-sm text-red-600">No se pudo armar el reporte. Revisa que los archivos importados estén completos.</div>'; return; }
+            cont.innerHTML = `<style>${RGD_CSS}</style>` + (rgdVista === 'detalle' ? rgdDetalleHTML(M) : rgdHojaHTML(M));
         }
-
-        function calcularVentasHoy() {
-            const hoy = obtenerFechaHoyISO();
-            let total = 0, cantidad = 0;
-            if (ventasImport) {
-                Object.values(ventasImport.periodsData || {}).forEach(p => {
-                    (p.sales || []).forEach(v => { if (v.fechaEmision === hoy) { total += v.total || 0; cantidad++; } });
-                });
-            }
-            return { total, cantidad };
+        function rgdCopiar() {
+            const t = rgdTexto(rgdConstruirModelo());
+            const ok = () => showToast('Texto copiado. Ya puedes pegarlo en WhatsApp o en el correo.');
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok).catch(() => rgdCopiarViejo(t, ok));
+            else rgdCopiarViejo(t, ok);
         }
-
-        function calcularVentasMes() {
-            const cfg = ventasImport ? ventasImport.config : null;
-            const periodo = cfg ? cfg.periodoActivo : null;
-            let total = 0, cantidad = 0;
-            if (ventasImport && periodo && ventasImport.periodsData[periodo]) {
-                (ventasImport.periodsData[periodo].sales || []).forEach(v => { total += v.total || 0; cantidad++; });
-            }
-            return { total, cantidad, periodo };
+        function rgdCopiarViejo(t, ok) {
+            const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;left:-9999px'; document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); ok(); } catch (e) { showToast('No se pudo copiar. Selecciona el texto a mano.', 'error'); }
+            ta.remove();
         }
-
-        function calcularComprasHoy() {
-            const hoy = obtenerFechaHoyISO();
-            let total = 0, cantidad = 0;
-            if (comprasImport) {
-                Object.values(comprasImport.periodsData || {}).forEach(p => {
-                    (p.purchases || []).forEach(c => { if (c.fechaEmision === hoy) { total += c.total || 0; cantidad++; } });
-                });
+        function rgdEnviar(canal) {
+            const M = rgdConstruirModelo(); const t = rgdTexto(M);
+            if (canal === 'correo') {
+                const a = (document.getElementById('rgd-envio-correo') || {}).value || '';
+                if (!a.trim()) { showToast('Escribe el correo del destinatario.', 'error'); return; }
+                window.location.href = `mailto:${encodeURIComponent(a.trim())}?subject=${encodeURIComponent('Reporte gerencial del día ' + rgdDMA(M.hoy))}&body=${encodeURIComponent(t.replace(/\*/g, ''))}`;
+            } else {
+                let n = String((document.getElementById('rgd-envio-celular') || {}).value || '').replace(/\D/g, '');
+                if (!n) { showToast('Escribe el celular para WhatsApp.', 'error'); return; }
+                if (n.length === 9) n = '51' + n;
+                window.open(`https://wa.me/${n}?text=${encodeURIComponent(t)}`, '_blank');
             }
-            return { total, cantidad };
-        }
-
-        function calcularComprasMes() {
-            const cfg = comprasImport ? comprasImport.config : null;
-            const periodo = cfg ? cfg.periodoActivo : null;
-            let total = 0, cantidad = 0;
-            if (comprasImport && periodo && comprasImport.periodsData[periodo]) {
-                (comprasImport.periodsData[periodo].purchases || []).forEach(c => { total += c.total || 0; cantidad++; });
-            }
-            return { total, cantidad, periodo };
-        }
-
-        function calcularSaldoCajaBancos() {
-            const cuentas = { '101': 'Caja', '1041': 'Bancos', '1052': 'Billeteras' };
-            const saldos = {};
-            Object.keys(cuentas).forEach(c => { saldos[c] = 0; });
-            if (diarioImport) {
-                Object.values(diarioImport.periodsData || {}).forEach(p => {
-                    (p.asientos || []).forEach(a => {
-                        (a.lineas || []).forEach(l => {
-                            if (cuentas[l.cuenta] !== undefined) saldos[l.cuenta] += (l.debe || 0) - (l.haber || 0);
-                        });
-                    });
-                });
-            }
-            const total = Object.values(saldos).reduce((s, v) => s + v, 0);
-            return { total, detalle: Object.entries(cuentas).map(([cod, nom]) => ({ nombre: nom, saldo: saldos[cod] })) };
-        }
-
-        // (2026-10-24) Con los cobros parciales y vencimientos: saldo al cierre del último mes importado.
-        function calcularCxCPendientes() {
-            if (!ventasImport) return { total: 0, cantidad: 0 };
-            const periodos = Object.keys(ventasImport.periodsData || {}).sort();
-            const r = periodos.length ? armarVencimientosTercerosV('cxc', periodos[periodos.length - 1]) : null;
-            return r ? { total: r.totalGeneral, cantidad: r.lista.reduce((s, g) => s + g.facturas.length, 0) } : { total: 0, cantidad: 0 };
-        }
-
-        function calcularCxPPendientes() {
-            if (!comprasImport) return { total: 0, cantidad: 0 };
-            const periodos = Object.keys(comprasImport.periodsData || {}).sort();
-            const r = periodos.length ? armarVencimientosTercerosV('cxp', periodos[periodos.length - 1]) : null;
-            return r ? { total: r.totalGeneral, cantidad: r.lista.reduce((s, g) => s + g.facturas.length, 0) } : { total: 0, cantidad: 0 };
-        }
-
-        function calcularDetraccionesPendientesResumen() {
-            let total = 0, cantidad = 0;
-            if (comprasImport) {
-                Object.values(comprasImport.periodsData || {}).forEach(p => {
-                    (p.purchases || []).forEach(c => {
-                        if (c.sujetaDetraccion && !c.constanciaDetraccion) { total += c.montoDetraccion || 0; cantidad++; }
-                    });
-                });
-            }
-            return { total, cantidad };
-        }
-
-        // Calcula los bloques SELECCIONADOS (checkboxes marcados), en un formato neutral
-        // que reutilizan tanto el texto para WhatsApp/correo, como la versión imprimible
-        // y la exportación a Excel — así los 3 formatos siempre muestran lo mismo.
-        function obtenerBloquesResumenDia() {
-            const fmt = (n) => 'S/ ' + (n || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const cxComp = (cant) => `${cant} comprobante${cant === 1 ? '' : 's'}`;
-            const bloques = [];
-
-            if (document.getElementById('rgd-chk-ventas-hoy').checked) {
-                const d = calcularVentasHoy();
-                bloques.push({ icono: '🟢', etiqueta: 'Ventas de hoy', valor: fmt(d.total), detalle: cxComp(d.cantidad) });
-            }
-            if (document.getElementById('rgd-chk-ventas-mes').checked) {
-                const d = calcularVentasMes();
-                bloques.push({ icono: '📊', etiqueta: 'Ventas del mes', valor: fmt(d.total), detalle: cxComp(d.cantidad) });
-            }
-            if (document.getElementById('rgd-chk-compras-hoy').checked) {
-                const d = calcularComprasHoy();
-                bloques.push({ icono: '🔴', etiqueta: 'Compras de hoy', valor: fmt(d.total), detalle: cxComp(d.cantidad) });
-            }
-            if (document.getElementById('rgd-chk-compras-mes').checked) {
-                const d = calcularComprasMes();
-                bloques.push({ icono: '📊', etiqueta: 'Compras del mes', valor: fmt(d.total), detalle: cxComp(d.cantidad) });
-            }
-            if (document.getElementById('rgd-chk-saldo-bancos').checked) {
-                const d = calcularSaldoCajaBancos();
-                bloques.push({ icono: '🏦', etiqueta: 'Saldo en Caja y Bancos', valor: fmt(d.total), detalle: '' });
-            }
-            if (document.getElementById('rgd-chk-cxc').checked) {
-                const d = calcularCxCPendientes();
-                bloques.push({ icono: '⏳', etiqueta: 'Por Cobrar (pendiente)', valor: fmt(d.total), detalle: cxComp(d.cantidad) });
-            }
-            if (document.getElementById('rgd-chk-cxp').checked) {
-                const d = calcularCxPPendientes();
-                bloques.push({ icono: '⏳', etiqueta: 'Por Pagar (pendiente)', valor: fmt(d.total), detalle: cxComp(d.cantidad) });
-            }
-            if (document.getElementById('rgd-chk-detracciones').checked) {
-                const d = calcularDetraccionesPendientesResumen();
-                if (d.cantidad > 0) bloques.push({ icono: '⚠️', etiqueta: 'Detracciones pendientes de depositar', valor: fmt(d.total), detalle: `${d.cantidad}`, esAlerta: true });
-            }
-            return bloques;
         }
 
         // ==================================================================
@@ -4175,119 +4785,6 @@ const MypecarPEVista = (function () {
                 let cuerpo = texto;
                 if (cuerpo.length > 3500) cuerpo = cuerpo.slice(0, 3500).replace(/\n[^\n]*$/, '') + '\n…';
                 window.open(`https://wa.me/${cel}?text=${encodeURIComponent(cuerpo)}`, '_blank');
-            }
-        }
-
-        function generarTextoResumenDia() {
-            const nombreEmpresa = obtenerConfigEmpresaImportada();
-            const hoy = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-            const bloques = obtenerBloquesResumenDia();
-
-            let lineas = [];
-            lineas.push(`*RESUMEN GERENCIAL DEL DÍA*`);
-            lineas.push(`${(nombreEmpresa.nombreComercial || nombreEmpresa.razonSocial || '').trim()}`);
-            lineas.push(`${hoy}`);
-            lineas.push('');
-            bloques.forEach(b => {
-                lineas.push(`${b.icono} *${b.etiqueta}:* ${b.valor}${b.detalle ? ` (${b.detalle})` : ''}`);
-            });
-            lineas.push('');
-            lineas.push(`_Generado con MYPECAR CONTABLE_`);
-            return lineas.join('\n');
-        }
-
-        function renderResumenDiaImprimible() {
-            const nombreEmpresa = obtenerConfigEmpresaImportada();
-            const hoy = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-            document.getElementById('rgd-imp-empresa').innerText = (nombreEmpresa.nombreComercial || nombreEmpresa.razonSocial || '').trim();
-            document.getElementById('rgd-imp-fecha').innerText = hoy;
-            const bloques = obtenerBloquesResumenDia();
-            document.getElementById('rgd-imp-filas').innerHTML = bloques.map(b => `
-                <div class="flex items-center justify-between p-3 rounded-lg ${b.esAlerta ? 'bg-amber-50' : 'bg-slate-50'}">
-                    <span class="text-sm text-slate-700">${b.icono} ${b.etiqueta}${b.detalle ? ` <span class="text-slate-400">(${b.detalle})</span>` : ''}</span>
-                    <span class="font-bold text-slate-900">${b.valor}</span>
-                </div>`).join('');
-        }
-
-        function imprimirResumenDia() {
-            renderResumenDiaImprimible();
-            document.body.classList.add('imprimiendo-rgd');
-            window.print();
-            setTimeout(() => document.body.classList.remove('imprimiendo-rgd'), 500);
-        }
-
-        async function exportarResumenDiaExcel() {
-            if (typeof ExcelJS === 'undefined') { showToast('No se pudo cargar la librería de Excel.', 'error'); return; }
-            const nombreEmpresa = obtenerConfigEmpresaImportada();
-            const hoy = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-            const bloques = obtenerBloquesResumenDia();
-
-            const wb = new ExcelJS.Workbook();
-            const cfgEmpresaRGD = obtenerConfigEmpresaImportada();
-            wb.creator = (cfgEmpresaRGD.nombreComercial || cfgEmpresaRGD.razonSocial || 'MYPECAR CONTABLE') + ' - REPORTES';
-            wb.created = new Date();
-            const ws = wb.addWorksheet('Resumen del Día');
-            ws.columns = [{ width: 42 }, { width: 20 }, { width: 20 }];
-            ws.pageSetup = { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 };
-
-            ws.mergeCells(1, 1, 1, 3);
-            ws.getCell(1, 1).value = 'RESUMEN GERENCIAL DEL DÍA';
-            ws.getCell(1, 1).font = { bold: true, size: 14 };
-            ws.mergeCells(2, 1, 2, 3);
-            ws.getCell(2, 1).value = `${(nombreEmpresa.nombreComercial || nombreEmpresa.razonSocial || '').trim()} — ${hoy}`;
-            ws.getCell(2, 1).font = { italic: true, size: 10, color: { argb: 'FF64748B' } };
-
-            let row = 4;
-            ws.getRow(row).values = ['Concepto', 'Monto', 'Detalle'];
-            ws.getRow(row).font = { bold: true };
-            ws.getRow(row).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-            row++;
-            bloques.forEach(b => {
-                ws.getRow(row).values = [`${b.icono} ${b.etiqueta}`, b.valor, b.detalle || ''];
-                if (b.esAlerta) ws.getRow(row).font = { color: { argb: 'FFB45309' }, bold: true };
-                row++;
-            });
-
-            insertarLogoEnHojaExcel(wb, ws, cfgEmpresaRGD);
-            agregarPieDeLicenciaExcel(ws);
-            const buffer = await wb.xlsx.writeBuffer();
-            const blob = new Blob([buffer], { type: 'application/octet-stream' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = `Resumen_Gerencial_${obtenerFechaHoyISO()}.xlsx`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showToast('Resumen exportado a Excel.');
-        }
-
-        function renderResumenDia() {
-            renderRGDFrescura();
-            const preview = document.getElementById('rgd-preview');
-            if (preview) preview.innerText = generarTextoResumenDia();
-        }
-
-        function copiarResumenDia() {
-            const texto = generarTextoResumenDia();
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(texto).then(() => showToast('Resumen copiado al portapapeles.'));
-            } else {
-                showToast('No se pudo copiar automáticamente — selecciona el texto de la vista previa manualmente.', 'error');
-            }
-        }
-
-        function enviarResumenDia(canal) {
-            const texto = generarTextoResumenDia();
-            const nombreEmpresa = obtenerConfigEmpresaImportada();
-            const asunto = `Resumen Gerencial del Día — ${(nombreEmpresa.nombreComercial || nombreEmpresa.razonSocial || '').trim()}`;
-            if (canal === 'correo') {
-                const correo = document.getElementById('rgd-envio-correo').value.trim();
-                if (!correo) { showToast('Escribe el correo del destinatario primero.', 'error'); return; }
-                const textoPlano = texto.replace(/\*/g, '').replace(/_/g, '');
-                window.open(`mailto:${correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(textoPlano)}`, '_blank');
-            } else if (canal === 'whatsapp') {
-                const celular = document.getElementById('rgd-envio-celular').value.trim().replace(/\D/g, '');
-                if (!celular) { showToast('Escribe el celular del destinatario primero.', 'error'); return; }
-                window.open(`https://wa.me/51${celular}?text=${encodeURIComponent(texto)}`, '_blank');
             }
         }
 
