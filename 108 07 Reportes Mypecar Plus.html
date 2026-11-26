@@ -75,6 +75,15 @@
         .dash-imprimible .dash-snap { display: block !important; width: 100%; height: 100%; object-fit: contain; }
     }
     .dash-snap { display: none; }
+    /* Estado de Resultados (2026-11-26): imprimir solo la hoja con su encabezado */
+    @media print {
+        body.imprimiendo-er * { visibility: hidden; }
+        body.imprimiendo-er #er-hoja, body.imprimiendo-er #er-hoja * { visibility: visible; }
+        body.imprimiendo-er #er-hoja { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; margin: 0; box-shadow: none; border: 0; border-radius: 0; padding: 0; }
+        body.imprimiendo-er #er-hoja .er-controles { display: none !important; }
+        body.imprimiendo-er #er-encabezado, body.imprimiendo-er #er-pie { display: block !important; }
+        #er-hoja { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
     /* Informe Gerencial (2026-11-25): impresión limpia, solo la hoja y sin cortes feos */
     @media print {
         #informe-gerencial-hoja { font-size: 10px; border-radius: 0 !important; }
@@ -1198,28 +1207,47 @@ const MypecarPEVista = (function () {
 
         <!-- ================= PESTAÑA: ESTADO DE RESULTADOS ================= -->
         <section id="tab-resultados" class="tab-content hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto">
-                <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4">
-                    <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fa-solid fa-chart-line text-indigo-500"></i> Estado de Resultados (Mes - Acumulado)</h3>
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <select id="er-periodo" onchange="renderEstadoResultados()" class="bg-slate-50 border border-slate-200 text-xs rounded-lg p-2"></select>
-                        <button onclick="exportarEstadoResultadosExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
-                            <i class="fa-solid fa-file-excel"></i> Exportar
+            <div id="er-hoja" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto">
+                <div class="no-print er-controles">
+                    <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4">
+                        <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2"><i class="fa-solid fa-chart-line text-indigo-500"></i> Estado de Resultados (Mes - Acumulado)</h3>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <select id="er-periodo" onchange="renderEstadoResultados()" class="bg-slate-50 border border-slate-200 text-xs rounded-lg p-2"></select>
+                            <button onclick="exportarEstadoResultadosExcel()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                                <i class="fa-solid fa-file-excel"></i> Exportar
+                            </button>
+                            <button onclick="exportarEstadoResultadosMensualExcel()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap">
+                                <i class="fa-solid fa-table-columns"></i> Excel Mensual (Ene-Dic)
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-end gap-2 mb-4 pb-4 border-b border-slate-100">
+                        <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Preparado por</label><input id="er-preparado" onchange="guardarPreparadoPorER()" class="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs w-56"></div>
+                        <button onclick="erImprimir()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-print"></i> Imprimir / Guardar como PDF
                         </button>
-                        <button onclick="exportarEstadoResultadosMensualExcel()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap">
-                            <i class="fa-solid fa-table-columns"></i> Excel Mensual (Ene-Dic)
+                        <button onclick="erDescargarPdf()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-file-pdf"></i> Descargar PDF
+                        </button>
+                        <button onclick="erEnviar('correo')" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-envelope"></i> Correo
+                        </button>
+                        <button onclick="erEnviar('whatsapp')" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-2.5 rounded-lg flex items-center gap-1.5 transition-all">
+                            <i class="fa-brands fa-whatsapp"></i> WhatsApp
                         </button>
                     </div>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-xs font-bold text-slate-500">Presentación:</span>
+                        <button id="btn-er-funcion" onclick="setModoEstadoResultados('funcion')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-indigo-600 text-white transition-all">Por Función</button>
+                        <button id="btn-er-naturaleza" onclick="setModoEstadoResultados('naturaleza')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 transition-all">Por Naturaleza</button>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2 mb-3">
-                    <span class="text-xs font-bold text-slate-500">Presentación:</span>
-                    <button id="btn-er-funcion" onclick="setModoEstadoResultados('funcion')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-indigo-600 text-white transition-all">Por Función</button>
-                    <button id="btn-er-naturaleza" onclick="setModoEstadoResultados('naturaleza')" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 transition-all">Por Naturaleza</button>
-                </div>
+                <div id="er-encabezado" class="hidden text-center mb-4 pb-3 border-b-2 border-slate-300"></div>
                 <table class="w-full text-sm">
                     <thead><tr class="text-[10px] uppercase text-slate-400"><th class="text-left pb-1">Concepto</th><th class="text-right pb-1">Mes</th><th class="text-right pb-1 pl-3">% Vtas</th><th class="text-right pb-1 pl-4">Acumulado</th><th class="text-right pb-1 pl-3">% Vtas</th></tr></thead>
                     <tbody id="er-body" class="divide-y divide-slate-100"></tbody>
                 </table>
+                <p id="er-pie" class="hidden text-[10px] text-slate-500 mt-4 pt-2 border-t"></p>
             </div>
         </section>
 
@@ -7623,6 +7651,8 @@ function renderAnalisisCuenta() {
 
         function renderEstadoResultados() {
             const tbody = document.getElementById('er-body');
+            const inpPrep = document.getElementById('er-preparado'); if (inpPrep && document.activeElement !== inpPrep) inpPrep.value = erPreparadoPor();
+            erActualizarEncabezado();
             if (!diarioImport) { tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400">Importa los Datos del Libro Diario primero.</td></tr>`; return; }
             const periodo = document.getElementById('er-periodo').value;
             if (!periodo) return;
@@ -7670,6 +7700,199 @@ function renderAnalisisCuenta() {
             if (Math.abs(erMes.gastosSinCC) > 0.005 || Math.abs(erAcum.gastosSinCC) > 0.005) html += row('(-) Otros gastos sin CC', -erMes.gastosSinCC, -erAcum.gastosSinCC, erMes.ventasNetas, erAcum.ventasNetas, {});
             html += row('UTILIDAD NETA DEL EJERCICIO', erMes.utilidad, erAcum.utilidad, erMes.ventasNetas, erAcum.ventasNetas, { bold: true, border: true });
             tbody.innerHTML = html;
+        }
+
+        // ------------------------------------------------------------------
+        // ESTADO DE RESULTADOS — imprimir, PDF, correo y WhatsApp (2026-11-26)
+        // Misma barra y mismo funcionamiento que Informe Gerencial y Punto de Equilibrio.
+        // El PDF sale de la hoja que se ve en pantalla (con encabezado de la empresa y firma).
+        // ------------------------------------------------------------------
+        function erPreparadoPor() { if (appConfig.erPreparadoPor === undefined) appConfig.erPreparadoPor = 'CARLOS FLORES FIGUEROA'; return (appConfig.erPreparadoPor || '').trim(); }
+        function guardarPreparadoPorER() {
+            appConfig.erPreparadoPor = document.getElementById('er-preparado').value.trim();
+            try { localStorage.setItem('reportes_app_config', JSON.stringify(appConfig)); } catch (e) {}
+            erActualizarEncabezado();
+        }
+        function erEscape(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+        function erTituloModo() { return modoEstadoResultados === 'naturaleza' ? 'ESTADO DE RESULTADOS POR NATURALEZA' : 'ESTADO DE RESULTADOS POR FUNCIÓN'; }
+        function erActualizarEncabezado() {
+            const enc = document.getElementById('er-encabezado'), pie = document.getElementById('er-pie');
+            if (!enc || !pie) return;
+            const sel = document.getElementById('er-periodo');
+            if (!diarioImport || !sel || !sel.value) { enc.classList.add('hidden'); pie.classList.add('hidden'); return; }
+            const cfg = diarioImport.config || {};
+            const periodo = sel.value;
+            enc.innerHTML = `<p class="font-black text-slate-900 text-base">${erEscape(igNombreEmpresa(cfg))}</p>
+                <p class="text-xs text-slate-600">RUC: ${erEscape(cfg.ruc || '—')}</p>
+                <p class="font-bold text-slate-800 text-sm mt-2">${erTituloModo()}</p>
+                <p class="text-xs text-slate-600">Mes de ${erEscape(formatPeriodoLabel(periodo))} y acumulado de enero a ${erEscape(formatPeriodoLabel(periodo))}</p>
+                <p class="text-[10px] text-slate-400">Expresado en soles (S/)</p>`;
+            enc.classList.remove('hidden');
+            const prep = erPreparadoPor();
+            pie.innerHTML = `${prep ? `<b>Preparado por:</b> ${erEscape(prep)} · ` : ''}Generado desde MYPECAR PLUS el ${new Date().toLocaleDateString('es-PE')}.`;
+            pie.classList.remove('hidden');
+        }
+        function erImprimir() {
+            if (!diarioImport) { showToast('Importa los Datos del Libro Diario primero.', 'error'); return; }
+            erActualizarEncabezado();
+            document.body.classList.add('imprimiendo-er');
+            const limpiar = () => { document.body.classList.remove('imprimiendo-er'); window.removeEventListener('afterprint', limpiar); };
+            window.addEventListener('afterprint', limpiar);
+            window.print();
+        }
+
+        async function erGenerarPdf() {
+            if (!diarioImport) { showToast('Importa los Datos del Libro Diario primero.', 'error'); return null; }
+            const periodo = document.getElementById('er-periodo').value;
+            if (!periodo) { showToast('Elige el mes del Estado de Resultados.', 'error'); return null; }
+            renderEstadoResultados();
+            const hoja = document.getElementById('er-hoja');
+            const cfg = diarioImport.config || {};
+            await igAsegurarLibsPdf();
+            const ESC = igEsMovil() ? 1.5 : 2;
+            const ANCHO_PX = 820;
+            const cortes = [];
+            const lienzo = await window.html2canvas(hoja, {
+                scale: ESC, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 1100,
+                onclone: (docClon) => {
+                    const el = docClon.getElementById('er-hoja');
+                    if (!el) return;
+                    el.style.width = ANCHO_PX + 'px'; el.style.maxWidth = ANCHO_PX + 'px';
+                    el.style.borderRadius = '0'; el.style.border = '0'; el.style.boxShadow = 'none';
+                    el.querySelectorAll('.no-print, .er-controles').forEach(n => n.remove());
+                    const e1 = el.querySelector('#er-encabezado'), e2 = el.querySelector('#er-pie');
+                    if (e1) e1.classList.remove('hidden');
+                    if (e2) e2.classList.remove('hidden');
+                    const top = el.getBoundingClientRect().top;
+                    el.querySelectorAll('#er-body > tr').forEach(tr => { cortes.push(Math.round((tr.getBoundingClientRect().bottom - top) * ESC)); });
+                }
+            });
+            if (!lienzo || !lienzo.width || !lienzo.height) throw new Error('No se pudo dibujar el informe');
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+            const PW = 210, PH = 297, MX = 12, MT = 12, MB = 15;
+            const anchoMm = PW - 2 * MX;
+            const mmPorPx = anchoMm / lienzo.width;
+            const altoPagPx = Math.floor((PH - MT - MB) / mmPorPx);
+            const posibles = Array.from(new Set(cortes)).filter(c => c > 0 && c < lienzo.height).sort((a, b) => a - b);
+            const trozos = [];
+            let ini = 0;
+            while (ini < lienzo.height - 2) {
+                let fin = Math.min(lienzo.height, ini + altoPagPx);
+                if (fin < lienzo.height) {
+                    const cand = posibles.filter(c => c > ini + altoPagPx * 0.35 && c <= fin);
+                    if (cand.length) fin = cand[cand.length - 1];
+                }
+                trozos.push([ini, fin]);
+                ini = fin;
+            }
+            trozos.forEach(([a, b], i) => {
+                if (i > 0) doc.addPage();
+                const h = b - a;
+                const parte = document.createElement('canvas');
+                parte.width = lienzo.width; parte.height = h;
+                const ctx = parte.getContext('2d');
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, parte.width, parte.height);
+                ctx.drawImage(lienzo, 0, a, lienzo.width, h, 0, 0, lienzo.width, h);
+                doc.addImage(parte.toDataURL('image/jpeg', 0.92), 'JPEG', MX, MT, anchoMm, h * mmPorPx, undefined, 'FAST');
+            });
+
+            const empresa = igNombreEmpresa(cfg);
+            const corta = ((cfg.nombreComercial || cfg.razonSocial || 'Empresa') + '').trim();
+            const prep = erPreparadoPor() || 'CARLOS FLORES FIGUEROA';
+            const nomPeriodo = formatPeriodoLabel(periodo);
+            const total = doc.getNumberOfPages();
+            for (let p = 1; p <= total; p++) {
+                doc.setPage(p);
+                doc.setDrawColor(226, 232, 240); doc.line(MX, PH - 11, PW - MX, PH - 11);
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(100, 116, 139);
+                doc.text(igPdfTxt(`MYPECAR PLUS - Estado de Resultados - ${corta} - ${nomPeriodo}`).slice(0, 110), MX, PH - 7);
+                doc.text(`Página ${p} de ${total}`, PW - MX, PH - 7, { align: 'right' });
+            }
+            doc.setProperties({ title: igPdfTxt(`Estado de Resultados ${nomPeriodo} - ${empresa}`), author: igPdfTxt(prep), creator: 'MYPECAR PLUS' });
+            const slug = igSinTildes(corta).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30) || 'Empresa';
+            return { blob: doc.output('blob'), nombre: `Estado_Resultados_${slug}_${periodo}.pdf`, periodo, cfg };
+        }
+
+        async function erDescargarPdf() {
+            if (igOcupado) return;
+            igOcupado = true;
+            try {
+                showToast('Preparando el PDF...');
+                const x = await erGenerarPdf();
+                if (!x) return;
+                igDescargarBlob(x.blob, x.nombre);
+                showToast('PDF listo: ' + x.nombre);
+            } catch (e) {
+                console.error('Estado de Resultados: PDF', e);
+                showToast('No se pudo armar el PDF (' + (e.message || e) + '). Usa «Imprimir / Guardar como PDF».', 'error');
+            } finally { igOcupado = false; }
+        }
+
+        function erMensajeEnvio(canal, periodo) {
+            const cfg = (diarioImport && diarioImport.config) || {};
+            const empresa = igNombreEmpresa(cfg);
+            const prep = erPreparadoPor() || 'CARLOS FLORES FIGUEROA';
+            const neg = canal === 'whatsapp' ? (t => `*${t}*`) : (t => t);
+            const S = n => (n < 0 ? '-S/ ' : 'S/ ') + Math.abs(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const pc = (v, ve) => ve !== 0 ? ((v / ve) * 100).toFixed(1) + '%' : '—';
+            const mesMov = getMovimientosDelMes(periodo), acuMov = getMovimientosAcumulado(periodo);
+            const L = [];
+            L.push(canal === 'correo' ? 'Buenos días,' : 'Buenos días.', '');
+            L.push(`Te envío el ${erTituloModo().toLowerCase()} de ${empresa}, correspondiente a ${formatPeriodoLabel(periodo)}. El PDF adjunto trae el detalle.`, '');
+            if (modoEstadoResultados === 'naturaleza') {
+                const m = calcularEstadoResultadosNaturaleza(mesMov), a = calcularEstadoResultadosNaturaleza(acuMov);
+                L.push(neg(`Mes de ${formatPeriodoLabel(periodo)}`));
+                L.push(`- Ventas netas: ${S(m.ventasNetas)}`, `- Total gastos: ${S(m.totalGastos)}`, `- Utilidad (pérdida) neta: ${S(m.utilidad)} (${pc(m.utilidad, m.ventasNetas)} de las ventas)`, '');
+                L.push(neg('Acumulado del año'));
+                L.push(`- Ventas netas: ${S(a.ventasNetas)}`, `- Total gastos: ${S(a.totalGastos)}`, `- Utilidad (pérdida) neta: ${S(a.utilidad)} (${pc(a.utilidad, a.ventasNetas)} de las ventas)`);
+            } else {
+                const m = calcularEstadoResultados(mesMov), a = calcularEstadoResultados(acuMov);
+                L.push(neg(`Mes de ${formatPeriodoLabel(periodo)}`));
+                L.push(`- Ventas netas: ${S(m.ventasNetas)}`, `- Utilidad bruta: ${S(m.utilidadBruta)} (${pc(m.utilidadBruta, m.ventasNetas)})`, `- Utilidad operativa: ${S(m.utilidadOperativa)}`, `- Utilidad (pérdida) neta: ${S(m.utilidad)} (${pc(m.utilidad, m.ventasNetas)} de las ventas)`, '');
+                L.push(neg('Acumulado del año'));
+                L.push(`- Ventas netas: ${S(a.ventasNetas)}`, `- Utilidad bruta: ${S(a.utilidadBruta)} (${pc(a.utilidadBruta, a.ventasNetas)})`, `- Utilidad operativa: ${S(a.utilidadOperativa)}`, `- Utilidad (pérdida) neta: ${S(a.utilidad)} (${pc(a.utilidad, a.ventasNetas)} de las ventas)`);
+            }
+            L.push('', canal === 'correo' ? 'Saludos,' : 'Saludos.', prep);
+            return L.join('\n');
+        }
+
+        async function erEnviar(canal) {
+            if (igOcupado) return;
+            if (!diarioImport) { showToast('Importa los Datos del Libro Diario primero.', 'error'); return; }
+            const pedido = await igPedirDestino(canal);
+            if (!pedido) return;
+            const { destino, ventana } = pedido;
+            igOcupado = true;
+            try {
+                showToast('Preparando el PDF...');
+                const x = await erGenerarPdf();
+                if (!x) { if (ventana) ventana.close(); return; }
+                const texto = erMensajeEnvio(canal, x.periodo);
+                const asunto = `Estado de Resultados - ${igNombreEmpresa(x.cfg)} - ${formatPeriodoLabel(x.periodo)}`;
+                let archivo = null;
+                try { archivo = new File([x.blob], x.nombre, { type: 'application/pdf' }); } catch (e) { archivo = null; }
+                if (!destino && archivo && igPuedeCompartirArchivos()) {
+                    try { await navigator.share({ files: [archivo], title: asunto, text: texto }); showToast('Informe compartido.'); return; }
+                    catch (e) { if (e && e.name === 'AbortError') return; }
+                }
+                igDescargarBlob(x.blob, x.nombre);
+                if (canal === 'whatsapp') {
+                    let num = destino.replace(/\D/g, '');
+                    if (num.length === 9) num = '51' + num;
+                    const url = `https://wa.me/${num}?text=${encodeURIComponent(texto + '\n\n(El PDF quedó descargado: adjúntalo en este chat.)')}`;
+                    if (ventana) ventana.location.href = url; else window.open(url, '_blank');
+                } else {
+                    const cuerpo = `${texto}\n\n(El PDF quedó descargado como ${x.nombre}. Adjúntalo en este correo.)`;
+                    window.location.href = `mailto:${encodeURIComponent(destino)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+                }
+                showToast('PDF descargado. Adjúntalo en el mensaje que se abrió.');
+            } catch (e) {
+                console.error('Estado de Resultados: envío', e);
+                if (ventana) { try { ventana.close(); } catch (e2) { /* ya cerrada */ } }
+                showToast('No se pudo preparar el envío (' + (e.message || e) + ').', 'error');
+            } finally { igOcupado = false; }
         }
 
         // ==================================================================
