@@ -2052,9 +2052,11 @@ const MypecarPEVista = (function () {
 
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <h4 class="font-bold text-slate-700 text-sm mb-2">Enviar el texto resumido</h4>
+                <p class="text-xs text-slate-500 mb-2">El correo sale con el resumen escrito. Para adjuntar el reporte, descarga antes el Excel o usa Imprimir / PDF → Guardar como PDF, y adjúntalo en el correo.</p>
                 <div class="flex flex-wrap gap-2">
                     <input type="email" id="rgd-envio-correo" placeholder="Correo del Gerente o Contador" class="flex-1 min-w-[180px] bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
-                    <button onclick="rgdEnviar('correo')" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-700 text-white hover:bg-slate-800"><i class="fa-solid fa-envelope"></i> Correo</button>
+                    <button onclick="rgdEnviar('correo')" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-700 text-white hover:bg-slate-800" title="Abre Gmail en el navegador con el texto listo"><i class="fa-solid fa-envelope"></i> Correo (Gmail)</button>
+                    <button onclick="rgdEnviar('correo-local')" class="px-3 py-2 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 hover:bg-slate-50" title="Abre el programa de correo instalado (Outlook, Correo de Windows)">Usar mi programa de correo</button>
                     <input type="text" id="rgd-envio-celular" placeholder="Celular (WhatsApp)" class="flex-1 min-w-[180px] bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs">
                     <button onclick="rgdEnviar('whatsapp')" class="px-4 py-2 rounded-lg text-xs font-bold bg-green-600 text-white hover:bg-green-700"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
                 </div>
@@ -3981,10 +3983,16 @@ ${RGD_CSS}
         }
         function rgdEnviar(canal) {
             const M = rgdConstruirModelo(); const t = rgdTexto(M);
-            if (canal === 'correo') {
-                const a = (document.getElementById('rgd-envio-correo') || {}).value || '';
-                if (!a.trim()) { showToast('Escribe el correo del destinatario.', 'error'); return; }
-                window.location.href = `mailto:${encodeURIComponent(a.trim())}?subject=${encodeURIComponent('Reporte gerencial del día ' + rgdDMA(M.hoy))}&body=${encodeURIComponent(t.replace(/\*/g, ''))}`;
+            if (canal === 'correo' || canal === 'correo-local') {
+                const a = ((document.getElementById('rgd-envio-correo') || {}).value || '').trim();
+                if (!a) { showToast('Escribe el correo del destinatario.', 'error'); return; }
+                const asunto = 'Reporte gerencial del día ' + rgdDMA(M.hoy);
+                const cuerpo = t.replace(/\*/g, '') + '\n\n(Adjunta el PDF o el Excel del reporte antes de enviar.)';
+                if (canal === 'correo-local') { window.location.href = `mailto:${encodeURIComponent(a)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`; return; }
+                // Gmail en el navegador: no depende de tener un programa de correo instalado en la computadora.
+                const w = window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(a)}&su=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`, '_blank');
+                if (!w) { showToast('El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio e inténtalo otra vez.', 'error'); return; }
+                showToast('Se abrió Gmail con el texto listo. Adjunta el PDF o el Excel y envía.');
             } else {
                 let n = String((document.getElementById('rgd-envio-celular') || {}).value || '').replace(/\D/g, '');
                 if (!n) { showToast('Escribe el celular para WhatsApp.', 'error'); return; }
